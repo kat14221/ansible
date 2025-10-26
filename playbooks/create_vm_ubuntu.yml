@@ -4,13 +4,13 @@
 # Red: 2025:DB8:220::10/64 (SLAAC)
 
 - name: Crear VM Ubuntu PC
-  hosts: vm_hosts
+  hosts: ubuntu-pc
   gather_facts: no
+  connection: local
   tasks:
     - name: Incluir role vmware-ubuntu
       include_role:
         name: vmware-ubuntu
-      when: inventory_hostname == "ubuntu-pc"
 
     - name: Mostrar resumen
       debug:

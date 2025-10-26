@@ -4,13 +4,13 @@
 # Red: 2025:DB8:220::11/64 (SLAAC)
 
 - name: Crear VM Windows PC
-  hosts: vm_hosts
+  hosts: windows-pc
   gather_facts: no
+  connection: local
   tasks:
     - name: Incluir role vmware-windows
       include_role:
         name: vmware-windows
-      when: inventory_hostname == "windows-pc"
 
     - name: Mostrar resumen
       debug:

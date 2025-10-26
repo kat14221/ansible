@@ -4,13 +4,13 @@
 # Red: 2025:DB8:220::1/64 (LAN) + 2025:DB8:101::a1/64 (Uplink)
 
 - name: Crear VM Debian Router
-  hosts: esxi
+  hosts: vm_router
   gather_facts: no
+  connection: local
   tasks:
     - name: Incluir role vmware-router
       include_role:
         name: vmware-router
-      when: inventory_hostname == "esxi-vmware-host"
 
     - name: Mostrar resumen
       debug:
@@ -19,10 +19,10 @@
           - "  VM Debian Router Creada"
           - "================================================"
           - ""
-          - "VM: vm-debian-router"
-          - "IPv6 LAN: 2025:db8:220::1/64"
-          - "IPv6 Uplink: 2025:db8:101::a1/64"
-          - "Port-group: Red Fernandez"
+          - "VM: {{ vm_name }}"
+          - "IPv6 LAN: {{ networks[0].ipv6_address }}/{{ networks[0].ipv6_prefix }}"
+          - "Port-group: {{ networks[0].name }}"
+          - "ISO: {{ cdrom }}"
           - ""
-          - "Próximo paso: Instalar SO manualmente"
+          - "Próximo paso: Instalar SO manualmente en la VM"
           - "================================================"
