@@ -1,0 +1,148 @@
+---
+# Role: ios-basic-config
+# Descripción: Configuración básica de routers y switches Cisco IOS con IPv6
+
+- name: Guardar configuración actual
+  cisco.ios.ios_config:
+    save_when: modified
+  register: saved_config
+
+- name: Configurar hostname
+  cisco.ios.ios_config:
+    lines:
+      - hostname {{ hostname }}
+    save_when: always
+  when: hostname is defined
+
+- name: Configurar banner
+  cisco.ios.ios_config:
+    lines:
+      - banner motd ^C
+      - ================================================
+      -   {{ hostname if hostname is defined else inventory_hostname }}
+      -   Red Académica IPv6 - VMWARE-101001
+      -   Backbone: 2025:DB8:101::/64
+      -   Fecha: {{ ansible_date_time.iso8601 }}
+      - ================================================
+      - ^C
+
+- name: Configurar credenciales de usuario
+  cisco.ios.ios_config:
+    lines:
+      - username cisco privilege 15 secret cisco123
+      - username ansible privilege 15 secret ansible123
+    parents: configuration
+
+- name: Configurar línea de consola y VTY
+  cisco.ios.ios_config:
+    lines:
+      - login local
+      - transport input ssh
+    parents: 
+      - line console 0
+      - line vty 0 4
+
+- name: Habilitar SSH
+  cisco.ios.ios_config:
+    lines:
+      - ip domain-name vmware-101001.example.local
+      - crypto key generate rsa modulus 2048
+    parents: configuration
+  ignore_errors: yes
+
+- name: Habilitar IPv6 unicast routing
+  cisco.ios.ios_config:
+    lines:
+      - ipv6 unicast-routing
+      - ipv6 cef
+    parents: configuration
+
+- name: Configurar interfaces de router
+  cisco.ios.ios_config:
+    lines:
+      - description "{{ item.description }}"
+      - ipv6 address {{ item.ipv6_address }}/{{ item.ipv6_prefix }}
+      - ipv6 enable
+      - no shutdown
+    parents: interface {{ item.name }}
+  loop: "{{ interfaces | default([]) }}"
+  when: interfaces is defined
+
+- name: Configurar SVI de gestión en switch
+  cisco.ios.ios_config:
+    lines:
+      - ipv6 address {{ vlan_interfaces[0].ipv6_address }}/{{ vlan_interfaces[0].ipv6_prefix }}
+      - ipv6 enable
+      - no shutdown
+    parents: interface vlan {{ vlan_interfaces[0].id }}
+  when: vlan_interfaces is defined and vlan_interfaces | length > 0
+
+- name: Crear VLAN en switch
+  cisco.ios.ios_config:
+    lines:
+      - name "{{ item.name }}"
+    parents: vlan {{ item.id }}
+  loop: "{{ vlan_interfaces | default([]) }}"
+  when: vlan_interfaces is defined
+
+- name: Configurar puertos de acceso
+  cisco.ios.ios_config:
+    lines:
+      - description "{{ item.description }}"
+      - switchport mode access
+      - switchport access vlan {{ item.vlan }}
+      - no shutdown
+    parents: interface {{ item.port }}
+  loop: "{{ access_ports | default([]) }}"
+  when: access_ports is defined
+
+- name: Configurar puertos troncales
+  cisco.ios.ios_config:
+    lines:
+      - description "{{ item.description }}"
+      - switchport mode trunk
+      - switchport trunk allowed vlan {{ item.vlans | join(',') }}
+      - no shutdown
+    parents: interface {{ item.port }}
+  loop: "{{ trunk_ports | default([]) }}"
+  when: trunk_ports is defined
+
+- name: Guardar configuración final
+  cisco.ios.ios_config:
+    save_when: always
+
+- name: Obtener configuración running
+  cisco.ios.ios_command:
+    commands: show running-config
+  register: running_config
+
+- name: Guardar running-config
+  copy:
+    content: "{{ running_config.stdout[0] }}"
+    dest: "evidence/configs/{{ inventory_hostname }}_running_config.txt"
+  delegate_to: localhost
+
+- name: Obtener información de interfaces IPv6
+  cisco.ios.ios_command:
+    commands:
+      - show ipv6 interface brief
+      - show ipv6 route
+  register: ipv6_info
+
+- name: Guardar información IPv6
+  copy:
+    content: |
+      === IPv6 Interfaces ===
+      {{ ipv6_info.stdout[0] }}
+
+      === IPv6 Routes ===
+      {{ ipv6_info.stdout[1] }}
+    dest: "evidence/configs/{{ inventory_hostname }}_ipv6_info.txt"
+  delegate_to: localhost
+
+- name: Mostrar resumen
+  debug:
+    msg:
+      - "Configuración aplicada a {{ hostname if hostname is defined else inventory_hostname }}"
+      - "IPv6 unicast routing: habilitado"
+      - "Configuración guardada en evidence/configs/"

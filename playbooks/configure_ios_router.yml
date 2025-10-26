@@ -1,0 +1,30 @@
+﻿---
+# Playbook: Configurar Router IOS Core
+# Descripción: Config básica de router Cisco IOS con IPv6
+# Hostname: CORE-ROUTER-101
+# IPv6: 2025:db8:101::1/64
+
+- name: Configurar Router IOS Core
+  hosts: ios_routers
+  gather_facts: yes
+  connection: network_cli
+  tasks:
+    - name: Incluir role ios-basic-config
+      include_role:
+        name: ios-basic-config
+
+    - name: Mostrar resumen
+      debug:
+        msg:
+          - "================================================"
+          - "  Router IOS Configurado"
+          - "================================================"
+          - ""
+          - "Hostname: {{ hostname }}"
+          - "IPv6 unicast-routing: Habilitado"
+          - "Interfaces configuradas: {{ interfaces | length }}"
+          - "SSH: Habilitado"
+          - ""
+          - "Configuración guardada en:"
+          - "  evidence/configs/{{ inventory_hostname }}_running_config.txt"
+          - "================================================"

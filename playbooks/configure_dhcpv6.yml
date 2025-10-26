@@ -1,0 +1,35 @@
+﻿---
+# Playbook: Configurar DHCPv6 con DNSmasq
+# Descripción: DHCPv6 server + DNS para autoconfiguración
+# Rango: 2025:DB8:220::10-::FF
+
+- name: Configurar DHCPv6 en Debian Router
+  hosts: vm_router
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Incluir tareas específicas de DHCPv6
+      include_role:
+        name: debian-ipv6-router
+        tasks_from: main
+
+    - name: Verificar DNSmasq
+      command: systemctl status dnsmasq --no-pager
+      register: dnsmasq_check
+      failed_when: false
+
+    - name: Mostrar resumen
+      debug:
+        msg:
+          - "================================================"
+          - "  DHCPv6 Configurado con DNSmasq"
+          - "================================================"
+          - ""
+          - "Servicio: {{ 'Activo' if dnsmasq_check.rc == 0 else 'Inactivo' }}"
+          - "Rango DHCPv6: 2025:db8:220::10 - ::ff"
+          - "DNS Server: 2025:db8:220::1"
+          - "Domain: vmware-101001.example.local"
+          - ""
+          - "Configuración guardada en:"
+          - "  evidence/configs/dnsmasq_ipv6.conf"
+          - "================================================"

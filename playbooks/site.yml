@@ -1,0 +1,106 @@
+---
+# Playbook Maestro - Configuración Completa de VMWARE-101001
+# Red Académica IPv6 con Ansible
+# Backbone: 2025:DB8:101::/64
+# LAN: 2025:DB8:220::/64
+
+- name: Configurar equipos IOS (routers y switches)
+  hosts: all_ios
+  gather_facts: yes
+  connection: network_cli
+  roles:
+    - ios-basic-config
+  tags:
+    - ios
+    - ios_config
+
+- name: Crear VMs en ESXi
+  hosts: esxi
+  gather_facts: no
+  tasks:
+    - name: Crear VM Router Debian
+      include_role:
+        name: vmware-router
+      when: inventory_hostname == "esxi-vmware-host"
+      tags:
+        - vm_creation
+
+- name: Crear VMs de Usuario
+  hosts: vm_hosts
+  gather_facts: no
+  tasks:
+    - name: Crear VM Ubuntu PC
+      include_role:
+        name: vmware-ubuntu
+      when: inventory_hostname == "ubuntu-pc"
+      tags:
+        - vm_creation
+        - vm_ubuntu
+
+    - name: Crear VM Windows PC
+      include_role:
+        name: vmware-windows
+      when: inventory_hostname == "windows-pc"
+      tags:
+        - vm_creation
+        - vm_windows
+
+- name: Configurar Router Debian
+  hosts: vm_router
+  become: yes
+  gather_facts: yes
+  roles:
+    - debian-ipv6-router
+    - debian-services
+  tags:
+    - debian
+    - router
+    - services
+
+- name: Tests de Conectividad
+  hosts: vm_router
+  become: yes
+  roles:
+    - connectivity-tests
+  tags:
+    - tests
+    - connectivity
+
+- name: Captura de Tráfico
+  hosts: vm_router
+  become: yes
+  roles:
+    - traffic-capture
+  tags:
+    - capture
+    - traffic
+
+- name: Resumen Final
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Mostrar resumen de ejecución
+      debug:
+        msg:
+          - "================================================"
+          - "  Configuración Completa - VMWARE-101001"
+          - "================================================"
+          - ""
+          - "✅ Equipos IOS configurados"
+          - "✅ VMs creadas en ESXi"
+          - "✅ Router Debian configurado con IPv6"
+          - "✅ Servicios HTTP desplegados"
+          - "✅ Tests de conectividad ejecutados"
+          - "✅ Captura de tráfico completada"
+          - ""
+          - "📁 Evidencias guardadas en: evidence/"
+          - "   - Configs: evidence/configs/"
+          - "   - Tests: evidence/pings/"
+          - "   - Capturas: evidence/pcaps/"
+          - "   - Servicios: evidence/services/"
+          - "   - Logs: evidence/logs/"
+          - ""
+          - "🌐 Acceso HTTP: http://[2025:db8:220::1]"
+          - "🌐 Backbone: http://[2025:db8:101::a1]"
+          - ""
+          - "================================================"

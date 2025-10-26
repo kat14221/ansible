@@ -1,0 +1,27 @@
+# Configuración dnsmasq para DHCPv6 y DNS
+# Router: {{ inventory_hostname }} - {{ ansible_host }}
+
+# Habilitar DHCPv6
+enable-ra
+dhcp-range=interface:{{ networks[0].name if networks[0].name is defined else 'ens160' }},2025:db8:220::10,2025:db8:220::ff,64
+dhcp-option=option6:dns-server,[2025:db8:220::1]
+dhcp-option=option6:domain-search,vmware-101001.example.local
+
+# Configuración DNS
+bind-interfaces
+cache-size=1000
+local=/vmware-101001.example.local/
+domain=vmware-101001.example.local
+expand-hosts
+
+# Registros DNS
+address=/router.vmware-101001.example.local/2025:db8:220::1
+address=/debian-router.vmware-101001.example.local/2025:db8:220::1
+
+# Logging
+log-queries
+log-facility=/var/log/dnsmasq.log
+
+# Servidor DNS upstream (opcional)
+#server=2001:4860:4860::8888
+#server=2001:4860:4860::8844

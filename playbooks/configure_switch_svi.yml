@@ -1,0 +1,31 @@
+﻿---
+# Playbook: Configurar Switch IOS con SVIs
+# Descripción: Config de switch acceso con VLANs y SVIs
+# Hostname: SW-ACCESS-220
+# VLAN 220: 2025:db8:220::2/64
+
+- name: Configurar Switch IOS con SVIs
+  hosts: ios_switches
+  gather_facts: yes
+  connection: network_cli
+  tasks:
+    - name: Incluir role ios-basic-config
+      include_role:
+        name: ios-basic-config
+
+    - name: Mostrar resumen
+      debug:
+        msg:
+          - "================================================"
+          - "  Switch IOS Configurado"
+          - "================================================"
+          - ""
+          - "Hostname: {{ hostname }}"
+          - "VLANs: {{ vlan_interfaces | map(attribute='id') | list }}"
+          - "Access ports: {{ access_ports | length }}"
+          - "Trunk ports: {{ trunk_ports | length }}"
+          - "SVI Management: {{ management_ipv6 }}"
+          - ""
+          - "Configuración guardada en:"
+          - "  evidence/configs/{{ inventory_hostname }}_running_config.txt"
+          - "================================================"

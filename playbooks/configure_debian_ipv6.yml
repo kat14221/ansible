@@ -1,0 +1,30 @@
+﻿---
+# Playbook: Configurar Debian como Router IPv6
+# Descripción: IPv6 forwarding, RADVD, routing
+# Red LAN: 2025:DB8:220::/64
+
+- name: Configurar Debian como Router IPv6
+  hosts: vm_router
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Incluir role debian-ipv6-router
+      include_role:
+        name: debian-ipv6-router
+
+    - name: Mostrar resumen
+      debug:
+        msg:
+          - "================================================"
+          - "  Debian Router IPv6 Configurado"
+          - "================================================"
+          - ""
+          - "IPv6 Forwarding: Habilitado"
+          - "RADVD: Activo"
+          - "LAN: 2025:db8:220::/64"
+          - "Gateway: 2025:db8:220::1"
+          - "Uplink: 2025:db8:101::a1"
+          - ""
+          - "Configuraciones guardadas en:"
+          - "  evidence/configs/radvd.conf"
+          - "================================================"

@@ -1,0 +1,97 @@
+---
+# Role: debian-ipv6-router
+# Descripción: Configurar Debian como router IPv6 con SLAAC/DHCPv6
+
+- name: Instalar paquetes necesarios para IPv6 routing
+  apt:
+    name:
+      - radvd
+      - dnsmasq
+      - tcpdump
+      - iptables
+      - net-tools
+    state: present
+    update_cache: yes
+
+- name: Habilitar IPv6 forwarding
+  sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: '1'
+    state: present
+    sysctl_set: yes
+  register: ipv6_forwarding
+
+- name: Habilitar IPv6 forwarding por interfaz
+  sysctl:
+    name: "net.ipv6.conf.{{ item }}.forwarding"
+    value: '1'
+    state: present
+    sysctl_set: yes
+  loop:
+    - all
+    - default
+    - ens160
+    - ens192
+
+- name: Deshabilitar autoconfiguración DHCPv6
+  lineinfile:
+    path: /etc/sysctl.conf
+    regexp: "^#?net\\.ipv6\\.conf\\.{{ item }}\\.accept_ra"
+    line: "net.ipv6.conf.{{ item }}.accept_ra = 0"
+  loop:
+    - all
+    - ens160
+    - ens192
+
+- name: Crear configuración de radvd
+  template:
+    src: radvd.conf.j2
+    dest: /etc/radvd.conf
+  notify: restart radvd
+
+- name: Configurar dnsmasq para DHCPv6
+  template:
+    src: dnsmasq.conf.j2
+    dest: /etc/dnsmasq.d/ipv6.conf
+  notify: restart dnsmasq
+
+- name: Habilitar y iniciar radvd
+  systemd:
+    name: radvd
+    enabled: yes
+    state: started
+
+- name: Habilitar y iniciar dnsmasq
+  systemd:
+    name: dnsmasq
+    enabled: yes
+    state: started
+
+- name: Verificar estado de radvd
+  command: systemctl status radvd --no-pager
+  register: radvd_status
+  failed_when: false
+
+- name: Verificar estado de dnsmasq
+  command: systemctl status dnsmasq --no-pager
+  register: dnsmasq_status
+  failed_when: false
+
+- name: Guardar configuración de radvd
+  copy:
+    src: /etc/radvd.conf
+    dest: "evidence/configs/radvd.conf"
+  delegate_to: localhost
+
+- name: Guardar configuración de dnsmasq
+  copy:
+    src: /etc/dnsmasq.d/ipv6.conf
+    dest: "evidence/configs/dnsmasq_ipv6.conf"
+  delegate_to: localhost
+
+- name: Mostrar estado de servicios
+  debug:
+    msg:
+      - "radvd: {{ 'active' if radvd_status.rc == 0 else 'inactive' }}"
+      - "dnsmasq: {{ 'active' if dnsmasq_status.rc == 0 else 'inactive' }}"
+      - "IPv6 forwarding: {{ 'enabled' if ipv6_forwarding.value == '1' else 'disabled' }}"

@@ -1,0 +1,249 @@
+---
+# Role: debian-services
+# Descripción: Desplegar servicios de aplicación en el router Debian
+
+- name: Instalar servidores web y FTP
+  apt:
+    name:
+      - apache2
+      - vsftpd
+    state: present
+    update_cache: yes
+
+- name: Detener Apache para configuración
+  systemd:
+    name: apache2
+    state: stopped
+
+- name: Crear página de prueba
+  copy:
+    content: |
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <title>VMWARE-101001 - IPv6 Test Page</title>
+          <style>
+              body { font-family: Arial, sans-serif; margin: 40px; background: #f0f0f0; }
+              .container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+              h1 { color: #0066cc; }
+              .info { background: #e8f4fd; padding: 15px; border-left: 4px solid #0066cc; margin: 20px 0; }
+              .success { background: #d4edda; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0; }
+              code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <h1>🌐 Red Académica IPv6 - VMWARE-101001</h1>
+              
+              <div class="success">
+                  <h2>✅ Servidor HTTP Funcionando con IPv6</h2>
+                  <p>Esta página se sirve desde el router Debian configurado con Ansible.</p>
+              </div>
+              
+              <div class="info">
+                  <h3>📋 Información del Sistema</h3>
+                  <ul>
+                      <li><strong>Host:</strong> {{ inventory_hostname }}</li>
+                      <li><strong>Dirección IPv6 LAN:</strong> <code>2025:db8:220::1/64</code></li>
+                      <li><strong>Dirección IPv6 Uplink:</strong> <code>2025:db8:101::a1/64</code></li>
+                      <li><strong>Backbone:</strong> <code>2025:db8:101::/64</code></li>
+                      <li><strong>Subred LAN:</strong> <code>2025:db8:220::/64</code></li>
+                      <li><strong>Configuración:</strong> SLAAC/DHCPv6 con RADVD</li>
+                  </ul>
+              </div>
+              
+              <div class="info">
+                  <h3>🔧 Servicios Activos</h3>
+                  <ul>
+                      <li>Apache HTTP Server (IPv6)</li>
+                      <li>RADVD (Router Advertisement)</li>
+                      <li>DNSmasq (DHCPv6 + DNS)</li>
+                      <li>IP Forwarding IPv6</li>
+                  </ul>
+              </div>
+              
+              <div class="info">
+                  <h3>🌐 Conectividad</h3>
+                  <p>Acceso desde cualquier host en la LAN 2025:db8:220::/64:</p>
+                  <code>http://[2025:db8:220::1]</code>
+                  <p>Acceso desde el backbone:</p>
+                  <code>http://[2025:db8:101::a1]</code>
+              </div>
+              
+              <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666;">
+                  <p><small>Configurado automáticamente con Ansible - {{ ansible_date_time.iso8601 }}</small></p>
+              </div>
+          </div>
+      </body>
+      </html>
+    dest: /var/www/html/index.html
+
+- name: Configurar Apache para escuchar en IPv6
+  lineinfile:
+    path: /etc/apache2/ports.conf
+    line: "Listen [::]:80"
+    state: present
+
+- name: Habilitar módulos necesarios de Apache
+  command: a2enmod ssl rewrite
+  ignore_errors: yes
+
+- name: Iniciar y habilitar Apache
+  systemd:
+    name: apache2
+    state: started
+    enabled: yes
+
+- name: Verificar estado de Apache
+  command: systemctl status apache2 --no-pager
+  register: apache_status
+  failed_when: false
+
+- name: Verificar que Apache escucha en IPv6
+  command: netstat -tlnp | grep :80
+  register: apache_listening
+  failed_when: false
+
+- name: Probar el servidor HTTP desde localhost
+  uri:
+    url: "http://{{ ansible_host }}"
+    method: GET
+  register: http_test
+  ignore_errors: yes
+
+- name: Guardar información del servicio HTTP
+  copy:
+    content: |
+      === Servicio HTTP - Apache ===
+      Fecha: {{ ansible_date_time.iso8601 }}
+      
+      Estado del servicio: {{ 'running' if apache_status.rc == 0 else 'failed' }}
+      
+      Puertos en escucha:
+      {{ apache_listening.stdout | default('No se pudo obtener información') }}
+      
+      Prueba HTTP:
+      Status: {{ 'OK' if http_test.status | default(0) == 200 else 'FAIL' }}
+      URL: http://{{ ansible_host }}
+    dest: "evidence/services/{{ inventory_hostname }}_http_service.txt"
+  delegate_to: localhost
+
+- name: Configurar vsftpd para IPv6
+  copy:
+    content: |
+      # Configuración vsftpd para IPv6
+      listen=NO
+      listen_ipv6=YES
+      anonymous_enable=NO
+      local_enable=YES
+      write_enable=YES
+      local_umask=022
+      dirmessage_enable=YES
+      use_localtime=YES
+      xferlog_enable=YES
+      connect_from_port_20=YES
+      secure_chroot_dir=/var/run/vsftpd/empty
+      pam_service_name=vsftpd
+      ssl_enable=NO
+      pasv_enable=YES
+      pasv_min_port=10000
+      pasv_max_port=10100
+      allow_writeable_chroot=YES
+      ftpd_banner=VMWARE-101001 FTP Server IPv6
+    dest: /etc/vsftpd.conf
+    backup: yes
+
+- name: Crear usuario FTP de prueba
+  user:
+    name: ftpuser
+    password: "{{ 'ftppass123' | password_hash('sha512') }}"
+    shell: /bin/bash
+    home: /home/ftpuser
+    state: present
+
+- name: Crear directorio FTP público
+  file:
+    path: /home/ftpuser/public
+    state: directory
+    owner: ftpuser
+    group: ftpuser
+    mode: '0755'
+
+- name: Crear archivo de prueba FTP
+  copy:
+    content: |
+      ================================================
+      VMWARE-101001 - Red Académica IPv6
+      Servidor FTP funcionando correctamente
+      ================================================
+      
+      Información del Sistema:
+      - IPv6 LAN: 2025:db8:220::1/64
+      - IPv6 Uplink: 2025:db8:101::a1/64
+      - Backbone: 2025:db8:101::/64
+      
+      Acceso FTP:
+      - Usuario: ftpuser
+      - Password: ftppass123
+      - Desde LAN: ftp://[2025:db8:220::1]
+      - Desde backbone: ftp://[2025:db8:101::a1]
+      
+      Configurado con Ansible - {{ ansible_date_time.iso8601 }}
+    dest: /home/ftpuser/public/README.txt
+    owner: ftpuser
+    group: ftpuser
+    mode: '0644'
+
+- name: Iniciar y habilitar vsftpd
+  systemd:
+    name: vsftpd
+    state: started
+    enabled: yes
+
+- name: Verificar estado de vsftpd
+  command: systemctl status vsftpd --no-pager
+  register: vsftpd_status
+  failed_when: false
+
+- name: Verificar que vsftpd escucha en IPv6
+  command: netstat -tlnp | grep :21
+  register: vsftpd_listening
+  failed_when: false
+
+- name: Guardar información del servicio FTP
+  copy:
+    content: |
+      === Servicio FTP - vsftpd ===
+      Fecha: {{ ansible_date_time.iso8601 }}
+      
+      Estado del servicio: {{ 'running' if vsftpd_status.rc == 0 else 'failed' }}
+      
+      Puertos en escucha:
+      {{ vsftpd_listening.stdout | default('No se pudo obtener información') }}
+      
+      Configuración:
+      - Usuario: ftpuser
+      - Password: ftppass123
+      - Directorio: /home/ftpuser/public/
+      - IPv6: Habilitado
+      - Modo Pasivo: Puertos 10000-10100
+      
+      Acceso:
+      - Desde LAN: ftp://[2025:db8:220::1]
+      - Desde backbone: ftp://[2025:db8:101::a1]
+    dest: "evidence/services/{{ inventory_hostname }}_ftp_service.txt"
+  delegate_to: localhost
+
+- name: Mostrar resumen del servicio
+  debug:
+    msg:
+      - "=== Servicios Desplegados ==="
+      - "HTTP Estado: {{ 'Running' if apache_status.rc == 0 else 'Failed' }}"
+      - "FTP Estado: {{ 'Running' if vsftpd_status.rc == 0 else 'Failed' }}"
+      - "HTTP Acceso: http://{{ ansible_host }}"
+      - "HTTP Desde LAN: http://[2025:db8:220::1]"
+      - "HTTP Desde backbone: http://[2025:db8:101::a1]"
+      - "FTP Acceso: ftp://{{ ansible_host }}"
+      - "FTP Desde LAN: ftp://[2025:db8:220::1]"
+      - "FTP Desde backbone: ftp://[2025:db8:101::a1]"
+      - "FTP Usuario: ftpuser / ftppass123"

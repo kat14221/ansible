@@ -1,0 +1,29 @@
+﻿---
+# Playbook: Crear VM Windows PC en ESXi
+# Descripción: Aprovisiona VM Windows como PC de usuario
+# Red: 2025:DB8:220::11/64 (SLAAC)
+
+- name: Crear VM Windows PC
+  hosts: vm_hosts
+  gather_facts: no
+  tasks:
+    - name: Incluir role vmware-windows
+      include_role:
+        name: vmware-windows
+      when: inventory_hostname == "windows-pc"
+
+    - name: Mostrar resumen
+      debug:
+        msg:
+          - "================================================"
+          - "  VM Windows PC Creada"
+          - "================================================"
+          - ""
+          - "VM: vm-windows-pc"
+          - "IPv6: 2025:db8:220::11/64 (SLAAC)"
+          - "Gateway: 2025:db8:220::1"
+          - "Port-group: Red Fernandez"
+          - ""
+          - "Próximo paso: Instalar SO manualmente"
+          - "================================================"
+      when: inventory_hostname == "windows-pc"

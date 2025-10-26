@@ -1,0 +1,34 @@
+﻿---
+# Playbook: Tests de Conectividad IPv6
+# Descripción: Pings entre todos los nodos
+# Evidencias: evidence/pings/
+
+- name: Tests de Conectividad IPv6
+  hosts: vm_router
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Incluir role connectivity-tests
+      include_role:
+        name: connectivity-tests
+
+    - name: Mostrar resumen de tests
+      debug:
+        msg:
+          - "================================================"
+          - "  Tests de Conectividad Completados"
+          - "================================================"
+          - ""
+          - "Tests ejecutados:"
+          - "  - Router  Backbone"
+          - "  - Router  Ubuntu PC"
+          - "  - Router  Windows PC"
+          - "  - Ubuntu  Router"
+          - "  - Ubuntu  Windows"
+          - "  - Ubuntu  Backbone"
+          - ""
+          - "Resultados guardados en:"
+          - "  evidence/pings/debian-router_ping_results.txt"
+          - "  evidence/pings/ubuntu_pc_ping_results.txt"
+          - "  evidence/configs/debian-router_network_info.txt"
+          - "================================================"

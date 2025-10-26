@@ -1,0 +1,85 @@
+---
+# Role: traffic-capture
+# Descripción: Capturar tráfico IPv6 con tcpdump y configurar SPAN en switch
+
+- name: Instalar tcpdump si no está instalado
+  apt:
+    name: tcpdump
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Detener capturas anteriores si existen
+  command: pkill -f "tcpdump.*eth0.pcap"
+  ignore_errors: yes
+
+- name: Iniciar captura de tráfico IPv6 en interfaz LAN
+  shell: |
+    nohup tcpdump -i ens160 -w /tmp/capture_{{ ansible_date_time.epoch }}.pcap ip6 &
+    echo $! > /tmp/tcpdump.pid
+  async: 30
+  poll: 5
+  register: capture_start
+
+- name: Esperar un momento para capturar tráfico
+  pause:
+    seconds: 10
+
+- name: Generar tráfico de prueba
+  command: ping6 -c 5 {{ item }}
+  loop:
+    - "2025:db8:220::10"
+    - "2025:db8:101::1"
+  ignore_errors: yes
+
+- name: Esperar para capturar más tráfico
+  pause:
+    seconds: 10
+
+- name: Detener captura de tráfico
+  command: pkill -F /tmp/tcpdump.pid
+  ignore_errors: yes
+
+- name: Localizar archivos PCAP
+  find:
+    paths: /tmp
+    patterns: "capture_*.pcap"
+    age: -5m
+  register: pcap_files
+
+- name: Copiar PCAP más reciente
+  fetch:
+    src: "{{ pcap_files.files | sort(attribute='mtime') | last.path }}"
+    dest: "evidence/pcaps/{{ inventory_hostname }}_capture_{{ ansible_date_time.epoch }}.pcap"
+    flat: yes
+
+- name: Convertir PCAP a texto legible (resumen)
+  command: tcpdump -r {{ pcap_files.files | sort(attribute='mtime') | last.path }} -n -c 50
+  register: pcap_summary
+  ignore_errors: yes
+
+- name: Guardar resumen de captura
+  copy:
+    content: |
+      === Resumen de Captura de Tráfico IPv6 ===
+      Fecha: {{ ansible_date_time.iso8601 }}
+      Archivo: {{ pcap_files.files | sort(attribute='mtime') | last.path }}
+      
+      {{ pcap_summary.stdout | default('No se pudo leer el archivo PCAP') }}
+    dest: "evidence/pcaps/{{ inventory_hostname }}_capture_summary.txt"
+  delegate_to: localhost
+
+- name: Configurar SPAN en switch de acceso (simulado)
+  cisco.ios.ios_config:
+    lines:
+      - monitor session 1 source interface GigabitEthernet1/0/2 rx
+      - monitor session 1 destination interface GigabitEthernet1/0/3
+  when: inventory_hostname == "access-switch"
+  ignore_errors: yes
+
+- name: Mostrar resumen de captura
+  debug:
+    msg:
+      - "=== Captura de Tráfico Completada ==="
+      - "Archivo PCAP: evidence/pcaps/{{ inventory_hostname }}_capture_{{ ansible_date_time.epoch }}.pcap"
+      - "Resumen: evidence/pcaps/{{ inventory_hostname }}_capture_summary.txt"
+      - "Análizar con: wireshark evidence/pcaps/{{ inventory_hostname }}_capture_{{ ansible_date_time.epoch }}.pcap"

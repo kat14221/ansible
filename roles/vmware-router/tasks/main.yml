@@ -1,0 +1,55 @@
+---
+# Role: vmware-router
+# Descripción: Crear y aprovisionar VM Debian Router en ESXi con configuración IPv6
+
+- name: Verificar conectividad con ESXi
+  community.vmware.vmware_host_facts:
+    hostname: "{{ hostvars['esxi-vmware-host']['ansible_host'] }}"
+    username: "{{ hostvars['esxi-vmware-host']['ansible_user'] }}"
+    password: "{{ hostvars['esxi-vmware-host']['ansible_password'] }}"
+  register: esxi_facts
+  delegate_to: localhost
+
+- name: Crear VM Debian Router desde ISO
+  community.vmware.vmware_guest:
+    hostname: "{{ hostvars['esxi-vmware-host']['ansible_host'] }}"
+    username: "{{ hostvars['esxi-vmware-host']['ansible_user'] }}"
+    password: "{{ hostvars['esxi-vmware-host']['ansible_password'] }}"
+    datacenter: "{{ hostvars['esxi-vmware-host']['datacenter'] }}"
+    name: "{{ vm_name }}"
+    state: present
+    folder: "{{ vm_folder }}"
+    datastore: "{{ hostvars['esxi-vmware-host']['datastore'] }}"
+    guest_id: "{{ guest_id | default('debian11_64Guest') }}"
+    hardware:
+      memory_mb: 1024
+      num_cpus: 1
+      scsi: paravirtual
+    disk:
+      - size_gb: 20
+        type: thin
+    cdrom:
+      type: iso
+      iso_path: "{{ cdrom }}"
+      controller_number: 0
+      unit_number: 0
+    networks:
+      - name: "{{ networks[0].name }}"
+    force: yes
+  delegate_to: localhost
+  register: vm_facts
+
+- name: Encender VM Router para instalación
+  community.vmware.vmware_guest:
+    name: "{{ vm_name }}"
+    state: poweredon
+  delegate_to: localhost
+
+- name: Resumen de creación
+  debug:
+    msg:
+      - "VM {{ vm_name }} creada exitosamente"
+      - "Estado: Encendida para instalación desde ISO"
+      - "ISO: {{ cdrom }}"
+      - "NOTA: La instalación del SO debe completarse manualmente"
+      - "Después de instalar, configurar IPv6: {{ networks[0].ipv6_address }}/{{ networks[0].ipv6_prefix }}"

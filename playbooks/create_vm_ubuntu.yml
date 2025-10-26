@@ -1,0 +1,29 @@
+﻿---
+# Playbook: Crear VM Ubuntu PC en ESXi
+# Descripción: Aprovisiona VM Ubuntu como PC de usuario
+# Red: 2025:DB8:220::10/64 (SLAAC)
+
+- name: Crear VM Ubuntu PC
+  hosts: vm_hosts
+  gather_facts: no
+  tasks:
+    - name: Incluir role vmware-ubuntu
+      include_role:
+        name: vmware-ubuntu
+      when: inventory_hostname == "ubuntu-pc"
+
+    - name: Mostrar resumen
+      debug:
+        msg:
+          - "================================================"
+          - "  VM Ubuntu PC Creada"
+          - "================================================"
+          - ""
+          - "VM: vm-ubuntu-pc"
+          - "IPv6: 2025:db8:220::10/64 (SLAAC)"
+          - "Gateway: 2025:db8:220::1"
+          - "Port-group: Red Fernandez"
+          - ""
+          - "Próximo paso: Instalar SO manualmente"
+          - "================================================"
+      when: inventory_hostname == "ubuntu-pc"

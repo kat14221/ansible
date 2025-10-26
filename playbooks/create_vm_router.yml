@@ -1,0 +1,28 @@
+﻿---
+# Playbook: Crear VM Debian Router en ESXi
+# Descripción: Aprovisiona VM Debian como router IPv6
+# Red: 2025:DB8:220::1/64 (LAN) + 2025:DB8:101::a1/64 (Uplink)
+
+- name: Crear VM Debian Router
+  hosts: esxi
+  gather_facts: no
+  tasks:
+    - name: Incluir role vmware-router
+      include_role:
+        name: vmware-router
+      when: inventory_hostname == "esxi-vmware-host"
+
+    - name: Mostrar resumen
+      debug:
+        msg:
+          - "================================================"
+          - "  VM Debian Router Creada"
+          - "================================================"
+          - ""
+          - "VM: vm-debian-router"
+          - "IPv6 LAN: 2025:db8:220::1/64"
+          - "IPv6 Uplink: 2025:db8:101::a1/64"
+          - "Port-group: Red Fernandez"
+          - ""
+          - "Próximo paso: Instalar SO manualmente"
+          - "================================================"

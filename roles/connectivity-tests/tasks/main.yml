@@ -1,0 +1,110 @@
+---
+# Role: connectivity-tests
+# Descripción: Pruebas de conectividad IPv6 entre todos los nodos
+
+- name: Ping desde router a backbone
+  command: ping6 -c 4 2025:db8:101::1
+  register: ping_router_to_backbone
+  ignore_errors: yes
+
+- name: Ping desde router a PC Ubuntu
+  command: ping6 -c 4 2025:db8:220::10
+  register: ping_router_to_ubuntu
+  ignore_errors: yes
+
+- name: Ping desde router a PC Windows
+  command: ping6 -c 4 2025:db8:220::11
+  register: ping_router_to_windows
+  ignore_errors: yes
+
+- name: Ping desde Ubuntu a router
+  command: ping6 -c 4 2025:db8:220::1
+  register: ping_ubuntu_to_router
+  ignore_errors: yes
+  delegate_to: ubuntu-pc
+
+- name: Ping desde Ubuntu a Windows
+  command: ping6 -c 4 2025:db8:220::11
+  register: ping_ubuntu_to_windows
+  ignore_errors: yes
+  delegate_to: ubuntu-pc
+
+- name: Ping desde Ubuntu a backbone
+  command: ping6 -c 4 2025:db8:101::1
+  register: ping_ubuntu_to_backbone
+  ignore_errors: yes
+  delegate_to: ubuntu-pc
+
+- name: Guardar resultados de ping desde router
+  copy:
+    content: |
+      === Pruebas de Conectividad desde Router Debian ===
+      Fecha: {{ ansible_date_time.iso8601 }}
+      
+      --- Ping a Backbone (2025:db8:101::1) ---
+      Exit Code: {{ ping_router_to_backbone.rc }}
+      {{ ping_router_to_backbone.stdout | default('Error: ' + ping_router_to_backbone.stderr) }}
+      
+      --- Ping a Ubuntu PC (2025:db8:220::10) ---
+      Exit Code: {{ ping_router_to_ubuntu.rc }}
+      {{ ping_router_to_ubuntu.stdout | default('Error: ' + ping_router_to_ubuntu.stderr) }}
+      
+      --- Ping a Windows PC (2025:db8:220::11) ---
+      Exit Code: {{ ping_router_to_windows.rc }}
+      {{ ping_router_to_windows.stdout | default('Error: ' + ping_router_to_windows.stderr) }}
+    dest: "evidence/pings/{{ inventory_hostname }}_ping_results.txt"
+  delegate_to: localhost
+
+- name: Guardar resultados de ping desde Ubuntu
+  copy:
+    content: |
+      === Pruebas de Conectividad desde Ubuntu PC ===
+      Fecha: {{ ansible_date_time.iso8601 }}
+      
+      --- Ping a Router (2025:db8:220::1) ---
+      Exit Code: {{ ping_ubuntu_to_router.rc }}
+      {{ ping_ubuntu_to_router.stdout | default('Error: ' + ping_ubuntu_to_router.stderr) }}
+      
+      --- Ping a Windows PC (2025:db8:220::11) ---
+      Exit Code: {{ ping_ubuntu_to_windows.rc }}
+      {{ ping_ubuntu_to_windows.stdout | default('Error: ' + ping_ubuntu_to_windows.stderr) }}
+      
+      --- Ping a Backbone (2025:db8:101::1) ---
+      Exit Code: {{ ping_ubuntu_to_backbone.rc }}
+      {{ ping_ubuntu_to_backbone.stdout | default('Error: ' + ping_ubuntu_to_backbone.stderr) }}
+    dest: "evidence/pings/ubuntu_pc_ping_results.txt"
+  delegate_to: localhost
+
+- name: Obtener tabla de routing IPv6 desde router
+  command: ip -6 route show
+  register: ipv6_routes_router
+
+- name: Obtener interfaces IPv6 desde router
+  command: ip -6 addr show
+  register: ipv6_addr_router
+
+- name: Guardar información de red del router
+  copy:
+    content: |
+      === Información de Red - Router Debian ===
+      Fecha: {{ ansible_date_time.iso8601 }}
+      
+      --- Interfaces IPv6 ---
+      {{ ipv6_addr_router.stdout }}
+      
+      --- Rutas IPv6 ---
+      {{ ipv6_routes_router.stdout }}
+    dest: "evidence/configs/{{ inventory_hostname }}_network_info.txt"
+  delegate_to: localhost
+
+- name: Mostrar resumen de conectividad
+  debug:
+    msg:
+      - "=== Resultados de Conectividad ==="
+      - "Router -> Backbone: {{ 'OK' if ping_router_to_backbone.rc == 0 else 'FAIL' }}"
+      - "Router -> Ubuntu: {{ 'OK' if ping_router_to_ubuntu.rc == 0 else 'FAIL' }}"
+      - "Router -> Windows: {{ 'OK' if ping_router_to_windows.rc == 0 else 'FAIL' }}"
+      - "Ubuntu -> Router: {{ 'OK' if ping_ubuntu_to_router.rc == 0 else 'FAIL' }}"
+      - "Ubuntu -> Windows: {{ 'OK' if ping_ubuntu_to_windows.rc == 0 else 'FAIL' }}"
+      - "Ubuntu -> Backbone: {{ 'OK' if ping_ubuntu_to_backbone.rc == 0 else 'FAIL' }}"
+      - "Resultados guardados en evidence/pings/"

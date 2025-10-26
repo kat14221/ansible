@@ -1,0 +1,55 @@
+---
+# Deploy All - Despliegue Completo de Infraestructura IPv6
+# Ejecución paso a paso para facilitar troubleshooting
+
+- name: PASO 1: Configurar Equipos IOS
+  hosts: all_ios
+  gather_facts: yes
+  roles:
+    - ios-basic-config
+  tags: [ios, step1]
+
+- name: PASO 2: Crear VMs en ESXi
+  hosts: esxi
+  gather_facts: no
+  tasks:
+    - include_role:
+        name: vmware-router
+  tags: [vm, step2]
+
+- name: PASO 2.1: Crear VMs de Usuario
+  hosts: vm_hosts
+  gather_facts: no
+  tasks:
+    - name: Crear VM Ubuntu
+      include_role:
+        name: vmware-ubuntu
+      when: inventory_hostname == "ubuntu-pc"
+    
+    - name: Crear VM Windows
+      include_role:
+        name: vmware-windows
+      when: inventory_hostname == "windows-pc"
+  tags: [vm, step2]
+
+- name: PASO 3: Configurar Router IPv6
+  hosts: vm_router
+  become: yes
+  roles:
+    - debian-ipv6-router
+  tags: [router, step3]
+
+- name: PASO 4: Desplegar Servicios
+  hosts: vm_router
+  become: yes
+  roles:
+    - debian-services
+  tags: [services, step4]
+
+- name: Resumen del Despliegue
+  hosts: localhost
+  tasks:
+    - debug:
+        msg:
+          - "Despliegue de infraestructura completado"
+          - "Ejecutar site.yml para tests y capturas de tráfico"

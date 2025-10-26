@@ -1,0 +1,26 @@
+---
+# Test Only - Solo pruebas de conectividad y captura de tráfico
+# Usar después del despliegue inicial
+
+- name: Ejecutar Tests de Conectividad
+  hosts: vm_router
+  become: yes
+  roles:
+    - connectivity-tests
+  tags: [tests]
+
+- name: Capturar Tráfico IPv6
+  hosts: vm_router
+  become: yes
+  roles:
+    - traffic-capture
+  tags: [capture]
+
+- name: Resumen de Tests
+  hosts: localhost
+  tasks:
+    - debug:
+        msg:
+          - "Tests completados"
+          - "Revisar evidence/pings/ para resultados"
+          - "Revisar evidence/pcaps/ para capturas"

@@ -1,0 +1,35 @@
+# Archivos de credenciales
+vault.yml
+*.vault
+credentials.yml
+
+# Evidencias (opcional, puede ser útil versionarlas)
+evidence/pcaps/*.pcap
+evidence/logs/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Ansible
+*.retry
+.galaxy/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporal
+*.tmp
+*.bak
+*~

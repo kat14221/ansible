@@ -1,0 +1,35 @@
+# Configuración RADVD para Router Advertisement (RA)
+# LAN IPv6: {{ inventory_hostname }} - {{ networks[0].ipv6_address }}/{{ networks[0].ipv6_prefix }}
+
+interface {{ networks[0].name if networks[0].name is defined else 'ens160' }}
+{
+        # Habilitar anuncios RA
+        AdvSendAdvert on;
+
+        # Tipo de anuncio: Managed = 1 (usa DHCPv6), Other = 1 (usa SLAAC)
+        AdvManagedFlag on;
+        AdvOtherConfigFlag on;
+
+        # Subred IPv6
+        prefix 2025:db8:220::/64
+        {
+                AdvOnLink on;
+                AdvAutonomous on;
+                AdvRouterAddr off;
+                AdvValidLifetime 2592000;
+                AdvPreferredLifetime 604800;
+        };
+
+        # Información de ruta (default gateway)
+        RDNSS 2025:db8:220::1
+        {
+                AdvRDNSSPreference 8;
+                AdvRDNSSLifetime 3600;
+        };
+
+        # Prefijo de ruta por defecto
+        route ::/0 {
+                AdvRoutePreference medium;
+                AdvRouteLifetime 1800;
+        };
+};

@@ -1,0 +1,41 @@
+﻿---
+# Playbook: Captura de Tráfico IPv6
+# Descripción: tcpdump + SPAN en switch
+# Evidencias: evidence/pcaps/
+
+- name: Captura de Tráfico IPv6
+  hosts: vm_router
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Incluir role traffic-capture
+      include_role:
+        name: traffic-capture
+
+    - name: Mostrar resumen de captura
+      debug:
+        msg:
+          - "================================================"
+          - "  Captura de Tráfico Completada"
+          - "================================================"
+          - ""
+          - "Método: tcpdump en interfaz ens160"
+          - "Filtro: IPv6 (ip6)"
+          - "Duración: 20 segundos"
+          - ""
+          - "Tráfico capturado:"
+          - "  - Router Advertisements (RA)"
+          - "  - DHCPv6 Solicits"
+          - "  - ICMPv6 Echo Request/Reply"
+          - "  - Neighbor Discovery"
+          - ""
+          - "SPAN configurado en switch:"
+          - "  - Source: GigabitEthernet1/0/2"
+          - "  - Destination: GigabitEthernet1/0/3"
+          - ""
+          - "Archivos generados:"
+          - "  - evidence/pcaps/debian-router_capture_*.pcap"
+          - "  - evidence/pcaps/debian-router_capture_summary.txt"
+          - ""
+          - "Analizar con: wireshark evidence/pcaps/*.pcap"
+          - "================================================"

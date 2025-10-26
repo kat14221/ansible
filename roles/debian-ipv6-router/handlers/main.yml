@@ -1,0 +1,12 @@
+---
+# Handlers para reiniciar servicios
+
+- name: restart radvd
+  systemd:
+    name: radvd
+    state: restarted
+
+- name: restart dnsmasq
+  systemd:
+    name: dnsmasq
+    state: restarted
