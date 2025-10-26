@@ -4,17 +4,19 @@
 
 - name: Verificar conectividad con ESXi
   community.vmware.vmware_host_facts:
-    hostname: "{{ hostvars['esxi-vmware-host']['ansible_host'] }}"
-    username: "{{ hostvars['esxi-vmware-host']['ansible_user'] }}"
-    password: "{{ hostvars['esxi-vmware-host']['ansible_password'] }}"
+    hostname: "{{ hostvars['esxi-vmware-host']['vcenter_hostname'] }}"
+    username: "{{ hostvars['esxi-vmware-host']['vcenter_username'] }}"
+    password: "{{ hostvars['esxi-vmware-host']['vcenter_password'] }}"
+    validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
   register: esxi_facts
   delegate_to: localhost
 
 - name: Crear VM Ubuntu PC desde ISO
   community.vmware.vmware_guest:
-    hostname: "{{ hostvars['esxi-vmware-host']['ansible_host'] }}"
-    username: "{{ hostvars['esxi-vmware-host']['ansible_user'] }}"
-    password: "{{ hostvars['esxi-vmware-host']['ansible_password'] }}"
+    hostname: "{{ hostvars['esxi-vmware-host']['vcenter_hostname'] }}"
+    username: "{{ hostvars['esxi-vmware-host']['vcenter_username'] }}"
+    password: "{{ hostvars['esxi-vmware-host']['vcenter_password'] }}"
+    validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
     datacenter: "{{ hostvars['esxi-vmware-host']['datacenter'] }}"
     name: "{{ vm_name }}"
     state: present
@@ -41,6 +43,10 @@
 
 - name: Encender VM Ubuntu para instalación
   community.vmware.vmware_guest:
+    hostname: "{{ hostvars['esxi-vmware-host']['vcenter_hostname'] }}"
+    username: "{{ hostvars['esxi-vmware-host']['vcenter_username'] }}"
+    password: "{{ hostvars['esxi-vmware-host']['vcenter_password'] }}"
+    validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
     name: "{{ vm_name }}"
     state: poweredon
   delegate_to: localhost
