@@ -63,4 +63,4 @@
       - "Estado: Encendida para instalación desde ISO"
       - "ISO: {{ cdrom }}"
       - "NOTA: La instalación del SO debe completarse manualmente"
-      - "Después de instalar, configurar IPv6: {{ networks[0].ipv6_address }}/{{ networks[0].ipv6_prefix }} (SLAAC)"
+      - "Después de instalar, configurar IPv6: {{ networks[0].ipv6_address | default(networks[0].ipv6_expected | default('N/A')) }}/{{ networks[0].ipv6_prefix | default('64') }} (SLAAC)"
