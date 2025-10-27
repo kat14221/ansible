@@ -26,3 +26,21 @@
   async: 0
   poll: 0
   ignore_errors: yes
+
+- name: restart dnsmasq
+  systemd:
+    name: dnsmasq
+    state: restarted
+  become: yes
+
+- name: restart vsftpd
+  systemd:
+    name: vsftpd
+    state: restarted
+  become: yes
+
+- name: restart apache2
+  systemd:
+    name: apache2
+    state: restarted
+  become: yes

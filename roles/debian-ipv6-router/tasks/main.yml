@@ -28,7 +28,7 @@
     update_cache: yes
     cache_valid_time: 3600
 
-- name: Instalar paquetes necesarios para IPv6 routing
+- name: Instalar paquetes necesarios para IPv6 routing y servicios
   apt:
     name:
       - radvd
@@ -38,6 +38,13 @@
       - tshark
       - net-tools
       - iproute2
+      - resolvconf           # DNS permanente
+      - apache2              # Servicio HTTP
+      - dnsmasq              # Servicio DNS
+      - vsftpd               # Servicio FTP
+      - bind9-dnsutils       # Herramientas DNS (dig, nslookup)
+      - curl                 # Testing HTTP
+      - ftp                  # Cliente FTP para pruebas
     state: present
 
 - name: Habilitar IPv6 forwarding permanentemente

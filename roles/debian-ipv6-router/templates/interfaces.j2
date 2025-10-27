@@ -21,6 +21,9 @@ iface {{ mgmt_interface }} inet static
 {% if mgmt_gateway is defined %}
     gateway {{ mgmt_gateway }}
 {% endif %}
+    # DNS Servers
+    dns-nameservers 8.8.8.8 8.8.4.4 1.1.1.1
+    dns-search localdomain
 
 # ============================================
 # Interfaz 2: Proyecto IPv6 (Red Fernandez)
