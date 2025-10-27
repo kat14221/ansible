@@ -137,53 +137,15 @@
       deb http://deb.debian.org/debian {{ deb_release }}-updates main
   notify: apt sources changed
   become: yes
-  # ===== WAN: IP, ruta por defecto y DNS (antes de apt update) =====
-
+  # ===== WAN: Configuración en dos fases =====
 - name: Ensure /etc/network/interfaces.d exists
   file:
     path: /etc/network/interfaces.d
     state: directory
     mode: "0755"
 
-- name: Configure WAN (DHCP) persistently
-  copy:
-    dest: /etc/network/interfaces.d/wan.cfg
-    mode: "0644"
-    content: |
-      auto {{ wan_interface }}
-      allow-hotplug {{ wan_interface }}
-      iface {{ wan_interface }} inet dhcp
-  when: wan_method == 'dhcp'
-  notify: reload networking (ifupdown2)
-
-- name: Configure WAN (STATIC) persistently
-  copy:
-    dest: /etc/network/interfaces.d/wan.cfg
-    mode: "0644"
-    content: |
-      auto {{ wan_interface }}
-      allow-hotplug {{ wan_interface }}
-      iface {{ wan_interface }} inet static
-        address {{ wan_address }}
-        gateway {{ wan_gateway }}
-  when: wan_method == 'static'
-  notify: reload networking (ifupdown2)
-
-- name: Bring WAN up (runtime) – DHCP
-  shell: |
-    ip link set {{ wan_interface }} up
-    dhclient -4 -nw {{ wan_interface }} || true
-  when: wan_method == 'dhcp'
-  changed_when: false
-
-- name: Bring WAN up (runtime) – STATIC
-  shell: |
-    ip -4 addr show {{ wan_interface }} | grep -qw '{{ wan_address.split("/")[0] }}' \
-      || ip addr add {{ wan_address }} dev {{ wan_interface }}
-    ip route | grep -qw '^default' || ip route add default via {{ wan_gateway }} dev {{ wan_interface }}
-    ip link set {{ wan_interface }} up
-  when: wan_method == 'static'
-  changed_when: false
+- name: Include WAN configuration tasks
+  include_tasks: configure_wan.yml
 
 # ---- DNS del sistema (systemd-resolved si existe, si no /etc/resolv.conf) ----
 - name: Detect systemd-resolved

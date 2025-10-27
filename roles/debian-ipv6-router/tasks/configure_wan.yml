@@ -1,0 +1,38 @@
+# Configuración de la interfaz WAN
+---
+- name: Configurar WAN (DHCP) - Fase inicial
+  copy:
+    dest: /etc/network/interfaces.d/wan.cfg
+    mode: "0644"
+    content: |
+      # Configuración temporal para gestión Ansible
+      auto {{ wan_interface }}
+      iface {{ wan_interface }} inet static
+          address {{ ansible_initial_ip }}
+          netmask 255.255.255.0
+          gateway 172.17.25.1
+      
+      # Habilitamos IPv6 por DHCP
+      iface {{ wan_interface }} inet6 dhcp
+  notify: reload networking (ifupdown2)
+
+- name: Aplicar configuración temporal
+  shell: |
+    ip addr add {{ ansible_initial_ip }}/24 dev {{ wan_interface }} || true
+    ip link set {{ wan_interface }} up
+  changed_when: false
+
+- name: Esperar a que la interfaz esté disponible
+  wait_for:
+    timeout: 10
+
+- name: Configurar WAN (DHCP) - Fase final
+  copy:
+    dest: /etc/network/interfaces.d/wan.cfg
+    mode: "0644"
+    content: |
+      # Configuración final - DHCP completo
+      auto {{ wan_interface }}
+      iface {{ wan_interface }} inet dhcp
+      iface {{ wan_interface }} inet6 dhcp
+  notify: reload networking (ifupdown2)
