@@ -3,7 +3,7 @@
 
 # Habilitar DHCPv6
 enable-ra
-dhcp-range=interface:{{ networks[0].name if networks[0].name is defined else 'ens160' }},2025:db8:220::10,2025:db8:220::ff,64
+dhcp-range=interface:{{ networks[0].name if networks[0].name is defined else 'ens224' }},2025:db8:220::10,2025:db8:220::ff,64
 dhcp-option=option6:dns-server,[2025:db8:220::1]
 dhcp-option=option6:domain-search,vmware-101001.example.local
 

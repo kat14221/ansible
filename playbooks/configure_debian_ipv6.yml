@@ -2,7 +2,7 @@
 # Playbook: Configurar Debian Router - Gateway IPv6 Central
 # Descripción: Configura Debian como gateway IPv6 de la red 2025:DB8:101::/64
 # Servicios: IPv6 Forwarding, RA (radvd), DHCPv6, HTTP, FTP, Firewall
-# Interfaces: ens160 (gestión 172.17.25.10) + ens192 (proyecto 2025:DB8:101::1)
+# Interfaces: ens224 (gestión 172.17.25.10) + ens192 (proyecto 2025:DB8:101::1)
 
 - name: "⭐ Configurar Debian Router - Gateway IPv6 Central"
   hosts: debian_router

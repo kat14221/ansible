@@ -14,7 +14,7 @@
 
 - name: Iniciar captura de tráfico IPv6 en interfaz LAN
   shell: |
-    nohup tcpdump -i ens160 -w /tmp/capture_{{ ansible_date_time.epoch }}.pcap ip6 &
+    nohup tcpdump -i ens224 -w /tmp/capture_{{ ansible_date_time.epoch }}.pcap ip6 &
     echo $! > /tmp/tcpdump.pid
   async: 30
   poll: 5
