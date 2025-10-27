@@ -1,21 +1,15 @@
 ---
 - name: restart radvd
-  ansible.builtin.systemd:
-    name: radvd
-    state: restarted
+  systemd: { name: radvd, state: restarted }
 
 - name: restart isc-dhcp-server6
-  ansible.builtin.systemd:
-    name: isc-dhcp-server6
-    state: restarted
+  systemd: { name: isc-dhcp-server6, state: restarted }
 
 - name: restart nftables
-  ansible.builtin.systemd:
-    name: nftables
-    state: restarted
+  systemd: { name: nftables, state: restarted }
 
 - name: reload networking (ifupdown2)
-  ansible.builtin.command: ifreload -a
+  command: ifreload -a
   register: ifreload_result
   changed_when: true
   failed_when: false

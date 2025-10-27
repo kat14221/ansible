@@ -1,9 +1,9 @@
 ---
 # Role: debian-ipv6-router (radvd + isc-dhcp-server6)
-# Corrige APT de forma permanente y evita cuelgues
+# Configura DNS y prerequisitos automáticamente, arregla APT y evita cuelgues.
 
 # =========================
-# Variables de entorno APT
+# ENV común para APT
 # =========================
 - name: Set noninteractive env (apt)
   set_fact:
@@ -14,10 +14,85 @@
       UCF_FORCE_CONFOLD: "1"
 
 # =========================
-# PRE-APT: evitar cuelgues
+# DNS + prerequisitos básicos
+# =========================
+- name: Ensure base packages (ca-certificates, resolv tools)
+  apt:
+    name:
+      - ca-certificates
+      - systemd
+      - systemd-sysv
+    state: present
+    lock_timeout: 600
+  environment: "{{ apt_env }}"
+  register: base_pkgs
+  until: base_pkgs is succeeded
+  retries: 3
+  delay: 6
+  become: yes
+
+- name: Detect if systemd-resolved exists
+  stat:
+    path: /lib/systemd/system/systemd-resolved.service
+  register: has_resolved
+
+# --- Ruta A: usar systemd-resolved (preferida en Debian reciente) ---
+- name: Configure systemd-resolved with custom DNS
+  block:
+    - name: Write /etc/systemd/resolved.conf
+      copy:
+        dest: /etc/systemd/resolved.conf
+        mode: "0644"
+        content: |
+          [Resolve]
+          DNS={{ dhcpv6_dns_servers | join(" ") }}
+          FallbackDNS=1.1.1.1 8.8.8.8
+          DNSStubListener=yes
+    - name: Enable and start systemd-resolved
+      systemd:
+        name: systemd-resolved
+        enabled: yes
+        state: started
+    - name: Ensure resolv.conf is symlinked to stub
+      file:
+        src: /run/systemd/resolve/stub-resolv.conf
+        dest: /etc/resolv.conf
+        state: link
+        force: yes
+  when: has_resolved.stat.exists
+  become: yes
+
+# --- Ruta B: si no hay systemd-resolved, escribir resolv.conf directamente ---
+- name: Write /etc/resolv.conf (fallback)
+  copy:
+    dest: /etc/resolv.conf
+    mode: "0644"
+    content: |
+      {% for s in dhcpv6_dns_servers %}nameserver {{ s }}
+      {% endfor %}nameserver 1.1.1.1
+      nameserver 8.8.8.8
+  when: not has_resolved.stat.exists
+  become: yes
+
+# =========================
+# Tuning de red para APT
+# =========================
+- name: Prefer IPv4 & short timeouts for APT
+  copy:
+    dest: /etc/apt/apt.conf.d/99-network-tuning
+    mode: "0644"
+    content: |
+      Acquire::ForceIPv4 "true";
+      Acquire::Retries "1";
+      Acquire::http::Timeout "10";
+      Acquire::https::Timeout "10";
+  become: yes
+
+# =========================
+# PRE-APT: evitar locks
 # =========================
 - name: Stop apt timers during provisioning
-  ansible.builtin.systemd:
+  systemd:
     name: "{{ item }}"
     state: stopped
     enabled: no
@@ -28,7 +103,7 @@
   become: yes
 
 - name: Mask services that may lock apt
-  ansible.builtin.systemd:
+  systemd:
     name: "{{ item }}"
     masked: yes
   loop:
@@ -39,23 +114,21 @@
   become: yes
 
 - name: Wait for dpkg/apt locks to be free
-  ansible.builtin.shell: |
+  shell: |
     while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 2; done
     while fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do sleep 2; done
   changed_when: false
   become: yes
 
-# =========================================
-# APT: asegurar repos de Debian permanentes
-# =========================================
-# Detectar release (bookworm/bullseye, etc.)
+# =========================
+# Repos oficiales Debian
+# =========================
 - name: Detect Debian release codename
-  ansible.builtin.set_fact:
+  set_fact:
     deb_release: "{{ ansible_facts.distribution_release | default('bookworm') }}"
 
-# Limpiar sources.list legacy si está vacío o incorrecto (opcional: no borra .d/)
 - name: Render /etc/apt/sources.list with official mirrors
-  ansible.builtin.copy:
+  copy:
     dest: /etc/apt/sources.list
     mode: "0644"
     content: |
@@ -65,19 +138,11 @@
   notify: apt sources changed
   become: yes
 
-# (Opcional) Desactivar unattended-upgrades por provisión (se puede reactivar luego)
-- name: Disable periodic apt during provisioning
-  ansible.builtin.copy:
-    dest: /etc/apt/apt.conf.d/99-provisioning
-    mode: "0644"
-    content: |
-      APT::Periodic::Enable "0";
-      Unattended-Upgrade "0";
-  become: yes
-
-# Update cache con tolerancia a locks
+# =========================
+# apt update robusto
+# =========================
 - name: apt update (noninteractive, lock_timeout)
-  ansible.builtin.apt:
+  apt:
     update_cache: yes
     cache_valid_time: 3600
     lock_timeout: 600
@@ -88,11 +153,11 @@
   delay: 8
   become: yes
 
-# =========================================
-# Paquetes (radvd + isc-dhcp-server6) y limpieza
-# =========================================
+# =========================
+# Paquetes (radvd + isc-dhcp-server6)
+# =========================
 - name: Remove dnsmasq if present (avoid conflicts)
-  ansible.builtin.apt:
+  apt:
     name: dnsmasq
     state: absent
     purge: yes
@@ -100,8 +165,8 @@
   ignore_errors: yes
   become: yes
 
-- name: Install required packages (radvd + isc-dhcp-server6)
-  ansible.builtin.apt:
+- name: Install required packages (RA/DHCPv6/Firewall/Tools)
+  apt:
     name:
       - radvd
       - isc-dhcp-server
@@ -125,11 +190,11 @@
   delay: 8
   become: yes
 
-# =========================================
+# =========================
 # Kernel / IPv6
-# =========================================
+# =========================
 - name: Enable IPv6 forwarding (global)
-  ansible.builtin.sysctl:
+  sysctl:
     name: net.ipv6.conf.all.forwarding
     value: '1'
     state: present
@@ -137,18 +202,18 @@
   become: yes
 
 - name: Disable RA acceptance on LAN (we are router)
-  ansible.builtin.sysctl:
+  sysctl:
     name: "net.ipv6.conf.{{ interface }}.accept_ra"
     value: '0'
     state: present
     reload: yes
   become: yes
 
-# =========================================
-# Red (persistente + runtime sin cortar SSH)
-# =========================================
+# =========================
+# Red (persistente + runtime)
+# =========================
 - name: Render /etc/network/interfaces (ifupdown)
-  ansible.builtin.template:
+  template:
     src: interfaces.j2
     dest: /etc/network/interfaces
     mode: '0644'
@@ -157,17 +222,17 @@
   become: yes
 
 - name: Ensure IPv6 assigned on {{ interface }} (runtime)
-  ansible.builtin.shell: |
+  shell: |
     ip -6 addr show {{ interface }} | grep -qw '{{ ipv6_address }}' || ip -6 addr add {{ ipv6_address }}/{{ ipv6_prefix }} dev {{ interface }}
     ip link set {{ interface }} up
   changed_when: false
   become: yes
 
-# =========================================
+# =========================
 # radvd + isc-dhcp-server6
-# =========================================
+# =========================
 - name: Configure radvd (RA / SLAAC)
-  ansible.builtin.template:
+  template:
     src: radvd.conf.j2
     dest: /etc/radvd.conf
     mode: '0644'
@@ -175,7 +240,7 @@
   become: yes
 
 - name: Configure DHCPv6 (ISC)
-  ansible.builtin.template:
+  template:
     src: dhcpd6.conf.j2
     dest: /etc/dhcp/dhcpd6.conf
     mode: '0644'
@@ -183,7 +248,7 @@
   become: yes
 
 - name: Bind DHCPv6 to LAN interface
-  ansible.builtin.lineinfile:
+  lineinfile:
     path: /etc/default/isc-dhcp-server
     regexp: '^INTERFACESv6='
     line: 'INTERFACESv6="{{ interface }}"'
@@ -191,22 +256,19 @@
   notify: restart isc-dhcp-server6
   become: yes
 
-# =========================================
+# =========================
 # Firewall nftables
-# =========================================
+# =========================
 - name: Configure nftables (permit ICMPv6)
-  ansible.builtin.template:
+  template:
     src: nftables.conf.j2
     dest: /etc/nftables.conf
     mode: '0644'
   notify: restart nftables
   become: yes
 
-# =========================================
-# Servicios arriba
-# =========================================
 - name: Ensure services enabled and started
-  ansible.builtin.systemd:
+  systemd:
     name: "{{ item }}"
     enabled: yes
     state: started
@@ -216,28 +278,28 @@
     - nftables
   become: yes
 
-# =========================================
-# Verificación / Evidencia
-# =========================================
+# =========================
+# Evidencias
+# =========================
 - name: Show IPv6 on {{ interface }}
-  ansible.builtin.command: ip -6 addr show {{ interface }}
+  command: ip -6 addr show {{ interface }}
   register: ipv6_config
   changed_when: false
 
 - name: Check radvd
-  ansible.builtin.command: systemctl status radvd --no-pager
+  command: systemctl status radvd --no-pager
   register: radvd_status
   changed_when: false
   failed_when: false
 
 - name: Check DHCPv6
-  ansible.builtin.command: systemctl status isc-dhcp-server6 --no-pager
+  command: systemctl status isc-dhcp-server6 --no-pager
   register: dhcpv6_status
   changed_when: false
   failed_when: false
 
 - name: Summary
-  ansible.builtin.debug:
+  debug:
     msg:
       - "=================================================="
       - "✓ Debian IPv6 Router configurado (radvd + isc-dhcp-server6)"
