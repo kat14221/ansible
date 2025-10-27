@@ -1,0 +1,63 @@
+---
+# Verificación y corrección de servicios
+- name: "🔍 Verificar y corregir servicios"
+  hosts: debian_router
+  become: yes
+  tasks:
+    - name: Asegurar que el archivo de configuración DHCPv6 existe
+      file:
+        path: /etc/dhcp/dhcpd6.conf
+        state: file
+      register: dhcp_config
+
+    - name: Verificar configuración de DHCPv6
+      command: dhcpd -t -6 -cf /etc/dhcp/dhcpd6.conf
+      changed_when: false
+      when: dhcp_config.stat.exists
+      register: dhcp_check
+
+    - name: Configurar interfaz DHCPv6
+      lineinfile:
+        path: /etc/default/isc-dhcp-server
+        regexp: '^INTERFACESv6='
+        line: 'INTERFACESv6="{{ lan_interface }}"'
+        create: yes
+
+    - name: Reiniciar servicios
+      systemd:
+        name: "{{ item }}"
+        state: restarted
+        enabled: yes
+        daemon_reload: yes
+      loop:
+        - isc-dhcp-server
+        - radvd
+        - nftables
+        - apache2
+        - vsftpd
+
+    - name: Verificar estado de servicios
+      command: "systemctl status {{ item }}"
+      register: service_status
+      changed_when: false
+      failed_when: false
+      loop:
+        - isc-dhcp-server
+        - radvd
+        - nftables
+        - apache2
+        - vsftpd
+
+    - name: Mostrar estado de servicios
+      debug:
+        msg: "{{ item.stdout_lines }}"
+      loop: "{{ service_status.results }}"
+
+    - name: Verificar IPv6 en interfaz LAN
+      command: "ip -6 addr show {{ lan_interface }}"
+      register: ipv6_status
+      changed_when: false
+
+    - name: Mostrar configuración IPv6
+      debug:
+        msg: "{{ ipv6_status.stdout_lines }}"
