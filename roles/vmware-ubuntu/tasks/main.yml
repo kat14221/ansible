@@ -10,6 +10,7 @@
     validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
   register: esxi_facts
   delegate_to: localhost
+  become: false
 
 - name: Crear VM Ubuntu PC desde ISO
   community.vmware.vmware_guest:
@@ -41,6 +42,7 @@
       - name: "{{ networks[0].name }}"
     force: yes
   delegate_to: localhost
+  become: false
   register: vm_facts
 
 - name: Encender VM Ubuntu para instalación
@@ -52,6 +54,7 @@
     name: "{{ vm_name }}"
     state: poweredon
   delegate_to: localhost
+  become: false
 
 - name: Resumen de creación
   debug:
