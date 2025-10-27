@@ -41,13 +41,6 @@
       memory_mb: 8192
       num_cpus: 4
       scsi: paravirtual
-      boot_firmware: "efi"
-      version: 19
-      nested_virt: true
-      secure_boot: true
-      tpm:
-        - provider: "vtpm"
-          version: "2.0"
     disk:
       - size_gb: 40
         type: thin
