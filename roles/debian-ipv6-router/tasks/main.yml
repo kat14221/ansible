@@ -46,17 +46,6 @@
 # CONFIGURACIÓN DE REPOSITORIOS (SIMPLIFICADA)
 # ============================================
 
-- name: Verificar repositorios existentes
-  shell: grep -v '^#' /etc/apt/sources.list | grep -v '^$' | head -3
-  register: existing_repos
-  changed_when: false
-  failed_when: false
-
-- name: Mostrar repositorios encontrados
-  debug:
-    msg: "Repositorios existentes: {{ existing_repos.stdout_lines }}"
-  when: existing_repos.stdout_lines is defined
-
 - name: Actualizar cache de paquetes (forzado)
   apt:
     update_cache: yes
@@ -84,6 +73,13 @@
       - curl                 # Testing HTTP
       - ftp                  # Cliente FTP para pruebas
     state: present
+    force_apt_get: yes
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  retries: 3
+  delay: 10
+  register: pkg_install
+  until: pkg_install is succeeded
 
 - name: Habilitar IPv6 forwarding permanentemente
   sysctl:
