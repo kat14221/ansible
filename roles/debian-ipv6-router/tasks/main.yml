@@ -43,31 +43,19 @@
   ignore_errors: yes
 
 # ============================================
-# CONFIGURACIÓN DE REPOSITORIOS
+# CONFIGURACIÓN DE REPOSITORIOS (SIMPLIFICADA)
 # ============================================
 
-- name: Deshabilitar repositorio CD-ROM
-  lineinfile:
-    path: /etc/apt/sources.list
-    regexp: '^deb cdrom:'
-    state: absent
-  ignore_errors: yes
+- name: Verificar repositorios existentes
+  shell: grep -v '^#' /etc/apt/sources.list | grep -v '^$' | head -3
+  register: existing_repos
+  changed_when: false
+  failed_when: false
 
-- name: Hacer backup de sources.list original
-  command: cp -f /etc/apt/sources.list /etc/apt/sources.list.bak
-  ignore_errors: yes
-
-- name: Configurar repositorios de Debian (red)
-  shell: |
-    cat > /etc/apt/sources.list << 'EOF'
-    # Repositorios de Debian 12 (Bookworm) por red
-    deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
-    deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
-    deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
-    EOF
-    chmod 644 /etc/apt/sources.list
-  args:
-    executable: /bin/bash
+- name: Mostrar repositorios encontrados
+  debug:
+    msg: "Repositorios existentes: {{ existing_repos.stdout_lines }}"
+  when: existing_repos.stdout_lines is defined
 
 - name: Actualizar cache de paquetes (forzado)
   apt:
