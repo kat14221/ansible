@@ -77,7 +77,7 @@
     group: root
     mode: '0644'
     backup: yes
-  notify: restart networking
+  # NO reiniciar networking automáticamente para evitar cortar SSH
 
 - name: Configurar radvd (Router Advertisement)
   template:
