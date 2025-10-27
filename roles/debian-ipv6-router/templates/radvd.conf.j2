@@ -1,7 +1,7 @@
 # Configuración RADVD para Router Advertisement (RA)
-# Red IPv6 Unificada: 2025:DB8:101::/64
-# Gateway: {{ ipv6_address }}/{{ ipv6_prefix }}
-# Interfaz: {{ interface }}
+# Red IPv6 Unificada: {{ radvd_prefix }}
+# Gateway: {{ lan_ipv6_address }}/{{ lan_ipv6_prefix }}
+# Interfaz: {{ lan_interface }}
 
 interface {{ lan_interface }}
 {
