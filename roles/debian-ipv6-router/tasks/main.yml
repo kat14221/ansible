@@ -66,10 +66,14 @@
     mode: '0644'
     backup: yes
 
-- name: Actualizar cache de paquetes
+- name: Actualizar cache de paquetes (forzado)
   apt:
     update_cache: yes
-    cache_valid_time: 3600
+    force_apt_get: yes
+  retries: 3
+  delay: 10
+  register: apt_update_result
+  until: apt_update_result is succeeded
 
 - name: Instalar paquetes necesarios para IPv6 routing y servicios
   apt:
