@@ -137,6 +137,118 @@
       deb http://deb.debian.org/debian {{ deb_release }}-updates main
   notify: apt sources changed
   become: yes
+  # ===== WAN: IP, ruta por defecto y DNS (antes de apt update) =====
+
+- name: Ensure /etc/network/interfaces.d exists
+  file:
+    path: /etc/network/interfaces.d
+    state: directory
+    mode: "0755"
+
+- name: Configure WAN (DHCP) persistently
+  copy:
+    dest: /etc/network/interfaces.d/wan.cfg
+    mode: "0644"
+    content: |
+      auto {{ wan_interface }}
+      allow-hotplug {{ wan_interface }}
+      iface {{ wan_interface }} inet dhcp
+  when: wan_method == 'dhcp'
+  notify: reload networking (ifupdown2)
+
+- name: Configure WAN (STATIC) persistently
+  copy:
+    dest: /etc/network/interfaces.d/wan.cfg
+    mode: "0644"
+    content: |
+      auto {{ wan_interface }}
+      allow-hotplug {{ wan_interface }}
+      iface {{ wan_interface }} inet static
+        address {{ wan_address }}
+        gateway {{ wan_gateway }}
+  when: wan_method == 'static'
+  notify: reload networking (ifupdown2)
+
+- name: Bring WAN up (runtime) – DHCP
+  shell: |
+    ip link set {{ wan_interface }} up
+    dhclient -4 -nw {{ wan_interface }} || true
+  when: wan_method == 'dhcp'
+  changed_when: false
+
+- name: Bring WAN up (runtime) – STATIC
+  shell: |
+    ip -4 addr show {{ wan_interface }} | grep -qw '{{ wan_address.split("/")[0] }}' \
+      || ip addr add {{ wan_address }} dev {{ wan_interface }}
+    ip route | grep -qw '^default' || ip route add default via {{ wan_gateway }} dev {{ wan_interface }}
+    ip link set {{ wan_interface }} up
+  when: wan_method == 'static'
+  changed_when: false
+
+# ---- DNS del sistema (systemd-resolved si existe, si no /etc/resolv.conf) ----
+- name: Detect systemd-resolved
+  stat: { path: /lib/systemd/system/systemd-resolved.service }
+  register: has_resolved
+
+- name: Configure systemd-resolved
+  block:
+    - copy:
+        dest: /etc/systemd/resolved.conf
+        mode: "0644"
+        content: |
+          [Resolve]
+          DNS={{ dhcpv6_dns_servers | join(" ") }}
+          FallbackDNS=1.1.1.1 8.8.8.8
+          DNSStubListener=yes
+    - systemd: { name: systemd-resolved, enabled: yes, state: started }
+    - file:
+        src: /run/systemd/resolve/stub-resolv.conf
+        dest: /etc/resolv.conf
+        state: link
+        force: yes
+  when: has_resolved.stat.exists
+
+- name: Fallback resolv.conf (si no hay systemd-resolved)
+  copy:
+    dest: /etc/resolv.conf
+    mode: "0644"
+    content: |
+      {% for s in dhcpv6_dns_servers %}nameserver {{ s }}
+      {% endfor %}nameserver 1.1.1.1
+      nameserver 8.8.8.8
+  when: not has_resolved.stat.exists
+
+# ---- Tuning APT: IPv4 forzado (si tu WAN es IPv4/NAT), timeouts cortos ----
+- name: APT network tuning (timeouts y ForceIPv4 opcional)
+  copy:
+    dest: /etc/apt/apt.conf.d/99-network-tuning
+    mode: "0644"
+    content: |
+      {% if apt_force_ipv4 %}Acquire::ForceIPv4 "true";{% endif %}
+      Acquire::Retries "1";
+      Acquire::http::Timeout "10";
+      Acquire::https::Timeout "10";
+
+# ---- Pruebas rápidas de conectividad (no fallan el play, solo informan) ----
+- name: Check default route
+  command: ip route
+  register: ipr
+  changed_when: false
+  failed_when: false
+
+- name: Check reachability (ICMP and deb.debian.org DNS)
+  shell: |
+    (ping -c1 -w3 1.1.1.1 && echo "OK_ICMPv4") || echo "NO_ICMPv4"
+    getent ahosts deb.debian.org || true
+    timeout 5 curl -I http://deb.debian.org/debian/ || true
+  register: reach
+  changed_when: false
+  failed_when: false
+
+- debug:
+    msg:
+      - "RUTA: {{ ipr.stdout_lines | default([]) }}"
+      - "REACH: {{ reach.stdout_lines | default([]) }}"
 
 # =========================
 # apt update robusto
