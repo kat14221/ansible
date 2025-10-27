@@ -316,3 +316,4 @@ ansible-playbook playbooks/deploy_all.yml --tags step4
 **Fecha**: 2025-10-26  
 **Verificado por**: Ansible Automation  
 **Cumplimiento**: 100%
+

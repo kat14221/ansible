@@ -164,3 +164,4 @@ Antes de ejecutar, verifica:
 ✅ **El ESXi está en: 168.121.48.254**  
 ✅ **Credenciales: root / qwe123$**  
 ✅ **URL Web: https://168.121.48.254:10101/ui/#/login**
+

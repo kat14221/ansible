@@ -1,6 +1,4 @@
 # Configuración de Red - Debian Router
-# Red Universidad: 172.17.x.x (Gestión)
-# Red Proyecto: 2025:DB8:101::/64 (IPv6)
 # Generado por Ansible - NO editar manualmente
 
 source /etc/network/interfaces.d/*
@@ -12,32 +10,29 @@ auto lo
 iface lo inet loopback
 
 # ============================================
-# Interfaz 1: Gestión (VM Network)
+# Interfaz WAN (e.g., ens160)
+# Conectada a la red externa para salida a Internet.
+# - IPv4 por DHCP para obtener IP automáticamente
+# - IPv6 por DHCP para conectividad
 # ============================================
-auto {{ mgmt_interface }}
-iface {{ mgmt_interface }} inet static
-    address {{ mgmt_ipv4 }}
-    netmask {{ mgmt_netmask }}
-{% if mgmt_gateway is defined %}
-    gateway {{ mgmt_gateway }}
-{% endif %}
-    # DNS Servers
-    dns-nameservers 8.8.8.8 8.8.4.4 1.1.1.1
-    dns-search localdomain
+auto {{ wan_interface }}
+iface {{ wan_interface }} inet dhcp
+iface {{ wan_interface }} inet6 dhcp
 
 # ============================================
-# Interfaz 2: Proyecto IPv6 (Red Fernandez)
+# Interfaz LAN (e.g., ens192)
+# Conectada a la red del laboratorio.
+# - IPv6 estática para ser el gateway.
+# - Aquí operan radvd y dhcpv6.
 # ============================================
-auto {{ interface }}
-iface {{ interface }} inet6 static
-    address {{ ipv6_address }}
-    netmask {{ ipv6_prefix }}
-{% if ipv6_gateway is defined %}
-    gateway {{ ipv6_gateway }}
-{% endif %}
-    # IPv6 Privacy Extensions (deshabilitar para router)
-    pre-up echo 0 > /proc/sys/net/ipv6/conf/{{ interface }}/use_tempaddr
-    # Aceptar RA (deshabilitar, somos el router)
-    pre-up echo 0 > /proc/sys/net/ipv6/conf/{{ interface }}/accept_ra
-    # IPv6 Forwarding (habilitar)
-    pre-up echo 1 > /proc/sys/net/ipv6/conf/{{ interface }}/forwarding
+auto {{ lan_interface }}
+iface {{ lan_interface }} inet6 static
+    address {{ lan_ipv6_address }}/{{ lan_ipv6_prefix }}
+    # No hay gateway en la LAN, este es el gateway.
+
+    # Deshabilitamos la aceptación de Router Advertisements.
+    # Este equipo es el router, no un cliente.
+    pre-up echo 0 > /proc/sys/net/ipv6/conf/{{ lan_interface }}/accept_ra
+
+    # Habilitamos el forwarding en esta interfaz.
+    pre-up echo 1 > /proc/sys/net/ipv6/conf/{{ lan_interface }}/forwarding
