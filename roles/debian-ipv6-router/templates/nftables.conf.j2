@@ -15,7 +15,12 @@ table ip6 filter {
         ct state {established, related} accept
 
         # ICMPv6 (necesario para IPv6)
-        ip6 nexthdr icmpv6 accept
+        # Permitir tipos esenciales (destination-unreachable, packet-too-big, time-exceeded, parameter-problem)
+        # eco request/reply y Neighbor Discovery / Router Advertisement (133-136)
+        icmpv6 type { 1, 2, 3, 4, 128, 129, 133, 134, 135, 136 } accept
+
+        # Aceptar paquetes destinados a multicast (necesario para ND/RA)
+        ip6 daddr ff00::/8 accept
 
         # SSH
         tcp dport 22 accept
@@ -40,7 +45,14 @@ table ip6 filter {
     chain forward {
         type filter hook forward priority 0; policy accept;
         ct state {established, related} accept
-        ip6 nexthdr icmpv6 accept
+        # Permitir ICMPv6 de reenvío explícitamente
+        icmpv6 type { 128, 129, 133, 134, 135, 136 } accept
+
+        # Aceptar tráfico entre WAN y LAN interfaces (explicitar para evitar bloqueos accidentales)
+        {% if wan_interface is defined and lan_interface is defined %}
+        iifname "{{ lan_interface }}" oifname "{{ wan_interface }}" accept
+        iifname "{{ wan_interface }}" oifname "{{ lan_interface }}" accept
+        {% endif %}
     }
 
     chain output {

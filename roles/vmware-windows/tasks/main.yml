@@ -41,6 +41,9 @@
       memory_mb: 8192
       num_cpus: 4
       scsi: paravirtual
+      boot_firmware: "efi"
+      secure_boot: true
+      version: 19
     disk:
       - size_gb: 40
         type: thin
