@@ -1,6 +1,4 @@
 ---
-# handlers/debian-ipv6-router
-
 - name: restart radvd
   ansible.builtin.systemd:
     name: radvd
@@ -16,17 +14,8 @@
     name: nftables
     state: restarted
 
-# Reload de red (si usas ifupdown2). Si no existe ifreload,
-# puedes comentar este handler o usar el fallback de abajo.
 - name: reload networking (ifupdown2)
   ansible.builtin.command: ifreload -a
   register: ifreload_result
   changed_when: true
   failed_when: false
-
-# Fallback: reiniciar el servicio "networking" si no tienes ifreload
-- name: restart networking (fallback)
-  ansible.builtin.systemd:
-    name: networking
-    state: restarted
-  when: ifreload_result is defined and ifreload_result.rc == 127
