@@ -1,30 +1,71 @@
 ﻿---
-# Playbook: Configurar Debian como Router IPv6
-# Descripción: IPv6 forwarding, RADVD, routing
-# Red LAN: 2025:DB8:220::/64
+# Playbook: Configurar Debian Router - Gateway IPv6 Central
+# Descripción: Configura Debian como gateway IPv6 de la red 2025:DB8:101::/64
+# Servicios: IPv6 Forwarding, RA (radvd), DHCPv6, HTTP, FTP, Firewall
+# Interfaces: ens160 (gestión 172.17.25.10) + ens192 (proyecto 2025:DB8:101::1)
 
-- name: Configurar Debian como Router IPv6
-  hosts: vm_router
+- name: "⭐ Configurar Debian Router - Gateway IPv6 Central"
+  hosts: debian_router
   become: yes
   gather_facts: yes
-  tasks:
-    - name: Incluir role debian-ipv6-router
-      include_role:
-        name: debian-ipv6-router
-
-    - name: Mostrar resumen
+  
+  pre_tasks:
+    - name: "📝 Mostrar información del host"
       debug:
         msg:
-          - "================================================"
-          - "  Debian Router IPv6 Configurado"
-          - "================================================"
+          - "========================================"
+          - "  Configurando Debian Router"
+          - "========================================"
+          - "Host: {{ inventory_hostname }}"
+          - "IPv6: {{ ipv6_address }}/{{ ipv6_prefix }}"
+          - "Gestión IPv4: {{ mgmt_ipv4 }}"
+          - "Interfaz Proyecto: {{ interface }}"
+          - "Interfaz Gestión: {{ mgmt_interface }}"
+          - "Red: {{ radvd_prefix }}"
+          - "========================================"
+  
+  tasks:
+    - name: "📦 Aplicar role: debian-ipv6-router"
+      include_role:
+        name: debian-ipv6-router
+      tags:
+        - router
+        - ipv6
+        - network
+  
+  post_tasks:
+    - name: "✅ Configuración completada exitosamente"
+      debug:
+        msg:
+          - "========================================"
+          - "  ✅ Debian Router Configurado"
+          - "========================================"
           - ""
-          - "IPv6 Forwarding: Habilitado"
-          - "RADVD: Activo"
-          - "LAN: 2025:db8:220::/64"
-          - "Gateway: 2025:db8:220::1"
-          - "Uplink: 2025:db8:101::a1"
+          - "Red: {{ radvd_prefix }}"
+          - "Gateway: {{ ipv6_address }}/{{ ipv6_prefix }}"
           - ""
-          - "Configuraciones guardadas en:"
-          - "  evidence/configs/radvd.conf"
-          - "================================================"
+          - "Interfaces:"
+          - "  - {{ mgmt_interface }}: {{ mgmt_ipv4 }} (Gestión)"
+          - "  - {{ interface }}: {{ ipv6_address }} (Proyecto)"
+          - ""
+          - "DHCPv6 Pool: {{ dhcpv6_range_start }} - {{ dhcpv6_range_end }}"
+          - "DNS Servers: {{ dhcpv6_dns_servers | join(', ') }}"
+          - ""
+          - "Acceso:"
+          - "  - SSH (Gestión): ssh ansible@{{ mgmt_ipv4 }}"
+          - "  - SSH (IPv6): ssh ansible@[{{ ipv6_address }}]"
+          - "  - HTTP: http://[{{ ipv6_address }}]"
+          - "  - FTP: ftp://[{{ ipv6_address }}]"
+          - ""
+          - "Verificar servicios:"
+          - "  systemctl status radvd"
+          - "  systemctl status isc-dhcp-server6"
+          - "  systemctl status apache2"
+          - "  systemctl status vsftpd"
+          - "  systemctl status nftables"
+          - ""
+          - "Verificar red:"
+          - "  ip -6 addr show {{ interface }}"
+          - "  ip -6 route"
+          - "  ping6 -c4 2001:4860:4860::8888"
+          - "========================================"

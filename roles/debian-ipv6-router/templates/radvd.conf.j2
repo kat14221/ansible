@@ -1,33 +1,52 @@
 # Configuración RADVD para Router Advertisement (RA)
-# LAN IPv6: {{ inventory_hostname }} - {{ networks[0].ipv6_address }}/{{ networks[0].ipv6_prefix }}
+# Red IPv6 Unificada: 2025:DB8:101::/64
+# Gateway: {{ ipv6_address }}/{{ ipv6_prefix }}
+# Interfaz: {{ interface }}
 
-interface {{ networks[0].name if networks[0].name is defined else 'ens160' }}
+interface {{ interface }}
 {
         # Habilitar anuncios RA
         AdvSendAdvert on;
 
-        # Tipo de anuncio: Managed = 1 (usa DHCPv6), Other = 1 (usa SLAAC)
+        # Managed Flag: Clientes usan DHCPv6 para obtener IP
+        # Other Config Flag: Clientes usan DHCPv6 para DNS/otros parámetros
         AdvManagedFlag on;
         AdvOtherConfigFlag on;
 
-        # Subred IPv6
-        prefix 2025:db8:220::/64
+        # Intervalo de envío de RA
+        MinRtrAdvInterval 30;
+        MaxRtrAdvInterval 100;
+
+        # MTU de la red
+        AdvLinkMTU 1500;
+
+        # Subred IPv6: {{ radvd_prefix }}
+        prefix {{ radvd_prefix }}
         {
+                # Prefijo on-link (en misma red)
                 AdvOnLink on;
+                
+                # Autoconfiguración autónoma (SLAAC)
                 AdvAutonomous on;
+                
+                # No incluir dirección del router en prefijo
                 AdvRouterAddr off;
+                
+                # Tiempo de vida del prefijo (30 días)
                 AdvValidLifetime 2592000;
+                
+                # Tiempo preferido (7 días)
                 AdvPreferredLifetime 604800;
         };
 
-        # Información de ruta (default gateway)
-        RDNSS 2025:db8:220::1
+        # DNS Recursivo (RDNSS) - Google Public DNS IPv6
+        RDNSS {% for dns in dhcpv6_dns_servers %}{{ dns }}{% if not loop.last %} {% endif %}{% endfor %}
         {
                 AdvRDNSSPreference 8;
                 AdvRDNSSLifetime 3600;
         };
 
-        # Prefijo de ruta por defecto
+        # Ruta por defecto (Default Route)
         route ::/0 {
                 AdvRoutePreference medium;
                 AdvRouteLifetime 1800;

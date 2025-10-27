@@ -1,24 +1,65 @@
-# Proyecto Ansible: Red Académica IPv6 VMWARE-101001
+# Proyecto Ansible: Red IPv6 Unificada con Debian Router
 
-## Descripción
+## 🎯 Descripción del Proyecto
 
-Este proyecto automatiza la creación y configuración de una red académica IPv6 usando Ansible para gestionar VMs en VMware ESXi y equipos Cisco IOS.
+Proyecto de red IPv6 académica con **Debian Router** como gateway central de toda la topología.  
+Automatización completa usando Ansible para gestionar VMs en ESXi, router IPv6, servicios y equipos físicos Cisco IOS.
 
-## ⚠️ Nota Importante
+## 📊 Arquitectura de Red
 
-**Las VMs se crearán desde ISOs y la instalación del SO debe completarse manualmente.**
+```
+╔══════════════════════════════════════════════════════╗
+║  Red Universidad: 172.17.x.x (Gestión)                  ║
+║  ├─ ESXi Workstation: 172.17.25.1                        ║
+║  └─ VM Debian Router (VM Network): 172.17.25.10         ║
+╚══════════════════════════════════════════════════════╝
 
-Después de ejecutar los playbooks, deberás:
-1. Instalar el SO en cada VM desde el ISO montado
-2. Configurar las direcciones IPv6 según el inventario
-3. Configurar el adaptador físico en "Red Fernandez" para conectividad al backbone
+╔══════════════════════════════════════════════════════╗
+║  Red Separada: 2025:DB8:100::/64                          ║
+║  ├─ Router Físico Gi0/0/0: 2025:DB8:100::2               ║
+║  └─ Switch + dispositivos (topología separada)          ║
+╚══════════════════════════════════════════════════════╝
+                    │
+                    │ (Enrutamiento futuro)
+                    │
+╔══════════════════════════════════════════════════════╗
+║  Red Laboratorio: 2025:DB8:101::/64 ⭐ PROYECTO ACTUAL    ║
+║                                                            ║
+║  Router Físico Gi0/0/1: 2025:DB8:101::2                   ║
+║  Switch Físico: 2025:DB8:101::3                            ║
+║      │                                                     ║
+║      ├─ Workstation ESXi (Red Fernandez)                  ║
+║      │   └─ ⭐ VM Debian Router: 2025:DB8:101::1 (GATEWAY)║
+║      │      ├─ ens160: 172.17.25.10 (Gestión)            ║
+║      │      └─ ens192: 2025:DB8:101::1 (Proyecto)       ║
+║      │   ├─ VM Ubuntu: 2025:DB8:101::10                   ║
+║      │   └─ VM Windows: 2025:DB8:101::11                  ║
+║      │                                                     ║
+║      ├─ Laptop → GNS3 (3 VMs)                             ║
+║      └─ Access Point → Celular + Laptop Wi-Fi             ║
+╚══════════════════════════════════════════════════════╝
+```
 
-## Arquitectura
+## ⭐ Componente Principal: Debian Router (2 Interfaces)
 
-- **Backbone**: 2025:DB8:101::/64
-- **LAN VMWARE-101001**: 2025:DB8:220::/64
-- **Router**: vm-debian-router (2025:db8:220::1/64)
-- **Hosts**: vm-ubuntu-pc (2025:db8:220::10/64), vm-windows-pc (2025:db8:220::11/64)
+### 🔹 **Interfaz 1 - Gestión** (ens160 - VM Network)
+- **IPv4**: `172.17.25.10/24`
+- **Gateway**: `172.17.25.1` (ESXi)
+- **Uso**: Acceso de gestión desde red universidad
+
+### 🔹 **Interfaz 2 - Proyecto** (ens192 - Red Fernandez)
+- **IPv6**: `2025:DB8:101::1/64`
+- **Rol**: Gateway principal de la red IPv6
+- **Uso**: Router Advertisement + DHCPv6
+
+### ⚙️ **Servicios Instalados**
+- ✅ IPv6 Forwarding (Router)
+- ✅ radvd (Router Advertisement)
+- ✅ isc-dhcp-server6 (DHCPv6)
+- ✅ Apache2 (HTTP)
+- ✅ vsftpd (FTP)
+- ✅ tcpdump/tshark (Análisis de tráfico)
+- ✅ nftables (Firewall)
 
 ## Requisitos
 
@@ -39,13 +80,60 @@ Después de ejecutar los playbooks, deberás:
 - Ubuntu: `datastore1:ubuntu/ubuntu-24.04.2-desktop-amd64.iso`
 - Windows: `datastore1:W-11/Win11_24H2_Spanish_x64.iso`
 
-## Ejecución
+## 🚀 Ejecución del Proyecto
 
-### Opción 1: Playbook Maestro (Todo de una vez)
+### 📋 Pre-requisitos
+
+1. **VM Debian Router ya creada e instalada** en ESXi con:
+   - 2 adaptadores de red:
+     - Adapter 1: `VM Network` (Gestión - 172.17.25.10)
+     - Adapter 2: `Red Fernandez` (Proyecto IPv6)
+   - Usuario `ansible` con sudo sin contraseña
+   - SSH habilitado
+
+2. **Máquina de control con Ansible** (Ubuntu/Debian):
 ```bash
-ansible-playbook playbooks/site.yml -vvv
-# Crear VMs
-ansible-playbook playbooks/create_vm_router.yml -vvv
+sudo apt update
+sudo apt install -y ansible git python3-pip
+pip3 install pyvmomi
+ansible-galaxy collection install community.vmware cisco.ios ansible.netcommon
+```
+
+### 🕹️ Paso 1: Clonar y Preparar
+
+```bash
+# Clonar repositorio
+git clone <tu-repo>
+cd ansible-debian
+
+# Verificar inventario
+cat inventory/hosts.yml | grep -A 20 debian_router
+```
+
+### ⭐ Paso 2: Configurar Debian Router (PRINCIPAL)
+
+```bash
+# Configurar Debian Router completo
+ansible-playbook playbooks/configure_debian_ipv6.yml -vvv
+```
+
+**Esto instala y configura:**
+- ✅ IPv6 Forwarding
+- ✅ radvd (Router Advertisement)
+- ✅ isc-dhcp-server6 (DHCPv6)
+- ✅ Apache2 (HTTP)
+- ✅ vsftpd (FTP)
+- ✅ nftables (Firewall)
+- ✅ tcpdump/tshark
+
+### 💻 Paso 3: Crear VMs Adicionales (Opcional)
+
+```bash
+# Crear VM Ubuntu
+ansible-playbook playbooks/create_vm_ubuntu.yml -vvv
+
+# Crear VM Windows
+ansible-playbook playbooks/create_vm_windows.yml -vvv
 ansible-playbook playbooks/create_vm_ubuntu.yml -vvv
 ansible-playbook playbooks/create_vm_windows.yml -vvv
 

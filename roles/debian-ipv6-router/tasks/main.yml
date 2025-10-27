@@ -1,97 +1,143 @@
 ---
 # Role: debian-ipv6-router
-# Descripción: Configurar Debian como router IPv6 con SLAAC/DHCPv6
+# Descripción: Configurar Debian como router IPv6 para red 2025:DB8:101::/64
+# Gateway central de toda la topología
+
+- name: Actualizar cache de paquetes
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
 
 - name: Instalar paquetes necesarios para IPv6 routing
   apt:
     name:
       - radvd
-      - dnsmasq
+      - isc-dhcp-server
+      - nftables
       - tcpdump
-      - iptables
+      - tshark
       - net-tools
+      - iproute2
     state: present
-    update_cache: yes
 
-- name: Habilitar IPv6 forwarding
+- name: Habilitar IPv6 forwarding permanentemente
   sysctl:
     name: net.ipv6.conf.all.forwarding
     value: '1'
     state: present
-    sysctl_set: yes
+    reload: yes
   register: ipv6_forwarding
 
-- name: Habilitar IPv6 forwarding por interfaz
+- name: Habilitar IPv6 forwarding en interfaz específica
   sysctl:
-    name: "net.ipv6.conf.{{ item }}.forwarding"
+    name: "net.ipv6.conf.{{ interface }}.forwarding"
     value: '1'
     state: present
-    sysctl_set: yes
-  loop:
-    - all
-    - default
-    - ens160
-    - ens192
+    reload: yes
 
-- name: Deshabilitar autoconfiguración DHCPv6
-  lineinfile:
-    path: /etc/sysctl.conf
-    regexp: "^#?net\\.ipv6\\.conf\\.{{ item }}\\.accept_ra"
-    line: "net.ipv6.conf.{{ item }}.accept_ra = 0"
-  loop:
-    - all
-    - ens160
-    - ens192
+- name: Deshabilitar RA acceptance (somos el router)
+  sysctl:
+    name: "net.ipv6.conf.{{ interface }}.accept_ra"
+    value: '0'
+    state: present
+    reload: yes
 
-- name: Crear configuración de radvd
+- name: Configurar IPv6 estática en /etc/network/interfaces
+  template:
+    src: interfaces.j2
+    dest: "/etc/network/interfaces.d/{{ interface }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart networking
+
+- name: Configurar radvd (Router Advertisement)
   template:
     src: radvd.conf.j2
     dest: /etc/radvd.conf
+    owner: root
+    group: root
+    mode: '0644'
   notify: restart radvd
 
-- name: Configurar dnsmasq para DHCPv6
+- name: Configurar DHCPv6 server
   template:
-    src: dnsmasq.conf.j2
-    dest: /etc/dnsmasq.d/ipv6.conf
-  notify: restart dnsmasq
+    src: dhcpd6.conf.j2
+    dest: /etc/dhcp/dhcpd6.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart isc-dhcp-server6
 
-- name: Habilitar y iniciar radvd
+- name: Configurar interfaz para DHCPv6 server
+  lineinfile:
+    path: /etc/default/isc-dhcp-server
+    regexp: '^INTERFACESv6='
+    line: 'INTERFACESv6="{{ interface }}"'
+    create: yes
+  notify: restart isc-dhcp-server6
+
+- name: Habilitar e iniciar radvd
   systemd:
     name: radvd
     enabled: yes
     state: started
 
-- name: Habilitar y iniciar dnsmasq
+- name: Habilitar e iniciar isc-dhcp-server6
   systemd:
-    name: dnsmasq
+    name: isc-dhcp-server6
     enabled: yes
     state: started
+  ignore_errors: yes
+
+- name: Configurar firewall básico con nftables
+  template:
+    src: nftables.conf.j2
+    dest: /etc/nftables.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart nftables
+
+- name: Habilitar nftables
+  systemd:
+    name: nftables
+    enabled: yes
+    state: started
+
+- name: Verificar configuración IPv6
+  command: ip -6 addr show {{ interface }}
+  register: ipv6_config
+  changed_when: false
 
 - name: Verificar estado de radvd
   command: systemctl status radvd --no-pager
   register: radvd_status
+  changed_when: false
   failed_when: false
 
-- name: Verificar estado de dnsmasq
-  command: systemctl status dnsmasq --no-pager
-  register: dnsmasq_status
+- name: Verificar estado de DHCPv6
+  command: systemctl status isc-dhcp-server6 --no-pager
+  register: dhcpv6_status
+  changed_when: false
   failed_when: false
 
-- name: Guardar configuración de radvd
-  copy:
-    src: /etc/radvd.conf
-    dest: "evidence/configs/radvd.conf"
-  delegate_to: localhost
-
-- name: Guardar configuración de dnsmasq
-  copy:
-    src: /etc/dnsmasq.d/ipv6.conf
-    dest: "evidence/configs/dnsmasq_ipv6.conf"
-  delegate_to: localhost
-
-- name: Mostrar estado de servicios
+- name: Mostrar configuración completa
   debug:
     msg:
-      - "radvd: {{ 'active' if radvd_status.rc == 0 else 'inactive' }}"
-      - "dnsmasq: {{ 'active' if dnsmasq_status.rc == 0 else 'inactive' }}"
-      - "IPv6 forwarding: {{ 'enabled' if ipv6_forwarding.value == '1' else 'disabled' }}"
+      - "=================================================="
+      - "  ✓ Debian Router IPv6 Configurado"
+      - "=================================================="
+      - ""
+      - "Red: 2025:DB8:101::/64"
+      - "Gateway: {{ ipv6_address }}/{{ ipv6_prefix }}"
+      - "Interface: {{ interface }}"
+      - ""
+      - "Servicios:"
+      - "  • radvd: {{ 'ACTIVO ✓' if radvd_status.rc == 0 else 'INACTIVO ✗' }}"
+      - "  • DHCPv6: {{ 'ACTIVO ✓' if dhcpv6_status.rc == 0 else 'INACTIVO ✗' }}"
+      - "  • IPv6 Forwarding: HABILITADO ✓"
+      - ""
+      - "DHCPv6 Pool: {{ dhcpv6_range_start }} - {{ dhcpv6_range_end }}"
+      - "DNS: {{ dhcpv6_dns_servers | join(', ') }}"
+      - "=================================================="

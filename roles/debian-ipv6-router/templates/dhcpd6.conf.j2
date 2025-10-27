@@ -1,0 +1,27 @@
+# Configuración DHCPv6 Server para red 2025:DB8:101::/64
+# Debian Router - Gateway central
+
+# Global configuration
+authoritative;
+
+# Log level
+log-facility local7;
+
+# Subnet configuration
+subnet6 {{ dhcpv6_subnet }}/{{ dhcpv6_prefix }} {
+    # Rango de IPs para asignación dinámica
+    range6 {{ dhcpv6_range_start }} {{ dhcpv6_range_end }};
+
+    # Tiempo de concesión (lease time)
+    default-lease-time 3600;
+    max-lease-time 7200;
+
+    # DNS Servers
+    option dhcp6.name-servers {% for dns in dhcpv6_dns_servers %}{{ dns }}{% if not loop.last %}, {% endif %}{% endfor %};
+
+    # Domain search list
+    option dhcp6.domain-search "local";
+
+    # Rapid Commit (acelera la asignación)
+    option dhcp6.rapid-commit;
+}

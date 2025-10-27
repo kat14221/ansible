@@ -1,12 +1,28 @@
 ---
-# Handlers para reiniciar servicios
+# Handlers para reiniciar servicios del router IPv6
 
 - name: restart radvd
   systemd:
     name: radvd
     state: restarted
+  become: yes
 
-- name: restart dnsmasq
+- name: restart isc-dhcp-server6
   systemd:
-    name: dnsmasq
+    name: isc-dhcp-server6
     state: restarted
+  become: yes
+  ignore_errors: yes
+
+- name: restart nftables
+  systemd:
+    name: nftables
+    state: restarted
+  become: yes
+
+- name: restart networking
+  command: systemctl restart networking
+  become: yes
+  async: 0
+  poll: 0
+  ignore_errors: yes

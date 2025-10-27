@@ -1,0 +1,49 @@
+#!/usr/sbin/nftables -f
+# Firewall básico para Debian Router IPv6
+# Red: 2025:DB8:101::/64
+
+flush ruleset
+
+table ip6 filter {
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        # Aceptar loopback
+        iif lo accept
+
+        # Aceptar conexiones establecidas
+        ct state {established, related} accept
+
+        # ICMPv6 (necesario para IPv6)
+        ip6 nexthdr icmpv6 accept
+
+        # SSH
+        tcp dport 22 accept
+
+        # HTTP
+        tcp dport 80 accept
+
+        # FTP
+        tcp dport {20, 21} accept
+
+        # DHCPv6
+        udp dport 547 accept
+
+        # DNS
+        udp dport 53 accept
+        tcp dport 53 accept
+
+        # Log dropped packets
+        log prefix "INPUT-DROP: " drop
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy accept;
+        ct state {established, related} accept
+        ip6 nexthdr icmpv6 accept
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
