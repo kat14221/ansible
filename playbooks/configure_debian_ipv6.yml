@@ -10,7 +10,22 @@
   gather_facts: yes
   
   pre_tasks:
-    - name: "📝 Mostrar información del host"
+    - name: "� Verificar conexión SSH"
+      wait_for_connection:
+        timeout: 5
+        delay: 0
+      register: wait_result
+      ignore_errors: yes
+
+    - name: "❌ Mostrar error si la conexión falla"
+      fail:
+        msg: "No se pudo establecer conexión SSH. Por favor verifica que:\n
+             1. El host 172.17.25.10 está accesible (ping)\n
+             2. El usuario ansible existe y tiene acceso SSH\n
+             3. El usuario ansible tiene permisos sudo sin contraseña"
+      when: wait_result is failed
+
+    - name: "�📝 Mostrar información del host"
       debug:
         msg:
           - "========================================"

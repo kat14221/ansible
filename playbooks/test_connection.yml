@@ -1,0 +1,18 @@
+---
+- name: "🔍 Prueba de conexión SSH"
+  hosts: debian_router
+  gather_facts: no
+  tasks:
+    - name: "Verificar conexión SSH"
+      wait_for_connection:
+        timeout: 5
+        delay: 0
+
+    - name: "Verificar sudo"
+      command: whoami
+      become: yes
+      register: whoami_result
+
+    - name: "Mostrar resultado"
+      debug:
+        msg: "Conexión exitosa. Usuario: {{ whoami_result.stdout }}"
