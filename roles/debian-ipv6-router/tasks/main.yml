@@ -42,13 +42,14 @@
     state: present
     reload: yes
 
-- name: Configurar IPv6 estática en /etc/network/interfaces
+- name: Configurar interfaces de red (gestión + proyecto)
   template:
     src: interfaces.j2
-    dest: "/etc/network/interfaces.d/{{ interface }}"
+    dest: "/etc/network/interfaces"
     owner: root
     group: root
     mode: '0644'
+    backup: yes
   notify: restart networking
 
 - name: Configurar radvd (Router Advertisement)

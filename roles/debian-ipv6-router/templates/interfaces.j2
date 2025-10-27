@@ -1,12 +1,21 @@
 # Configuración de Red - Debian Router
 # Red Universidad: 172.17.x.x (Gestión)
 # Red Proyecto: 2025:DB8:101::/64 (IPv6)
+# Generado por Ansible - NO editar manualmente
+
+source /etc/network/interfaces.d/*
+
+# ============================================
+# Loopback
+# ============================================
+auto lo
+iface lo inet loopback
 
 # ============================================
 # Interfaz 1: Gestión (VM Network)
 # ============================================
-auto ens160
-iface ens160 inet static
+auto {{ mgmt_interface }}
+iface {{ mgmt_interface }} inet static
     address {{ mgmt_ipv4 }}
     netmask {{ mgmt_netmask }}
 {% if mgmt_gateway is defined %}
@@ -16,16 +25,16 @@ iface ens160 inet static
 # ============================================
 # Interfaz 2: Proyecto IPv6 (Red Fernandez)
 # ============================================
-auto ens192
-iface ens192 inet6 static
+auto {{ interface }}
+iface {{ interface }} inet6 static
     address {{ ipv6_address }}
     netmask {{ ipv6_prefix }}
 {% if ipv6_gateway is defined %}
     gateway {{ ipv6_gateway }}
 {% endif %}
     # IPv6 Privacy Extensions (deshabilitar para router)
-    pre-up echo 0 > /proc/sys/net/ipv6/conf/ens192/use_tempaddr
+    pre-up echo 0 > /proc/sys/net/ipv6/conf/{{ interface }}/use_tempaddr
     # Aceptar RA (deshabilitar, somos el router)
-    pre-up echo 0 > /proc/sys/net/ipv6/conf/ens192/accept_ra
+    pre-up echo 0 > /proc/sys/net/ipv6/conf/{{ interface }}/accept_ra
     # IPv6 Forwarding (habilitar)
-    pre-up echo 1 > /proc/sys/net/ipv6/conf/ens192/forwarding
+    pre-up echo 1 > /proc/sys/net/ipv6/conf/{{ interface }}/forwarding
