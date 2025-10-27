@@ -277,7 +277,7 @@
 
 - name: Disable RA acceptance on LAN (we are router)
   sysctl:
-    name: "net.ipv6.conf.{{ interface }}.accept_ra"
+    name: "net.ipv6.conf.{{ lan_interface }}.accept_ra"
     value: '0'
     state: present
     reload: yes
@@ -295,10 +295,10 @@
   notify: reload networking (ifupdown2)
   become: yes
 
-- name: Ensure IPv6 assigned on {{ interface }} (runtime)
+- name: Ensure IPv6 assigned on {{ lan_interface }} (runtime)
   shell: |
-    ip -6 addr show {{ interface }} | grep -qw '{{ ipv6_address }}' || ip -6 addr add {{ ipv6_address }}/{{ ipv6_prefix }} dev {{ interface }}
-    ip link set {{ interface }} up
+    ip -6 addr show {{ lan_interface }} | grep -qw '{{ lan_ipv6_address }}' || ip -6 addr add {{ lan_ipv6_address }}/{{ lan_ipv6_prefix }} dev {{ lan_interface }}
+    ip link set {{ lan_interface }} up
   changed_when: false
   become: yes
 
@@ -325,7 +325,7 @@
   lineinfile:
     path: /etc/default/isc-dhcp-server
     regexp: '^INTERFACESv6='
-    line: 'INTERFACESv6="{{ interface }}"'
+    line: 'INTERFACESv6="{{ lan_interface }}"'
     create: yes
   notify: restart isc-dhcp-server6
   become: yes
@@ -355,8 +355,8 @@
 # =========================
 # Evidencias
 # =========================
-- name: Show IPv6 on {{ interface }}
-  command: ip -6 addr show {{ interface }}
+- name: Show IPv6 on {{ lan_interface }}
+  command: ip -6 addr show {{ lan_interface }}
   register: ipv6_config
   changed_when: false
 
@@ -378,7 +378,7 @@
       - "=================================================="
       - "✓ Debian IPv6 Router configurado (radvd + isc-dhcp-server6)"
       - "Red: 2025:DB8:101::/64"
-      - "Gateway: {{ ipv6_address }}/{{ ipv6_prefix }} ({{ interface }})"
+      - "Gateway: {{ lan_ipv6_address }}/{{ lan_ipv6_prefix }} ({{ lan_interface }})"
       - "radvd: {{ 'OK' if radvd_status.rc == 0 else 'FALLÓ' }}"
       - "DHCPv6: {{ 'OK' if dhcpv6_status.rc == 0 else 'FALLÓ' }}"
       - "=================================================="
