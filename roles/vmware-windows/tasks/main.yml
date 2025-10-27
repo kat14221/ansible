@@ -2,6 +2,19 @@
 # Role: vmware-windows
 # Descripción: Crear y aprovisionar VM Windows PC en ESXi
 
+- name: Eliminar VM existente si existe
+  community.vmware.vmware_guest:
+    hostname: "{{ hostvars['esxi-vmware-host']['vcenter_hostname'] }}"
+    username: "{{ hostvars['esxi-vmware-host']['vcenter_username'] }}"
+    password: "{{ hostvars['esxi-vmware-host']['vcenter_password'] }}"
+    validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
+    name: "{{ vm_name }}"
+    state: absent
+    force: yes
+  delegate_to: localhost
+  become: false
+  ignore_errors: yes
+
 - name: Verificar conectividad con ESXi
   community.vmware.vmware_host_facts:
     hostname: "{{ hostvars['esxi-vmware-host']['vcenter_hostname'] }}"
@@ -25,9 +38,16 @@
     datastore: "{{ hostvars['esxi-vmware-host']['datastore'] }}"
     guest_id: "{{ guest_id | default('windows11_64Guest') }}"
     hardware:
-      memory_mb: 4096
-      num_cpus: 2
+      memory_mb: 8192
+      num_cpus: 4
       scsi: paravirtual
+      boot_firmware: "efi"
+      version: 19
+      nested_virt: true
+      secure_boot: true
+      tpm:
+        - provider: "vtpm"
+          version: "2.0"
     disk:
       - size_gb: 40
         type: thin
