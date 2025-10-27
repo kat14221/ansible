@@ -44,3 +44,23 @@
     name: apache2
     state: restarted
   become: yes
+
+- name: restart radvd
+  ansible.builtin.systemd:
+    name: radvd
+    state: restarted
+
+- name: restart isc-dhcp-server6
+  ansible.builtin.systemd:
+    name: isc-dhcp-server6
+    state: restarted
+
+- name: restart nftables
+  ansible.builtin.systemd:
+    name: nftables
+    state: restarted
+
+- name: Reload networking
+  ansible.builtin.command: ifreload -a
+  changed_when: true
+---
