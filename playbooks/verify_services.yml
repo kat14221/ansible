@@ -4,13 +4,12 @@
   hosts: debian_router
   become: yes
   tasks:
-    - name: Asegurar que el archivo de configuración DHCPv6 existe
-      file:
+    - name: Comprobar existencia del archivo de configuración DHCPv6
+      stat:
         path: /etc/dhcp/dhcpd6.conf
-        state: file
       register: dhcp_config
 
-    - name: Verificar configuración de DHCPv6
+    - name: Verificar configuración de DHCPv6 (si existe)
       command: dhcpd -t -6 -cf /etc/dhcp/dhcpd6.conf
       changed_when: false
       when: dhcp_config.stat.exists
