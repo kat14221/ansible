@@ -1,49 +1,5 @@
 ---
-# Handlers para reiniciar servicios del router IPv6
-
-- name: restart radvd
-  systemd:
-    name: radvd
-    state: restarted
-  become: yes
-
-- name: restart isc-dhcp-server6
-  systemd:
-    name: isc-dhcp-server6
-    state: restarted
-  become: yes
-  ignore_errors: yes
-
-- name: restart nftables
-  systemd:
-    name: nftables
-    state: restarted
-  become: yes
-
-- name: restart networking
-  command: systemctl restart networking
-  become: yes
-  async: 0
-  poll: 0
-  ignore_errors: yes
-
-- name: restart dnsmasq
-  systemd:
-    name: dnsmasq
-    state: restarted
-  become: yes
-
-- name: restart vsftpd
-  systemd:
-    name: vsftpd
-    state: restarted
-  become: yes
-
-- name: restart apache2
-  systemd:
-    name: apache2
-    state: restarted
-  become: yes
+# handlers/debian-ipv6-router
 
 - name: restart radvd
   ansible.builtin.systemd:
@@ -60,7 +16,17 @@
     name: nftables
     state: restarted
 
-- name: Reload networking
+# Reload de red (si usas ifupdown2). Si no existe ifreload,
+# puedes comentar este handler o usar el fallback de abajo.
+- name: reload networking (ifupdown2)
   ansible.builtin.command: ifreload -a
+  register: ifreload_result
   changed_when: true
----
+  failed_when: false
+
+# Fallback: reiniciar el servicio "networking" si no tienes ifreload
+- name: restart networking (fallback)
+  ansible.builtin.systemd:
+    name: networking
+    state: restarted
+  when: ifreload_result is defined and ifreload_result.rc == 127
