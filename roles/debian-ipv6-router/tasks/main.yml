@@ -348,7 +348,7 @@
     state: started
   loop:
     - radvd
-    - isc-dhcp-server6
+    - isc-dhcp-server
     - nftables
   become: yes
 
@@ -367,7 +367,7 @@
   failed_when: false
 
 - name: Check DHCPv6
-  command: systemctl status isc-dhcp-server6 --no-pager
+  command: systemctl status isc-dhcp-server --no-pager
   register: dhcpv6_status
   changed_when: false
   failed_when: false
