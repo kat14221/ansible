@@ -3,6 +3,49 @@
 # Descripción: Configurar Debian como router IPv6 para red 2025:DB8:101::/64
 # Gateway central de toda la topología
 
+# ============================================
+# LIMPIEZA DE LOCKS APT (por si hay procesos bloqueados)
+# ============================================
+
+- name: Verificar si hay procesos apt/dpkg corriendo
+  shell: ps aux | grep -E '[a]pt|[d]pkg' | grep -v grep
+  register: apt_processes
+  changed_when: false
+  failed_when: false
+
+- name: Matar procesos apt/dpkg bloqueados
+  shell: |
+    pkill -9 apt || true
+    pkill -9 apt-get || true
+    pkill -9 dpkg || true
+  when: apt_processes.rc == 0
+  ignore_errors: yes
+
+- name: Esperar a que terminen procesos apt
+  pause:
+    seconds: 3
+  when: apt_processes.rc == 0
+
+- name: Eliminar locks de apt
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/apt/lists/lock
+    - /var/cache/apt/archives/lock
+    - /var/lib/dpkg/lock
+    - /var/lib/dpkg/lock-frontend
+  ignore_errors: yes
+
+- name: Reconfigurar paquetes dpkg
+  command: dpkg --configure -a
+  changed_when: false
+  ignore_errors: yes
+
+# ============================================
+# CONFIGURACIÓN DE REPOSITORIOS
+# ============================================
+
 - name: Deshabilitar repositorio CD-ROM
   lineinfile:
     path: /etc/apt/sources.list
