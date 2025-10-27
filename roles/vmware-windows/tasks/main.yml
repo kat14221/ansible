@@ -10,6 +10,7 @@
     validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
   register: esxi_facts
   delegate_to: localhost
+  become: false
 
 - name: Crear VM Windows PC desde ISO
   community.vmware.vmware_guest:
@@ -22,7 +23,7 @@
     state: present
     folder: "{{ vm_folder }}"
     datastore: "{{ hostvars['esxi-vmware-host']['datastore'] }}"
-    guest_id: "{{ guest_id | default('windows10_64Guest') }}"
+    guest_id: "{{ guest_id | default('windows11_64Guest') }}"
     hardware:
       memory_mb: 4096
       num_cpus: 2
@@ -41,6 +42,7 @@
       - name: "{{ networks[0].name }}"
     force: yes
   delegate_to: localhost
+  become: false
   register: vm_facts
 
 - name: Encender VM Windows para instalación
@@ -52,6 +54,7 @@
     name: "{{ vm_name }}"
     state: poweredon
   delegate_to: localhost
+  become: false
 
 - name: Resumen de creación
   debug:
