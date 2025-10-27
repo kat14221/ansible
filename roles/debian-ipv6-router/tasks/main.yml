@@ -79,6 +79,18 @@
     backup: yes
   # NO reiniciar networking automáticamente para evitar cortar SSH
 
+- name: Verificar si interfaz IPv6 tiene IP configurada
+  shell: ip -6 addr show {{ interface }} | grep -q {{ ipv6_address }}
+  register: ipv6_configured
+  changed_when: false
+  failed_when: false
+
+- name: Configurar IPv6 en interfaz (sin reiniciar networking)
+  shell: |
+    ip addr add {{ ipv6_address }}/{{ ipv6_prefix }} dev {{ interface }} || true
+    ip link set {{ interface }} up
+  when: ipv6_configured.rc != 0
+
 - name: Configurar radvd (Router Advertisement)
   template:
     src: radvd.conf.j2
