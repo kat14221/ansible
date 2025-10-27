@@ -302,6 +302,22 @@
   changed_when: false
   become: yes
 
+- name: Ensure IPv6 forwarding on {{ lan_interface }} (per-interface)
+  sysctl:
+    name: "net.ipv6.conf.{{ lan_interface }}.forwarding"
+    value: '1'
+    state: present
+    reload: yes
+  become: yes
+
+- name: Ensure static IPv6 routes present (runtime)
+  command: ip -6 route add {{ item.network }} via {{ item.via }} dev {{ item.dev | default(lan_interface) }}
+  loop: "{{ static_routes | default([]) }}"
+  register: route_add_results
+  failed_when: false
+  changed_when: rc == 0
+  become: yes
+
 # =========================
 # radvd + isc-dhcp-server6
 # =========================

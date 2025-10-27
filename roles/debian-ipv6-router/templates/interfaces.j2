@@ -36,3 +36,15 @@ iface {{ lan_interface }} inet6 static
 
     # Habilitamos el forwarding en esta interfaz.
     pre-up echo 1 > /proc/sys/net/ipv6/conf/{{ lan_interface }}/forwarding
+
+    # Rutas estáticas adicionales (opcional)
+    # Definir en inventario: static_routes:
+    # - network: "2025:db8:100::/64"
+    #   via: "2025:db8:101::1"
+    #   dev: "{{ lan_interface }}"  # opcional, por defecto lan_interface
+    {% if static_routes is defined %}
+    {% for r in static_routes %}
+    post-up /sbin/ip -6 route add {{ r.network }} via {{ r.via }} dev {{ r.dev | default(lan_interface) }}
+    pre-down /sbin/ip -6 route del {{ r.network }} via {{ r.via }} dev {{ r.dev | default(lan_interface) }}
+    {% endfor %}
+    {% endif %}
