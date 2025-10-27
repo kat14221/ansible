@@ -3,6 +3,26 @@
 # Descripción: Configurar Debian como router IPv6 para red 2025:DB8:101::/64
 # Gateway central de toda la topología
 
+- name: Deshabilitar repositorio CD-ROM
+  lineinfile:
+    path: /etc/apt/sources.list
+    regexp: '^deb cdrom:'
+    state: absent
+  ignore_errors: yes
+
+- name: Configurar repositorios de Debian (red)
+  copy:
+    dest: /etc/apt/sources.list
+    content: |
+      # Repositorios de Debian 12 (Bookworm) por red
+      deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
+      deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
+      deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+
 - name: Actualizar cache de paquetes
   apt:
     update_cache: yes
