@@ -23,6 +23,7 @@ sudo apt-get install -y --no-install-recommends \
   python3 \
   python3-pip \
   python3-venv \
+  python3-full \
   ansible \
   git \
   sshpass \
@@ -35,7 +36,13 @@ sudo apt-get install -y --no-install-recommends \
   jq \
   vim \
   net-tools \
-  iputils-ping
+  iputils-ping \
+  python3-netaddr \
+  python3-jinja2 \
+  python3-passlib \
+  python3-requests \
+  python3-cryptography \
+  python3-jmespath
 
 # 3. Actualizar CA certificates
 echo "[3/6] Actualizando certificados..."
@@ -44,9 +51,15 @@ sudo update-ca-certificates 2>/dev/null || true
 # 4. Instalar dependencias Python
 echo "[4/6] Instalando dependencias Python..."
 if [[ -f requirements-pip.txt ]]; then
-  pip3 install --user --upgrade pip
-  pip3 install --user -r requirements-pip.txt
-  echo "✅ Dependencias Python instaladas desde requirements-pip.txt"
+  # Usar --break-system-packages para Debian 12/Ubuntu 23.04+
+  # Solo instala paquetes que no están disponibles vía apt
+  echo "Instalando pyvmomi (no disponible en apt)..."
+  pip3 install --break-system-packages pyvmomi>=8.0.0.1 || \
+    pip3 install --user pyvmomi>=8.0.0.1 || \
+    python3 -m pip install --break-system-packages pyvmomi>=8.0.0.1
+  
+  echo "✅ Dependencias Python instaladas (pyvmomi)"
+  echo "✅ Otras dependencias ya instaladas vía apt"
 else
   echo "⚠️  requirements-pip.txt no encontrado, saltando instalación pip"
 fi
