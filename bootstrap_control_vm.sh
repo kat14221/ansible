@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Bootstrap script para VM de control Ansible
 # Instala dependencias, Python, Ansible, collections y prepara evidencias
+# IDEMPOTENTE: Solo instala lo que falta
 
 set -euo pipefail
 
@@ -12,71 +13,170 @@ echo "=========================================="
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
 
+# Función para verificar si un paquete apt está instalado
+check_apt_package() {
+  dpkg -l "$1" 2>/dev/null | grep -q "^ii"
+}
+
+# Función para verificar si un paquete Python está instalado
+check_python_package() {
+  python3 -c "import $1" 2>/dev/null
+}
+
 # 1. Actualizar sistema base
 echo "[1/6] Actualizando sistema base..."
 sudo apt-get update -qq
-sudo apt-get upgrade -y -qq
+echo "✅ Índice de paquetes actualizado"
 
-# 2. Instalar paquetes esenciales
-echo "[2/6] Instalando paquetes esenciales..."
-sudo apt-get install -y --no-install-recommends \
-  python3 \
-  python3-pip \
-  python3-venv \
-  python3-full \
-  ansible \
-  git \
-  sshpass \
-  build-essential \
-  libssl-dev \
-  libffi-dev \
-  ca-certificates \
-  curl \
-  wget \
-  jq \
-  vim \
-  net-tools \
-  iputils-ping \
-  python3-netaddr \
-  python3-jinja2 \
-  python3-passlib \
-  python3-requests \
-  python3-cryptography \
-  python3-jmespath
+# 2. Verificar e instalar paquetes esenciales
+echo "[2/6] Verificando paquetes del sistema..."
+PACKAGES_TO_INSTALL=()
+
+REQUIRED_PACKAGES=(
+  "python3"
+  "python3-pip"
+  "python3-venv"
+  "python3-full"
+  "ansible"
+  "git"
+  "sshpass"
+  "build-essential"
+  "libssl-dev"
+  "libffi-dev"
+  "ca-certificates"
+  "curl"
+  "wget"
+  "jq"
+  "vim"
+  "net-tools"
+  "iputils-ping"
+  "python3-netaddr"
+  "python3-jinja2"
+  "python3-passlib"
+  "python3-requests"
+  "python3-cryptography"
+  "python3-jmespath"
+)
+
+for pkg in "${REQUIRED_PACKAGES[@]}"; do
+  if ! check_apt_package "$pkg"; then
+    PACKAGES_TO_INSTALL+=("$pkg")
+    echo "  ⬇️  $pkg (faltante)"
+  else
+    echo "  ✅ $pkg (ya instalado)"
+  fi
+done
+
+if [ ${#PACKAGES_TO_INSTALL[@]} -gt 0 ]; then
+  echo ""
+  echo "Instalando ${#PACKAGES_TO_INSTALL[@]} paquetes faltantes..."
+  sudo apt-get install -y --no-install-recommends "${PACKAGES_TO_INSTALL[@]}"
+  echo "✅ Paquetes instalados"
+else
+  echo "✅ Todos los paquetes ya están instalados"
+fi
 
 # 3. Actualizar CA certificates
 echo "[3/6] Actualizando certificados..."
 sudo update-ca-certificates 2>/dev/null || true
 
-# 4. Instalar dependencias Python
-echo "[4/6] Instalando dependencias Python..."
-if [[ -f requirements-pip.txt ]]; then
-  # Usar --break-system-packages para Debian 12/Ubuntu 23.04+
-  # Solo instala paquetes que no están disponibles vía apt
-  echo "Instalando pyvmomi (no disponible en apt)..."
-  pip3 install --break-system-packages pyvmomi>=8.0.0.1 || \
-    pip3 install --user pyvmomi>=8.0.0.1 || \
-    python3 -m pip install --break-system-packages pyvmomi>=8.0.0.1
-  
-  echo "✅ Dependencias Python instaladas (pyvmomi)"
-  echo "✅ Otras dependencias ya instaladas vía apt"
+# 4. Verificar e instalar dependencias Python
+echo "[4/6] Verificando dependencias Python..."
+
+# Verificar pyvmomi (no está en apt, necesita pip)
+if check_python_package "pyVmomi"; then
+  PYVMOMI_VERSION=$(python3 -c "import pyVmomi; print(pyVmomi.__version__)" 2>/dev/null || echo "desconocida")
+  echo "  ✅ pyvmomi ya instalado (versión: $PYVMOMI_VERSION)"
 else
-  echo "⚠️  requirements-pip.txt no encontrado, saltando instalación pip"
+  echo "  ⬇️  Instalando pyvmomi..."
+  if pip3 install --break-system-packages pyvmomi>=8.0.0.1 2>/dev/null; then
+    echo "  ✅ pyvmomi instalado con --break-system-packages"
+  elif pip3 install --user pyvmomi>=8.0.0.1 2>/dev/null; then
+    echo "  ✅ pyvmomi instalado con --user"
+  else
+    echo "  ⚠️  Error al instalar pyvmomi, intentando método alternativo..."
+    python3 -m pip install --break-system-packages pyvmomi>=8.0.0.1 || \
+      echo "  ❌ No se pudo instalar pyvmomi. Instalar manualmente después."
+  fi
 fi
 
-# 5. Instalar Ansible Collections
-echo "[5/6] Instalando Ansible Collections..."
+# Verificar otras dependencias ya instaladas vía apt
+PYTHON_DEPS=("netaddr" "jinja2" "passlib" "requests" "cryptography" "jmespath")
+echo ""
+echo "Verificando dependencias Python (vía apt):"
+for dep in "${PYTHON_DEPS[@]}"; do
+  if check_python_package "$dep"; then
+    echo "  ✅ $dep"
+  else
+    echo "  ⚠️  $dep no encontrado (debería estar instalado vía apt)"
+  fi
+done
+
+# 5. Verificar e instalar Ansible Collections
+echo "[5/6] Verificando Ansible Collections..."
 if [[ -f requirements.yml ]]; then
-  ansible-galaxy collection install -r requirements.yml --force
-  echo "✅ Collections instaladas desde requirements.yml"
+  # Verificar collections instaladas
+  echo "Verificando collections requeridas..."
+  COLLECTIONS_TO_INSTALL=false
+  
+  REQUIRED_COLLECTIONS=("community.vmware" "cisco.ios" "ansible.netcommon" "ansible.posix" "ansible.utils")
+  
+  for collection in "${REQUIRED_COLLECTIONS[@]}"; do
+    if ansible-galaxy collection list | grep -q "$collection"; then
+      INSTALLED_VERSION=$(ansible-galaxy collection list | grep "$collection" | awk '{print $2}')
+      echo "  ✅ $collection ($INSTALLED_VERSION)"
+    else
+      echo "  ⬇️  $collection (faltante)"
+      COLLECTIONS_TO_INSTALL=true
+    fi
+  done
+  
+  if [ "$COLLECTIONS_TO_INSTALL" = true ]; then
+    echo ""
+    echo "Instalando/actualizando collections faltantes..."
+    ansible-galaxy collection install -r requirements.yml --force
+    echo "✅ Collections actualizadas"
+  else
+    echo "✅ Todas las collections ya están instaladas"
+    echo "   (Usa --force para actualizar)"
+  fi
 else
   echo "⚠️  requirements.yml no encontrado, saltando instalación de collections"
 fi
 
 # 6. Crear estructura de evidencias
-echo "[6/6] Creando estructura de directorios..."
-mkdir -p evidence/{configs,pings,pcaps,services,reports,logs}
-mkdir -p group_vars/all
+echo "[6/6] Verificando estructura de directorios..."
+DIRS_CREATED=0
+DIRS_EXISTED=0
+
+REQUIRED_DIRS=(
+  "evidence/configs"
+  "evidence/pings"
+  "evidence/pcaps"
+  "evidence/services"
+  "evidence/reports"
+  "evidence/logs"
+  "evidence/technical_reports"
+  "group_vars/all"
+)
+
+for dir in "${REQUIRED_DIRS[@]}"; do
+  if [ -d "$dir" ]; then
+    echo "  ✅ $dir (existe)"
+    ((DIRS_EXISTED++))
+  else
+    mkdir -p "$dir"
+    echo "  ⬇️  $dir (creado)"
+    ((DIRS_CREATED++))
+  fi
+done
+
+if [ $DIRS_CREATED -gt 0 ]; then
+  echo "✅ $DIRS_CREATED directorios creados"
+fi
+if [ $DIRS_EXISTED -gt 0 ]; then
+  echo "✅ $DIRS_EXISTED directorios ya existían"
+fi
 
 # Permisos
 chmod +x bootstrap_control_vm.sh 2>/dev/null || true
@@ -86,8 +186,16 @@ echo "=========================================="
 echo "✅ Bootstrap completado exitosamente"
 echo "=========================================="
 echo ""
-echo "Próximos pasos:"
+echo "📊 Resumen:"
+echo "  • Paquetes apt: ${#PACKAGES_TO_INSTALL[@]} instalados"
+echo "  • pyvmomi: $(check_python_package pyVmomi && echo 'OK' || echo 'Verificar manualmente')"
+echo "  • Collections: $(ansible-galaxy collection list 2>/dev/null | grep -c 'community\|cisco\|ansible' || echo '0') instaladas"
+echo "  • Directorios: $DIRS_CREATED creados, $DIRS_EXISTED ya existían"
+echo ""
+echo "📋 Próximos pasos:"
 echo "  1. Ejecutar: ansible-playbook playbooks/bootstrap_control.yml"
-echo "  2. Crear/editar Vault: ansible-vault create group_vars/all/vault.yml"
-echo "  3. Ejecutar playbook principal: ansible-playbook playbooks/site.yml --ask-vault-pass"
+echo "  2. Configurar Vault: cp group_vars/all/vault.yml.template group_vars/all/vault.yml"
+echo "  3. Editar credenciales: vim group_vars/all/vault.yml"
+echo "  4. Cifrar Vault: ansible-vault encrypt group_vars/all/vault.yml"
+echo "  5. Ejecutar: ansible-playbook playbooks/site.yml"
 echo ""
