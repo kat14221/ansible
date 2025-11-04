@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Índice de Informes Técnicos - VMWARE-101001</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        h1 { color: #667eea; text-align: center; font-size: 2.5em; margin-bottom: 10px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 40px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 40px; }
+        .stat-box { background: #667eea; color: white; padding: 20px; border-radius: 10px; text-align: center; }
+        .stat-box h2 { margin: 0; font-size: 2.5em; }
+        .stat-box p { margin: 5px 0 0 0; opacity: 0.9; }
+        .report-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .report-card { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 10px; padding: 25px; transition: all 0.3s; }
+        .report-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+        .report-card h3 { color: #667eea; margin: 0 0 15px 0; font-size: 1.5em; }
+        .report-card p { color: #4a5568; margin: 10px 0; }
+        .report-links { margin-top: 15px; }
+        .report-links a { display: inline-block; padding: 8px 15px; margin: 5px 5px 0 0; background: #667eea; color: white; text-decoration: none; border-radius: 5px; transition: background 0.3s; }
+        .report-links a:hover { background: #5568d3; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.85em; font-weight: bold; }
+        .badge-linux { background: #48bb78; color: white; }
+        .badge-network { background: #ed8936; color: white; }
+        .badge-windows { background: #4299e1; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Informes Técnicos del Proyecto</h1>
+        <p class="subtitle">VMWARE-101001 • Red Académica IPv6 • {{ ansible_date_time.iso8601 }}</p>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <h2>{{ groups['all'] | length }}</h2>
+                <p>Hosts Totales</p>
+            </div>
+            <div class="stat-box">
+                <h2>{{ groups['linux_servers'] | default([]) | length }}</h2>
+                <p>Servidores Linux</p>
+            </div>
+            <div class="stat-box">
+                <h2>{{ groups['network_devices'] | default([]) | length }}</h2>
+                <p>Dispositivos de Red</p>
+            </div>
+            <div class="stat-box">
+                <h2>{{ groups['windows_hosts'] | default([]) | length }}</h2>
+                <p>Hosts Windows</p>
+            </div>
+        </div>
+
+        <h2 style="color: #667eea; border-bottom: 3px solid #667eea; padding-bottom: 10px; margin-bottom: 20px;">Informes Disponibles</h2>
+        
+        <div class="report-grid">
+            {% for host in groups['all'] %}
+            <div class="report-card">
+                <h3>🖥️ {{ host }}</h3>
+                <p>
+                    {% if host in groups['linux_servers'] | default([]) %}
+                    <span class="badge badge-linux">Linux Server</span>
+                    {% elif host in groups['network_devices'] | default([]) %}
+                    <span class="badge badge-network">Dispositivo de Red</span>
+                    {% elif host in groups['windows_hosts'] | default([]) %}
+                    <span class="badge badge-windows">Windows Host</span>
+                    {% else %}
+                    <span class="badge" style="background: #718096; color: white;">Otro</span>
+                    {% endif %}
+                </p>
+                <div class="report-links">
+                    <a href="{{ host }}_technical_report.html" target="_blank">📄 HTML</a>
+                    <a href="{{ host }}_technical_report.txt" download>📝 TXT</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="margin-top: 40px; text-align: center; color: #718096; padding-top: 20px; border-top: 2px solid #e2e8f0;">
+            <p>Generado automáticamente por Ansible • {{ ansible_date_time.date }} {{ ansible_date_time.time }}</p>
+            <p style="margin-top: 10px;">📁 Todos los informes disponibles en: <code>evidence/technical_reports/</code></p>
+        </div>
+    </div>
+</body>
+</html>

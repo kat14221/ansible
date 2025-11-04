@@ -1,0 +1,206 @@
+---
+# Role: evidence-collector
+# Descripción: Recolecta evidencias de red IPv6, conectividad, configuraciones y tráfico
+
+- name: Crear directorios de evidencias locales
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - evidence/configs
+    - evidence/pings
+    - evidence/pcaps
+    - evidence/reports
+  delegate_to: localhost
+  run_once: true
+
+# ==========================================
+# LINUX/DEBIAN HOSTS - Configuración IPv6
+# ==========================================
+- name: Recolectar direccionamiento IPv6
+  command: ip -6 addr show
+  register: ipv6_addr
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Recolectar tabla de rutas IPv6
+  command: ip -6 route show
+  register: ipv6_route
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Recolectar interfaces de red
+  command: ip link show
+  register: ip_links
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Guardar configuración de red (Linux)
+  copy:
+    content: |
+      ===== Configuración de Red - {{ inventory_hostname }} =====
+      Fecha: {{ ansible_date_time.iso8601 }}
+      OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+      
+      === IPv6 Addresses ===
+      {{ ipv6_addr.stdout }}
+      
+      === IPv6 Routes ===
+      {{ ipv6_route.stdout }}
+      
+      === Network Interfaces ===
+      {{ ip_links.stdout }}
+    dest: "evidence/configs/{{ inventory_hostname }}_network.txt"
+  delegate_to: localhost
+  when: ansible_os_family == "Debian"
+
+# ==========================================
+# CISCO IOS - Configuración
+# ==========================================
+- name: Recolectar running-config de IOS
+  cisco.ios.ios_command:
+    commands:
+      - show running-config
+  register: ios_running_config
+  when: ansible_network_os is defined and ansible_network_os == "ios"
+
+- name: Recolectar rutas IPv6 de IOS
+  cisco.ios.ios_command:
+    commands:
+      - show ipv6 route
+  register: ios_ipv6_routes
+  when: ansible_network_os is defined and ansible_network_os == "ios"
+
+- name: Guardar configuración IOS
+  copy:
+    content: |
+      ===== Configuración IOS - {{ inventory_hostname }} =====
+      Fecha: {{ ansible_date_time.iso8601 }}
+      
+      === Running Config ===
+      {{ ios_running_config.stdout[0] }}
+      
+      === IPv6 Routes ===
+      {{ ios_ipv6_routes.stdout[0] }}
+    dest: "evidence/configs/{{ inventory_hostname }}_running_config.txt"
+  delegate_to: localhost
+  when: ansible_network_os is defined and ansible_network_os == "ios"
+
+# ==========================================
+# PRUEBAS DE CONECTIVIDAD IPv6
+# ==========================================
+- name: Definir targets de ping
+  set_fact:
+    ping_targets:
+      - { name: "backbone", ip: "2025:db8:101::1" }
+      - { name: "debian_router", ip: "2025:db8:101::1" }
+      - { name: "ubuntu_pc", ip: "2025:db8:101::10" }
+      - { name: "windows_pc", ip: "2025:db8:101::11" }
+      - { name: "lab_network", ip: "2025:db8:100::2" }
+
+- name: Ejecutar ping6 a targets
+  command: ping6 -c 4 {{ item.ip }}
+  loop: "{{ ping_targets }}"
+  register: ping_results
+  failed_when: false
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Guardar resultados de ping
+  copy:
+    content: |
+      ===== Pruebas de Conectividad - {{ inventory_hostname }} =====
+      Fecha: {{ ansible_date_time.iso8601 }}
+      
+      {% for result in ping_results.results %}
+      === Ping a {{ result.item.name }} ({{ result.item.ip }}) ===
+      Exit Code: {{ result.rc }}
+      {{ result.stdout if result.rc == 0 else result.stderr }}
+      
+      {% endfor %}
+    dest: "evidence/pings/{{ inventory_hostname }}_pings.txt"
+  delegate_to: localhost
+  when: ansible_os_family == "Debian" and ping_results is defined
+
+# ==========================================
+# CAPTURA DE TRÁFICO
+# ==========================================
+- name: Verificar si tcpdump está instalado
+  command: which tcpdump
+  register: tcpdump_check
+  failed_when: false
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Capturar tráfico IPv6 (30 segundos)
+  shell: |
+    timeout 30 tcpdump -i {{ lan_interface | default('any') }} -w /tmp/capture_{{ ansible_date_time.epoch }}.pcap ip6 &
+    sleep 5
+    ping6 -c 3 2025:db8:101::1 || true
+    sleep 25
+  async: 35
+  poll: 0
+  register: capture_job
+  when:
+    - ansible_os_family == "Debian"
+    - tcpdump_check.rc == 0
+    - inventory_hostname == "debian-router"
+
+- name: Esperar captura
+  async_status:
+    jid: "{{ capture_job.ansible_job_id }}"
+  register: job_result
+  until: job_result.finished
+  retries: 10
+  delay: 5
+  when:
+    - ansible_os_family == "Debian"
+    - capture_job is defined
+    - capture_job.ansible_job_id is defined
+
+- name: Descargar PCAP
+  fetch:
+    src: "/tmp/capture_{{ ansible_date_time.epoch }}.pcap"
+    dest: "evidence/pcaps/{{ inventory_hostname }}_capture.pcap"
+    flat: yes
+  when:
+    - ansible_os_family == "Debian"
+    - inventory_hostname == "debian-router"
+  ignore_errors: yes
+
+# ==========================================
+# REPORTE FINAL JSON
+# ==========================================
+- name: Generar reporte de evidencias (JSON)
+  copy:
+    content: |
+      {
+        "hostname": "{{ inventory_hostname }}",
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "os": "{{ ansible_distribution | default('Unknown') }} {{ ansible_distribution_version | default('') }}",
+        "ipv6_configured": {{ (ipv6_addr is defined and ipv6_addr.rc == 0) | lower }},
+        "connectivity_tests": {
+          {% if ping_results is defined %}
+          {% for result in ping_results.results %}
+          "{{ result.item.name }}": {{ (result.rc == 0) | lower }}{{ "," if not loop.last else "" }}
+          {% endfor %}
+          {% endif %}
+        },
+        "evidence_files": {
+          "network_config": "evidence/configs/{{ inventory_hostname }}_network.txt",
+          "ping_results": "evidence/pings/{{ inventory_hostname }}_pings.txt",
+          "pcap": "evidence/pcaps/{{ inventory_hostname }}_capture.pcap"
+        }
+      }
+    dest: "evidence/reports/{{ inventory_hostname }}_report.json"
+  delegate_to: localhost
+
+- name: Resumen de evidencias recolectadas
+  debug:
+    msg:
+      - "✅ Evidencias recolectadas para {{ inventory_hostname }}"
+      - "  - Configs: evidence/configs/"
+      - "  - Pings: evidence/pings/"
+      - "  - PCAPs: evidence/pcaps/"
+      - "  - Reportes: evidence/reports/"

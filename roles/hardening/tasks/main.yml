@@ -1,0 +1,127 @@
+---
+# Role: hardening
+# Descripción: Hardening básico de seguridad en hosts Linux
+
+- name: Actualizar sistema
+  apt:
+    update_cache: yes
+    upgrade: safe
+  become: yes
+  when: ansible_os_family == "Debian"
+
+# ==========================================
+# USUARIOS Y PERMISOS
+# ==========================================
+- name: Crear usuario operador con permisos limitados
+  user:
+    name: operator
+    groups: sudo
+    shell: /bin/bash
+    create_home: yes
+    password: "{{ 'operator123' | password_hash('sha512') }}"
+  become: yes
+
+- name: Configurar sudoers para operator (requiere contraseña)
+  lineinfile:
+    path: /etc/sudoers.d/operator
+    line: "operator ALL=(ALL:ALL) ALL"
+    create: yes
+    mode: '0440'
+    validate: 'visudo -cf %s'
+  become: yes
+
+- name: Configurar sudoers para ansible (sin contraseña)
+  lineinfile:
+    path: /etc/sudoers.d/ansible
+    line: "ansible ALL=(ALL:ALL) NOPASSWD: ALL"
+    create: yes
+    mode: '0440'
+    validate: 'visudo -cf %s'
+  become: yes
+
+# ==========================================
+# FAIL2BAN
+# ==========================================
+- name: Instalar fail2ban
+  apt:
+    name: fail2ban
+    state: present
+  become: yes
+  when: ansible_os_family == "Debian"
+
+- name: Configurar fail2ban para SSH
+  copy:
+    dest: /etc/fail2ban/jail.local
+    mode: '0644'
+    content: |
+      [DEFAULT]
+      bantime = 3600
+      findtime = 600
+      maxretry = 5
+      
+      [sshd]
+      enabled = true
+      port = ssh
+      logpath = /var/log/auth.log
+      maxretry = 3
+  become: yes
+  notify: restart fail2ban
+
+- name: Iniciar y habilitar fail2ban
+  systemd:
+    name: fail2ban
+    state: started
+    enabled: yes
+  become: yes
+
+# ==========================================
+# LOGS Y AUDITORÍA
+# ==========================================
+- name: Configurar logrotate para logs de Ansible
+  copy:
+    dest: /etc/logrotate.d/ansible
+    mode: '0644'
+    content: |
+      /var/log/ansible/*.log {
+        daily
+        rotate 7
+        compress
+        missingok
+        notifempty
+      }
+  become: yes
+
+- name: Asegurar permisos en /var/log
+  file:
+    path: /var/log
+    mode: '0755'
+    state: directory
+  become: yes
+
+# ==========================================
+# KERNEL HARDENING
+# ==========================================
+- name: Aplicar configuración de kernel hardening
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.ipv4.conf.all.rp_filter', value: '1' }
+    - { name: 'net.ipv4.conf.default.rp_filter', value: '1' }
+    - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
+    - { name: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+    - { name: 'net.ipv6.conf.all.accept_source_route', value: '0' }
+    - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.all.log_martians', value: '1' }
+  become: yes
+
+- name: Resumen de hardening
+  debug:
+    msg:
+      - "✅ Hardening aplicado"
+      - "  - Usuario operator creado"
+      - "  - Sudoers configurados"
+      - "  - Fail2ban activo"
+      - "  - Kernel hardening aplicado"

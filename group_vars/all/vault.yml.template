@@ -1,0 +1,35 @@
+---
+# ============================================================
+# ANSIBLE VAULT - Credenciales sensibles
+# ============================================================
+# IMPORTANTE: Renombrar a vault.yml y cifrar con:
+#   mv vault.yml.template vault.yml
+#   ansible-vault encrypt group_vars/all/vault.yml
+# EDITAR CON: ansible-vault edit group_vars/all/vault.yml
+# ============================================================
+
+# === VMware/ESXi ===
+vault_vcenter_hostname: "172.17.25.1"
+vault_vcenter_username: "root"
+vault_vcenter_password: "qwe123$"
+vault_vcenter_port: 443
+vault_vcenter_validate_certs: "no"
+
+# === Credenciales SSH ===
+vault_ansible_user: "ansible"
+vault_ansible_ssh_public_key: "ssh-rsa AAAAB3NzaC... ansible@control"  # Reemplazar con clave real
+
+# === Routers Cisco IOS ===
+vault_cisco_user: "cisco"
+vault_cisco_password: "cisco123"
+vault_cisco_enable_secret: "cisco123"
+
+# === Debian Router ===
+vault_debian_ansible_password: "ansible_secure_pass"
+
+# === Windows hosts ===
+vault_windows_admin_password: "Windows@2024!"
+
+# === FTP/HTTP Services ===
+vault_ftp_user: "ftpuser"
+vault_ftp_password: "ftppass123"

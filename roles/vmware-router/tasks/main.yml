@@ -11,6 +11,22 @@
   register: esxi_facts
   delegate_to: localhost
 
+- name: Verificar si la VM ya existe
+  community.vmware.vmware_guest_info:
+    hostname: "{{ hostvars['esxi-vmware-host']['vcenter_hostname'] }}"
+    username: "{{ hostvars['esxi-vmware-host']['vcenter_username'] }}"
+    password: "{{ hostvars['esxi-vmware-host']['vcenter_password'] }}"
+    validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
+    datacenter: "{{ hostvars['esxi-vmware-host']['datacenter'] }}"
+    name: "{{ vm_name }}"
+  register: vm_info
+  failed_when: false
+  delegate_to: localhost
+
+- name: Marcar existencia de VM
+  set_fact:
+    vm_exists: "{{ (vm_info is defined) and (vm_info.instance is defined) }}"
+
 - name: Crear VM Debian Router desde ISO
   community.vmware.vmware_guest:
     hostname: "{{ hostvars['esxi-vmware-host']['vcenter_hostname'] }}"
@@ -40,10 +56,11 @@
     networks:
       - name: "{{ networks[0].name }}"
     force: yes
+  when: not vm_exists | default(false)
   delegate_to: localhost
   register: vm_facts
 
-- name: Encender VM Router para instalación
+- name: Encender VM Router si existe o fue creada
   community.vmware.vmware_guest:
     hostname: "{{ hostvars['esxi-vmware-host']['vcenter_hostname'] }}"
     username: "{{ hostvars['esxi-vmware-host']['vcenter_username'] }}"
@@ -53,10 +70,10 @@
     state: poweredon
   delegate_to: localhost
 
-- name: Resumen de creación
+- name: Resumen de creación/reuso
   debug:
     msg:
-      - "VM {{ vm_name }} creada exitosamente"
+      - "VM {{ vm_name }} {{ 'reutilizada' if vm_exists | default(false) else 'creada' }}"
       - "Estado: Encendida para instalación desde ISO"
       - "ISO: {{ cdrom }}"
       - "NOTA: La instalación del SO debe completarse manualmente"

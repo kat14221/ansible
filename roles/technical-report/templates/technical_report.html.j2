@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe Técnico - {{ report_hostname }}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .header .meta {
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        .section {
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .info-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        .info-item strong {
+            display: block;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.9em;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .status-success {
+            background: #48bb78;
+            color: white;
+        }
+        .status-warning {
+            background: #ed8936;
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #f7fafc;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Informe Técnico del Sistema</h1>
+        <div class="meta">
+            <strong>Host:</strong> {{ report_hostname }} | 
+            <strong>Fecha:</strong> {{ report_timestamp }} |
+            <strong>Proyecto:</strong> VMWARE-101001
+        </div>
+    </div>
+
+    <!-- Información General -->
+    <div class="section">
+        <h2>🖥️ Información General del Sistema</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>Sistema Operativo</strong>
+                {{ ansible_distribution | default('N/A') }} {{ ansible_distribution_version | default('') }}
+            </div>
+            <div class="info-item">
+                <strong>Kernel</strong>
+                {{ ansible_kernel | default('N/A') }}
+            </div>
+            <div class="info-item">
+                <strong>Arquitectura</strong>
+                {{ ansible_architecture | default('N/A') }}
+            </div>
+            <div class="info-item">
+                <strong>Hostname</strong>
+                {{ ansible_hostname | default('N/A') }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Hardware -->
+    <div class="section">
+        <h2>⚙️ Recursos de Hardware</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>CPUs</strong>
+                {{ ansible_processor_vcpus | default('N/A') }} vCPUs
+            </div>
+            <div class="info-item">
+                <strong>Memoria Total</strong>
+                {{ ansible_memtotal_mb | default('N/A') }} MB
+            </div>
+            <div class="info-item">
+                <strong>Memoria Libre</strong>
+                {{ ansible_memfree_mb | default('N/A') }} MB
+            </div>
+            <div class="info-item">
+                <strong>Swap</strong>
+                {{ ansible_swaptotal_mb | default('N/A') }} MB
+            </div>
+        </div>
+    </div>
+
+    <!-- Red IPv6 -->
+    {% if network_info is defined %}
+    <div class="section">
+        <h2>🌐 Configuración de Red IPv6</h2>
+        {% for item in network_info.results %}
+        <h3>{{ item.item }}</h3>
+        <pre>{{ item.stdout }}</pre>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Servicios -->
+    {% if services_running is defined %}
+    <div class="section">
+        <h2>🔧 Servicios Activos</h2>
+        <pre>{{ services_running.stdout }}</pre>
+    </div>
+    {% endif %}
+
+    <!-- Firewall -->
+    {% if firewall_info is defined %}
+    <div class="section">
+        <h2>🔥 Configuración del Firewall</h2>
+        {% for item in firewall_info.results %}
+        <pre>{{ item.stdout }}</pre>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- SSH Hardening -->
+    {% if ssh_config is defined %}
+    <div class="section">
+        <h2>🔒 Configuración SSH Hardening</h2>
+        <pre>{{ ssh_config.stdout }}</pre>
+    </div>
+    {% endif %}
+
+    <!-- Cisco IOS -->
+    {% if ios_full_config is defined %}
+    <div class="section">
+        <h2>📡 Configuración Cisco IOS</h2>
+        <pre>{{ ios_full_config.stdout[0] }}</pre>
+    </div>
+    {% endif %}
+
+    <div class="section" style="text-align: center; color: #718096;">
+        <p>Generado automáticamente por Ansible • Proyecto VMWARE-101001 • {{ report_timestamp }}</p>
+    </div>
+</body>
+</html>

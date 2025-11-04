@@ -1,0 +1,140 @@
+---
+# Playbook: Bootstrap de VM de Control
+# Descripción: Post-instalación y configuración de la VM de control Ansible
+
+- name: Bootstrap de VM de Control Ansible
+  hosts: localhost
+  gather_facts: yes
+  become: yes
+  tasks:
+    - name: Verificar que estamos en la VM de control
+      debug:
+        msg:
+          - "Hostname: {{ ansible_hostname }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Python: {{ ansible_python_version }}"
+
+    # Estructura de directorios
+    - name: Asegurar directorios de evidencias
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ playbook_dir }}/../evidence/configs"
+        - "{{ playbook_dir }}/../evidence/pings"
+        - "{{ playbook_dir }}/../evidence/pcaps"
+        - "{{ playbook_dir }}/../evidence/services"
+        - "{{ playbook_dir }}/../evidence/reports"
+        - "{{ playbook_dir }}/../evidence/logs"
+      delegate_to: localhost
+      become: no
+
+    - name: Verificar archivo ansible.cfg
+      stat:
+        path: "{{ playbook_dir }}/../ansible.cfg"
+      register: cfg_exists
+
+    - name: Crear ansible.cfg base si no existe
+      copy:
+        dest: "{{ playbook_dir }}/../ansible.cfg"
+        mode: '0644'
+        content: |
+          [defaults]
+          inventory = inventory/hosts.yml
+          roles_path = ./roles
+          host_key_checking = False
+          retry_files_enabled = False
+          gathering = smart
+          fact_caching = jsonfile
+          fact_caching_connection = /tmp/ansible_facts
+          fact_caching_timeout = 3600
+          log_path = evidence/logs/ansible.log
+          nocows = 1
+          display_skipped_hosts = False
+          remote_tmp = /tmp/.ansible
+          vault_password_file = .vault_pass
+
+          [privilege_escalation]
+          become = True
+          become_method = sudo
+          become_user = root
+          become_ask_pass = False
+
+          [ssh_connection]
+          ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no
+          pipelining = True
+          remote_user = ansible
+      when: not cfg_exists.stat.exists
+      delegate_to: localhost
+      become: no
+
+    # Validar instalación de collections
+    - name: Verificar instalación de Ansible Collections
+      command: ansible-galaxy collection list
+      register: collections_list
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar collections instaladas
+      debug:
+        msg: "{{ collections_list.stdout_lines }}"
+      when: collections_list.rc == 0
+
+    - name: Verificar dependencias Python críticas
+      command: pip3 show {{ item }}
+      loop:
+        - pyvmomi
+        - netaddr
+        - passlib
+      register: pip_check
+      failed_when: false
+      changed_when: false
+
+    - name: Advertencia si falta alguna dependencia
+      debug:
+        msg: "⚠️  Falta instalar: {{ item.item }}"
+      loop: "{{ pip_check.results }}"
+      when: item.rc != 0
+
+    # Generar par de llaves SSH para la VM de control
+    - name: Generar par de llaves SSH para control
+      openssh_keypair:
+        path: ~/.ssh/id_rsa_ansible
+        type: rsa
+        size: 4096
+        comment: "ansible-control-vm"
+        force: no
+      become: no
+
+    - name: Mostrar clave pública generada
+      command: cat ~/.ssh/id_rsa_ansible.pub
+      register: pubkey
+      changed_when: false
+
+    - name: Información de clave SSH
+      debug:
+        msg:
+          - "Clave pública generada (copiar a hosts remotos):"
+          - "{{ pubkey.stdout }}"
+
+    # Resumen final
+    - name: Resumen de Bootstrap
+      debug:
+        msg:
+          - "=================================================="
+          - "✅ VM de Control configurada correctamente"
+          - "=================================================="
+          - "Estructura de evidencias: evidence/"
+          - "Ansible configurado: ansible.cfg"
+          - "Collections instaladas"
+          - ""
+          - "⚠️  SIGUIENTES PASOS MANUALES:"
+          - "1. Crear Vault cifrado:"
+          - "   mv group_vars/all/vault.yml.template group_vars/all/vault.yml"
+          - "   ansible-vault encrypt group_vars/all/vault.yml"
+          - "2. Guardar contraseña de Vault en .vault_pass (gitignore!)"
+          - "3. Copiar clave SSH pública a hosts remotos"
+          - "4. Ejecutar playbook principal:"
+          - "   ansible-playbook playbooks/site.yml"
+          - "=================================================="

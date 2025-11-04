@@ -1,0 +1,13 @@
+---
+- name: restart samba
+  systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - smbd
+    - nmbd
+  become: yes
+
+- name: reload firewalld
+  command: firewall-cmd --reload
+  become: yes

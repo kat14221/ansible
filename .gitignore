@@ -2,10 +2,12 @@
 vault.yml
 *.vault
 credentials.yml
+.vault_pass
+group_vars/all/vault.yml
 
-# Evidencias (opcional, puede ser útil versionarlas)
-evidence/pcaps/*.pcap
-evidence/logs/*.log
+# Evidencias (generadas automáticamente, no versionadas)
+evidence/
+!evidence/.gitkeep
 
 # Python
 __pycache__/

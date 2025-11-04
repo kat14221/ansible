@@ -1,0 +1,77 @@
+---
+# Playbook: Generar Informes Técnicos Completos
+# Descripción: Genera informes técnicos de todos los hosts y los centraliza en la VM de control
+
+- name: Crear directorio para informes en VM de control
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Crear directorio para informes
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /tmp/ansible_reports
+        - evidence/reports
+        - evidence/technical_reports
+
+- name: Generar informes técnicos de todos los hosts
+  hosts: all
+  gather_facts: yes
+  roles:
+    - technical-report
+  tags:
+    - reports
+    - technical
+
+- name: Configurar carpetas compartidas en servidores Linux
+  hosts: linux_servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - shared-folders
+  tags:
+    - shares
+    - samba
+
+- name: Consolidar informes en VM de control
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Copiar todos los informes a evidence/technical_reports/
+      copy:
+        src: "/tmp/ansible_reports/"
+        dest: "evidence/technical_reports/"
+      failed_when: false
+
+    - name: Generar índice HTML de todos los informes
+      template:
+        src: ../roles/technical-report/templates/index_reports.html.j2
+        dest: "evidence/technical_reports/index.html"
+
+    - name: Comprimir informes en archivo ZIP
+      archive:
+        path: "evidence/technical_reports/*"
+        dest: "evidence/informes_tecnicos_{{ ansible_date_time.date }}.zip"
+        format: zip
+
+    - name: Resumen final
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ Informes Técnicos Generados"
+          - "=========================================="
+          - ""
+          - "📁 Ubicación:"
+          - "   evidence/technical_reports/"
+          - "   evidence/informes_tecnicos_{{ ansible_date_time.date }}.zip"
+          - ""
+          - "📊 Índice de informes:"
+          - "   evidence/technical_reports/index.html"
+          - ""
+          - "📁 Carpetas compartidas configuradas en:"
+          - "   - debian-router: \\\\<IP>\\reports"
+          - "   - ubuntu-pc: \\\\<IP>\\reports"
+          - ""
+          - "=========================================="

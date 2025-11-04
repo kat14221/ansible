@@ -4,14 +4,14 @@
 # Backbone: 2025:DB8:101::/64
 # LAN: 2025:DB8:220::/64
 
-- name: Configurar equipos IOS (routers y switches)
-  hosts: all_ios
+- name: Configurar Dispositivos de Red (IOS)
+  hosts: network_devices
   gather_facts: yes
-  connection: network_cli
   roles:
     - ios-basic-config
   tags:
     - ios
+    - network
     - ios_config
 
 - name: Crear VMs en ESXi
@@ -75,6 +75,64 @@
     - capture
     - traffic
 
+- name: Aplicar Firewall Policy (Reglas Asimétricas)
+  hosts: vm_router
+  become: yes
+  gather_facts: yes
+  roles:
+    - firewall-policy
+  tags:
+    - firewall
+    - security
+
+- name: Hardening de Seguridad SSH (Solo Linux)
+  hosts: linux_servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - ssh-hardening
+  tags:
+    - security
+    - ssh
+
+- name: Hardening General del Sistema (Solo Linux)
+  hosts: linux_servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - hardening
+  tags:
+    - security
+    - hardening
+
+- name: Recolectar Evidencias Finales
+  hosts: all
+  gather_facts: yes
+  roles:
+    - evidence-collector
+  tags:
+    - evidence
+    - validation
+
+- name: Generar Informes Técnicos
+  hosts: all
+  gather_facts: yes
+  roles:
+    - technical-report
+  tags:
+    - reports
+    - technical
+
+- name: Configurar Carpetas Compartidas (Samba)
+  hosts: linux_servers
+  become: yes
+  gather_facts: yes
+  roles:
+    - shared-folders
+  tags:
+    - shares
+    - samba
+
 - name: Resumen Final
   hosts: localhost
   gather_facts: no
@@ -90,17 +148,30 @@
           - "✅ VMs creadas en ESXi"
           - "✅ Router Debian configurado con IPv6"
           - "✅ Servicios HTTP desplegados"
+          - "✅ Firewall configurado (reglas asimétricas)"
+          - "✅ Hardening de seguridad aplicado"
           - "✅ Tests de conectividad ejecutados"
           - "✅ Captura de tráfico completada"
+          - "✅ Evidencias recolectadas"
+          - "✅ Informes técnicos generados"
+          - "✅ Carpetas compartidas configuradas"
           - ""
           - "📁 Evidencias guardadas en: evidence/"
           - "   - Configs: evidence/configs/"
           - "   - Tests: evidence/pings/"
           - "   - Capturas: evidence/pcaps/"
           - "   - Servicios: evidence/services/"
+          - "   - Reportes: evidence/reports/"
+          - "   - Informes Técnicos: evidence/technical_reports/"
           - "   - Logs: evidence/logs/"
+          - ""
+          - "📊 Ver informes: evidence/technical_reports/index.html"
+          - "📁 Carpetas compartidas:"
+          - "   \\\\172.17.25.126\\reports (debian-router)"
+          - "   \\\\2025:db8:101::10\\reports (ubuntu-pc)"
           - ""
           - "🌐 Acceso HTTP: http://[2025:db8:220::1]"
           - "🌐 Backbone: http://[2025:db8:101::a1]"
           - ""
+          - "🔒 Firewall: 100::/64 → 101::/64 ✅ | 101::/64 → 100::/64 ❌"
           - "================================================"

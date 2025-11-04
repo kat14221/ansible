@@ -1,0 +1,53 @@
+---
+# Playbook: Validación de Conectividad y Evidencias
+# Descripción: Recolecta evidencias y valida que existan todos los archivos requeridos
+
+- name: Recolectar evidencias de todos los hosts
+  hosts: all
+  gather_facts: yes
+  roles:
+    - evidence-collector
+  tags:
+    - evidence
+    - validation
+
+- name: Validar existencia de archivos de evidencia
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Verificar directorios de evidencia
+      stat:
+        path: "evidence/{{ item }}"
+      register: evidence_dirs
+      failed_when: not evidence_dirs.stat.exists or not evidence_dirs.stat.isdir
+      loop:
+        - configs
+        - pings
+        - reports
+        - pcaps
+    
+    - name: Listar archivos de evidencia generados
+      find:
+        paths: "evidence/{{ item }}"
+        file_type: file
+      register: evidence_files
+      loop:
+        - configs
+        - pings
+        - reports
+    
+    - name: Mostrar resumen de evidencias
+      debug:
+        msg:
+          - "=================================================="
+          - "✅ Validación de Evidencias Completada"
+          - "=================================================="
+          - "Configs: {{ evidence_files.results[0].matched }} archivos"
+          - "Pings: {{ evidence_files.results[1].matched }} archivos"
+          - "Reports: {{ evidence_files.results[2].matched }} archivos"
+          - "=================================================="
+    
+    - name: Fallar si no hay suficientes evidencias
+      fail:
+        msg: "⚠️  Faltan evidencias mínimas requeridas"
+      when: evidence_files.results[0].matched < 1 or evidence_files.results[1].matched < 1

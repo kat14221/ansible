@@ -1,0 +1,194 @@
+---
+# Role: technical-report
+# Descripción: Genera informe técnico completo del sistema y lo descarga a la VM de control
+
+- name: Crear directorio temporal para informes en host remoto
+  file:
+    path: /tmp/ansible_reports
+    state: directory
+    mode: '0755'
+  when: ansible_os_family == "Debian"
+
+# ==========================================
+# INFORMACIÓN DEL SISTEMA
+# ==========================================
+- name: Recolectar información del sistema
+  setup:
+    gather_subset:
+      - all
+  when: ansible_os_family == "Debian"
+
+- name: Obtener información de hardware
+  command: "{{ item }}"
+  register: hw_info
+  loop:
+    - lscpu
+    - free -h
+    - df -h
+    - lsblk
+  failed_when: false
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+# ==========================================
+# CONFIGURACIÓN DE RED
+# ==========================================
+- name: Obtener configuración de red IPv6
+  command: "{{ item }}"
+  register: network_info
+  loop:
+    - ip -6 addr show
+    - ip -6 route show
+    - ip link show
+    - ss -tulnp
+  failed_when: false
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+# ==========================================
+# SERVICIOS Y PROCESOS
+# ==========================================
+- name: Listar servicios activos
+  command: systemctl list-units --type=service --state=running
+  register: services_running
+  failed_when: false
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Estado de firewall
+  command: "{{ item }}"
+  register: firewall_info
+  loop:
+    - firewall-cmd --state
+    - firewall-cmd --list-all
+    - firewall-cmd --get-active-zones
+  failed_when: false
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+# ==========================================
+# SEGURIDAD
+# ==========================================
+- name: Verificar SSH hardening
+  command: grep -E "^(PermitRootLogin|PasswordAuthentication|PubkeyAuthentication)" /etc/ssh/sshd_config
+  register: ssh_config
+  failed_when: false
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Estado de fail2ban
+  command: fail2ban-client status
+  register: fail2ban_status
+  failed_when: false
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+# ==========================================
+# CISCO IOS - Running Config
+# ==========================================
+- name: Obtener running-config completo (IOS)
+  cisco.ios.ios_command:
+    commands:
+      - show running-config
+      - show version
+      - show ipv6 interface brief
+      - show ipv6 route
+  register: ios_full_config
+  when: ansible_network_os is defined and ansible_network_os == "ios"
+
+# ==========================================
+# GENERAR INFORME HTML
+# ==========================================
+- name: Generar informe técnico en HTML
+  template:
+    src: technical_report.html.j2
+    dest: "/tmp/ansible_reports/{{ inventory_hostname }}_technical_report.html"
+  delegate_to: localhost
+  vars:
+    report_timestamp: "{{ ansible_date_time.iso8601 }}"
+    report_hostname: "{{ inventory_hostname }}"
+
+# ==========================================
+# GENERAR INFORME TXT
+# ==========================================
+- name: Generar informe técnico en texto plano
+  copy:
+    content: |
+      ========================================================================
+      INFORME TÉCNICO - {{ inventory_hostname }}
+      ========================================================================
+      Generado: {{ ansible_date_time.iso8601 }}
+      Sistema Operativo: {{ ansible_distribution | default('N/A') }} {{ ansible_distribution_version | default('') }}
+      Kernel: {{ ansible_kernel | default('N/A') }}
+      Arquitectura: {{ ansible_architecture | default('N/A') }}
+      
+      ========================================================================
+      HARDWARE
+      ========================================================================
+      Procesador: {{ ansible_processor | default('N/A') }}
+      CPUs: {{ ansible_processor_vcpus | default('N/A') }}
+      Memoria Total: {{ ansible_memtotal_mb | default('N/A') }} MB
+      Memoria Libre: {{ ansible_memfree_mb | default('N/A') }} MB
+      Swap Total: {{ ansible_swaptotal_mb | default('N/A') }} MB
+      
+      ========================================================================
+      RED - IPv6
+      ========================================================================
+      {% if network_info is defined %}
+      {% for item in network_info.results %}
+      === {{ item.item }} ===
+      {{ item.stdout }}
+      
+      {% endfor %}
+      {% endif %}
+      
+      ========================================================================
+      SERVICIOS ACTIVOS
+      ========================================================================
+      {% if services_running is defined %}
+      {{ services_running.stdout }}
+      {% endif %}
+      
+      ========================================================================
+      FIREWALL
+      ========================================================================
+      {% if firewall_info is defined %}
+      {% for item in firewall_info.results %}
+      {{ item.stdout }}
+      
+      {% endfor %}
+      {% endif %}
+      
+      ========================================================================
+      SSH HARDENING
+      ========================================================================
+      {% if ssh_config is defined %}
+      {{ ssh_config.stdout }}
+      {% endif %}
+      
+      ========================================================================
+      FAIL2BAN
+      ========================================================================
+      {% if fail2ban_status is defined %}
+      {{ fail2ban_status.stdout }}
+      {% endif %}
+      
+      ========================================================================
+      CISCO IOS - CONFIGURACIÓN
+      ========================================================================
+      {% if ios_full_config is defined %}
+      {{ ios_full_config.stdout[0] }}
+      {% endif %}
+      
+      ========================================================================
+      FIN DEL INFORME
+      ========================================================================
+    dest: "/tmp/ansible_reports/{{ inventory_hostname }}_technical_report.txt"
+  delegate_to: localhost
+
+- name: Resumen de informe técnico
+  debug:
+    msg:
+      - "✅ Informe técnico generado para {{ inventory_hostname }}"
+      - "   📄 HTML: /tmp/ansible_reports/{{ inventory_hostname }}_technical_report.html"
+      - "   📄 TXT: /tmp/ansible_reports/{{ inventory_hostname }}_technical_report.txt"

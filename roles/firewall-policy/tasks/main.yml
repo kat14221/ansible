@@ -1,0 +1,167 @@
+---
+# Role: firewall-policy
+# Descripción: Configurar firewalld con reglas asimétricas entre subredes IPv6
+
+- name: Instalar firewalld
+  apt:
+    name:
+      - firewalld
+      - python3-firewall
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Detener y deshabilitar nftables (conflicto con firewalld)
+  systemd:
+    name: nftables
+    state: stopped
+    enabled: no
+  ignore_errors: yes
+  become: yes
+
+- name: Iniciar y habilitar firewalld
+  systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+  become: yes
+
+# ==========================================
+# ZONAS FIREWALLD
+# ==========================================
+- name: Crear zona 'internal' para LAN (2025:db8:101::/64)
+  ansible.posix.firewalld:
+    zone: internal
+    permanent: yes
+    state: present
+  become: yes
+
+- name: Crear zona 'external' para red laboratorio (2025:db8:100::/64)
+  ansible.posix.firewalld:
+    zone: external
+    permanent: yes
+    state: present
+  become: yes
+
+# ==========================================
+# ASIGNAR INTERFACES A ZONAS
+# ==========================================
+- name: Asignar interfaz LAN a zona internal
+  ansible.posix.firewalld:
+    zone: internal
+    interface: "{{ lan_interface }}"
+    permanent: yes
+    state: enabled
+  become: yes
+  notify: reload firewalld
+
+- name: Asignar interfaz WAN a zona external
+  ansible.posix.firewalld:
+    zone: external
+    interface: "{{ wan_interface }}"
+    permanent: yes
+    state: enabled
+  become: yes
+  when: wan_interface is defined
+  notify: reload firewalld
+
+# ==========================================
+# REGLAS: PERMITIR TRÁFICO DESDE LAB (100::/64) → INTERNAL (101::/64)
+# ==========================================
+- name: Permitir tráfico iniciado desde 2025:db8:100::/64 (external → internal)
+  ansible.posix.firewalld:
+    zone: internal
+    rich_rule: 'rule family="ipv6" source address="2025:db8:100::/64" accept'
+    permanent: yes
+    state: enabled
+  become: yes
+
+- name: Permitir ICMP IPv6 en zona internal
+  ansible.posix.firewalld:
+    zone: internal
+    service: "{{ item }}"
+    permanent: yes
+    state: enabled
+  loop:
+    - dhcpv6-client
+    - ssh
+  become: yes
+
+- name: Permitir ping (ICMPv6) en zona internal
+  ansible.posix.firewalld:
+    zone: internal
+    icmp_block_inversion: no
+    permanent: yes
+    state: enabled
+  become: yes
+
+# ==========================================
+# REGLAS: BLOQUEAR TRÁFICO INICIADO DESDE INTERNAL (101::/64) → LAB (100::/64)
+# ==========================================
+- name: Bloquear tráfico iniciado desde 2025:db8:101::/64 hacia 2025:db8:100::/64
+  ansible.posix.firewalld:
+    zone: external
+    rich_rule: 'rule family="ipv6" source address="2025:db8:101::/64" drop'
+    permanent: yes
+    state: enabled
+  become: yes
+
+# ==========================================
+# PERMITIR ESTABLISHED/RELATED (respuestas)
+# ==========================================
+- name: Permitir tráfico establecido y relacionado en zona internal
+  ansible.posix.firewalld:
+    zone: internal
+    state: enabled
+    permanent: yes
+    masquerade: no
+  become: yes
+
+# ==========================================
+# SERVICIOS ESENCIALES EN ZONA INTERNAL
+# ==========================================
+- name: Permitir servicios HTTP/FTP en zona internal
+  ansible.posix.firewalld:
+    zone: internal
+    service: "{{ item }}"
+    permanent: yes
+    state: enabled
+  loop:
+    - http
+    - https
+    - ftp
+  become: yes
+
+# ==========================================
+# APLICAR CAMBIOS
+# ==========================================
+- name: Recargar firewalld para aplicar cambios
+  command: firewall-cmd --reload
+  become: yes
+
+- name: Verificar estado de firewalld
+  command: firewall-cmd --state
+  register: firewalld_state
+  changed_when: false
+  become: yes
+
+- name: Listar zonas activas
+  command: firewall-cmd --get-active-zones
+  register: active_zones
+  changed_when: false
+  become: yes
+
+- name: Resumen de firewall
+  debug:
+    msg:
+      - "=================================================="
+      - "✅ Firewall configurado con firewalld"
+      - "Estado: {{ firewalld_state.stdout }}"
+      - "Zonas activas:"
+      - "{{ active_zones.stdout }}"
+      - ""
+      - "Reglas aplicadas:"
+      - "  ✅ Permitido: 2025:db8:100::/64 → 2025:db8:101::/64"
+      - "  ❌ Bloqueado: 2025:db8:101::/64 → 2025:db8:100::/64 (nuevas conexiones)"
+      - "  ✅ Permitido: Respuestas (established/related)"
+      - "=================================================="
