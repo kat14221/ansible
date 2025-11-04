@@ -5,7 +5,6 @@
 - name: Bootstrap de VM de Control Ansible
   hosts: localhost
   gather_facts: yes
-  become: yes
   tasks:
     - name: Verificar que estamos en la VM de control
       debug:
@@ -20,6 +19,8 @@
         path: "{{ item }}"
         state: directory
         mode: '0755'
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
       loop:
         - "{{ playbook_dir }}/../evidence/configs"
         - "{{ playbook_dir }}/../evidence/pings"
@@ -28,7 +29,6 @@
         - "{{ playbook_dir }}/../evidence/reports"
         - "{{ playbook_dir }}/../evidence/logs"
       delegate_to: localhost
-      become: no
 
     - name: Verificar archivo ansible.cfg
       stat:
@@ -67,7 +67,6 @@
           remote_user = ansible
       when: not cfg_exists.stat.exists
       delegate_to: localhost
-      become: no
 
     # Validar instalación de collections
     - name: Verificar instalación de Ansible Collections
@@ -97,26 +96,50 @@
       loop: "{{ pip_check.results }}"
       when: item.rc != 0
 
+    - name: Instalar pyvmomi si falta
+      pip:
+        name: pyvmomi>=8.0.0.1
+        state: present
+        extra_args: --break-system-packages
+      when: pip_check.results[0].rc != 0
+      ignore_errors: yes
+
     # Generar par de llaves SSH para la VM de control
+    - name: Asegurar directorio .ssh existe
+      file:
+        path: "{{ ansible_env.HOME }}/.ssh"
+        state: directory
+        mode: '0700'
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+
     - name: Generar par de llaves SSH para control
       openssh_keypair:
-        path: ~/.ssh/id_rsa_ansible
+        path: "{{ ansible_env.HOME }}/.ssh/id_rsa_ansible"
         type: rsa
         size: 4096
-        comment: "ansible-control-vm"
+        comment: "ansible-control-vm@{{ ansible_hostname }}"
         force: no
-      become: no
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+
+    - name: Verificar que la clave pública existe
+      stat:
+        path: "{{ ansible_env.HOME }}/.ssh/id_rsa_ansible.pub"
+      register: pubkey_file
 
     - name: Mostrar clave pública generada
-      command: cat ~/.ssh/id_rsa_ansible.pub
+      command: "cat {{ ansible_env.HOME }}/.ssh/id_rsa_ansible.pub"
       register: pubkey
       changed_when: false
+      when: pubkey_file.stat.exists
 
     - name: Información de clave SSH
       debug:
         msg:
           - "Clave pública generada (copiar a hosts remotos):"
           - "{{ pubkey.stdout }}"
+      when: pubkey_file.stat.exists and pubkey.stdout is defined
 
     # Resumen final
     - name: Resumen de Bootstrap
