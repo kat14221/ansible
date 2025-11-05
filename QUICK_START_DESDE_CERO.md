@@ -95,53 +95,49 @@ ansible-playbook playbooks/bootstrap_control.yml
 
 ---
 
-## 🔐 Paso 5: Configurar Vault (Credenciales)
+## 🔐 Paso 5: Configurar Vault (AUTOMATIZADO)
 
-### **5.1 Crear Vault desde Template:**
+### **Opción A: Setup Automático (Recomendado) 🚀**
 ```bash
-# Copiar template
-cp group_vars/all/vault.yml.template group_vars/all/vault.yml
+# Un solo comando para configurar TODO
+chmod +x scripts/*.sh
+./scripts/quick_setup.sh
 ```
 
-### **5.2 Editar Credenciales Reales:**
+Este script te preguntará interactivamente:
+- ✅ Credenciales de ESXi/vCenter
+- ✅ Credenciales de Cisco IOS
+- ✅ Contraseña del Vault
+- ✅ Creará y cifrará automáticamente el vault.yml
+- ✅ Guardará la contraseña en .vault_pass
+- ✅ Te permitirá copiar claves SSH
+
+---
+
+### **Opción B: Setup Manual Paso a Paso**
+
+#### **5.1 Configurar Vault Automáticamente:**
 ```bash
-vim group_vars/all/vault.yml
+chmod +x scripts/setup_vault.sh
+./scripts/setup_vault.sh
 ```
 
-**Cambiar estos valores:**
-```yaml
-# ESXi/vCenter
-vault_vcenter_hostname: "172.17.25.1"  # Tu IP de ESXi
-vault_vcenter_username: "root"         # Tu usuario de ESXi
-vault_vcenter_password: "TU_PASSWORD"  # ⚠️ Tu password real
-
-# Cisco IOS
-vault_cisco_user: "admin"              # Tu usuario Cisco
-vault_cisco_password: "TU_PASSWORD"    # ⚠️ Tu password real
-
-# SSH Key (generar después)
-vault_ansible_ssh_public_key: ""       # Se llenará después
+**El script te pedirá:**
+```
+IP de ESXi/vCenter [172.17.25.1]: 
+Usuario de vCenter [root]: 
+Contraseña de vCenter: ********
+Usuario de Cisco IOS [admin]: 
+Contraseña de Cisco IOS: ********
+Contraseña del Vault (mínimo 8 caracteres): ********
+Confirmar contraseña del Vault: ********
 ```
 
-### **5.3 Cifrar el Vault:**
-```bash
-# Cifrar con Ansible Vault
-ansible-vault encrypt group_vars/all/vault.yml
-
-# Te pedirá una contraseña (recuérdala, la necesitarás)
-# Ejemplo: "mi_password_vault_123"
-```
-
-### **5.4 Guardar Password del Vault:**
-```bash
-# Crear archivo con password (para no escribirla cada vez)
-echo "mi_password_vault_123" > .vault_pass
-
-# Proteger el archivo
-chmod 600 .vault_pass
-
-# ⚠️ NUNCA commitear este archivo a Git (ya está en .gitignore)
-```
+**Automáticamente:**
+- ✅ Crea `group_vars/all/vault.yml` con tus credenciales
+- ✅ Cifra el archivo con Ansible Vault
+- ✅ Guarda la contraseña en `.vault_pass`
+- ✅ Incluye tu clave SSH pública si existe
 
 ---
 
@@ -179,31 +175,30 @@ ansible_host: "2025:db8:101::11"  # ✅ OK (IPv6)
 
 ---
 
-## 🔑 Paso 7: Configurar SSH Keys
+## 🔑 Paso 7: Copiar SSH Keys (AUTOMATIZADO)
 
-### **7.1 Generar Clave SSH (si no existe):**
+### **Opción A: Script Automático (cuando hosts estén listos) 🚀**
 ```bash
-# Ver clave pública generada por bootstrap
+# Copia la clave SSH a todos los hosts
+./scripts/copy_ssh_keys.sh
+```
+
+**El script:**
+- ✅ Detecta automáticamente tu clave SSH
+- ✅ Lista todos los hosts del inventario
+- ✅ Te pide el usuario SSH (normalmente `ansible`)
+- ✅ Copia la clave a cada host
+- ✅ Muestra resumen de éxitos/fallos
+
+---
+
+### **Opción B: Copia Manual**
+```bash
+# Ver clave pública
 cat ~/.ssh/id_rsa_ansible.pub
-```
 
-### **7.2 Copiar a Vault:**
-```bash
-# Editar Vault
-ansible-vault edit group_vars/all/vault.yml
-
-# Añadir la clave pública:
-vault_ansible_ssh_public_key: "ssh-rsa AAAAB3NzaC1yc2EA... ansible@ansible-control"
-```
-
-### **7.3 Copiar Clave a Hosts Remotos:**
-
-**Cuando las VMs estén creadas y configuradas:**
-```bash
-# Copiar a debian-router
+# Copiar a cada host manualmente
 ssh-copy-id -i ~/.ssh/id_rsa_ansible.pub ansible@172.17.25.126
-
-# Copiar a ubuntu-pc (después de tener IPv6)
 ssh-copy-id -i ~/.ssh/id_rsa_ansible.pub ansible@2025:db8:101::10
 
 # Verificar acceso
