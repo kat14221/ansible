@@ -30,9 +30,9 @@ vault_ansible_ssh_private_key: |
   -----END OPENSSH PRIVATE KEY-----
 
 # === Routers Cisco IOS ===
-vault_cisco_user: "cisco"
-vault_cisco_password: "cisco123"
-vault_cisco_enable_secret: "cisco123"
+vault_cisco_user: "ansible"
+vault_cisco_password: "Ansible123"
+vault_cisco_enable_secret: "Ansible123"
 
 # === Debian Router ===
 vault_debian_root_password: "$6$rounds=4096$salt$hash..."  # Hash generado
