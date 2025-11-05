@@ -35,7 +35,7 @@
         path: "{{ playbook_dir }}/../ansible.cfg"
       register: cfg_exists
 
-    - name: Crear ansible.cfg base si no existe
+    - name: Crear ansible.cfg con configuración completa
       copy:
         dest: "{{ playbook_dir }}/../ansible.cfg"
         mode: '0644'
@@ -65,7 +65,6 @@
           ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no
           pipelining = True
           remote_user = ansible
-      when: not cfg_exists.stat.exists
       delegate_to: localhost
 
     # Validar instalación de collections
