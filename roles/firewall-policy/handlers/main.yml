@@ -1,4 +1,14 @@
 ---
+# Handlers para firewall-policy
+
 - name: reload firewalld
-  command: firewall-cmd --reload
+  systemd:
+    name: firewalld
+    state: reloaded
+  become: yes
+
+- name: restart firewalld
+  systemd:
+    name: firewalld
+    state: restarted
   become: yes

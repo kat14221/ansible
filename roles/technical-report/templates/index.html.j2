@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Índice de Informes - VMWARE-101001</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .section h3 { color: #333; border-bottom: 2px solid #667eea; padding-bottom: 5px; }
+        .host-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .host-card { background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #667eea; }
+        .host-card h4 { margin-top: 0; color: #333; }
+        .host-card a { color: #667eea; text-decoration: none; font-weight: bold; }
+        .host-card a:hover { text-decoration: underline; }
+        .status-ok { color: #28a745; }
+        .status-warning { color: #ffc107; }
+        .status-error { color: #dc3545; }
+        .summary-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; }
+        .stat-number { font-size: 2em; font-weight: bold; }
+        .timestamp { font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Informes Técnicos</h1>
+            <h2>Proyecto: Red Académica IPv6 VMWARE-101001</h2>
+            <p class="timestamp">Generado: {{ ansible_date_time.iso8601 }}</p>
+        </div>
+
+        <!-- Estadísticas Resumen -->
+        <div class="section">
+            <h3>📈 Resumen del Proyecto</h3>
+            <div class="summary-stats">
+                <div class="stat-card">
+                    <div class="stat-number">{{ groups['all'] | length }}</div>
+                    <div>Hosts Totales</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ groups['linux_servers'] | length if groups['linux_servers'] is defined else 0 }}</div>
+                    <div>Servidores Linux</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ groups['network_devices'] | length if groups['network_devices'] is defined else 0 }}</div>
+                    <div>Dispositivos de Red</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ groups['windows_hosts'] | length if groups['windows_hosts'] is defined else 0 }}</div>
+                    <div>Hosts Windows</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Informes por Host -->
+        <div class="section">
+            <h3>🖥️ Informes por Host</h3>
+            <div class="host-grid">
+                {% for host in groups['all'] %}
+                <div class="host-card">
+                    <h4>{{ host }}</h4>
+                    <p><strong>IP:</strong> {{ hostvars[host]['ansible_host'] | default('N/A') }}</p>
+                    <p><strong>Tipo:</strong> 
+                        {% if host in groups['linux_servers'] %}
+                            <span class="status-ok">🐧 Linux Server</span>
+                        {% elif host in groups['network_devices'] %}
+                            <span class="status-warning">🔧 Network Device</span>
+                        {% elif host in groups['windows_hosts'] %}
+                            <span class="status-warning">🪟 Windows Host</span>
+                        {% else %}
+                            <span class="status-error">❓ Unknown</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Función:</strong>
+                        {% if host == 'debian-router' %}
+                            Router IPv6 Principal
+                        {% elif host == 'ubuntu-pc' %}
+                            Cliente Linux
+                        {% elif host == 'windows-pc' %}
+                            Cliente Windows
+                        {% elif host == 'physical-router' %}
+                            Router Físico Cisco
+                        {% elif 'switch' in host %}
+                            Switch de Red
+                        {% else %}
+                            Dispositivo de Red
+                        {% endif %}
+                    </p>
+                    <p>
+                        <a href="{{ host }}_technical_report.html">📄 Ver Informe Detallado</a>
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Topología de Red -->
+        <div class="section">
+            <h3>🌐 Topología de Red</h3>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; font-family: monospace;">
+                <pre>
+Red Laboratorio (2025:db8:100::/64)
+    ↓
+physical-router (2025:db8:100::2 / 2025:db8:101::2)
+    ↓
+switch-3 (L2 Bridge)
+    ↓
+ESXi Hypervisor (172.17.25.1)
+    ↓
+Red Fernandez (2025:db8:101::/64)
+    ├── debian-router (::1) - Gateway/DHCP/HTTP
+    ├── ubuntu-pc (::10) - Cliente SLAAC
+    └── windows-pc (::11) - Cliente SLAAC
+                </pre>
+            </div>
+        </div>
+
+        <!-- Enlaces Rápidos -->
+        <div class="section">
+            <h3>🔗 Enlaces Rápidos</h3>
+            <div class="host-grid">
+                <div class="host-card">
+                    <h4>📊 Informe Consolidado</h4>
+                    <p>Vista general de todos los hosts</p>
+                    <a href="consolidated_report.html">Ver Informe Consolidado</a>
+                </div>
+                <div class="host-card">
+                    <h4>📁 Evidencias</h4>
+                    <p>Archivos de configuración y logs</p>
+                    <a href="../configs/">Ver Configuraciones</a><br>
+                    <a href="../pings/">Ver Tests de Conectividad</a><br>
+                    <a href="../pcaps/">Ver Capturas de Tráfico</a>
+                </div>
+                <div class="host-card">
+                    <h4>📋 Documentación</h4>
+                    <p>Documentación del proyecto</p>
+                    <a href="../../README.md">README Principal</a><br>
+                    <a href="../../GUIA_USO.md">Guía de Uso</a><br>
+                    <a href="../../docs/CONTEXTO.md">Contexto Académico</a>
+                </div>
+                <div class="host-card">
+                    <h4>🌐 Servicios Web</h4>
+                    <p>Acceso a servicios desplegados</p>
+                    <a href="http://[2025:db8:101::1]" target="_blank">HTTP Server (IPv6)</a><br>
+                    <a href="ftp://[2025:db8:101::1]" target="_blank">FTP Server (IPv6)</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estado del Proyecto -->
+        <div class="section">
+            <h3>✅ Estado del Proyecto</h3>
+            <div class="host-grid">
+                <div class="host-card">
+                    <h4>Infraestructura</h4>
+                    <p class="status-ok">✅ VMs creadas en ESXi</p>
+                    <p class="status-ok">✅ Dispositivos IOS configurados</p>
+                    <p class="status-ok">✅ Red IPv6 funcional</p>
+                </div>
+                <div class="host-card">
+                    <h4>Servicios</h4>
+                    <p class="status-ok">✅ RADVD (Router Advertisement)</p>
+                    <p class="status-ok">✅ DHCPv6 configurado</p>
+                    <p class="status-ok">✅ HTTP/FTP desplegados</p>
+                </div>
+                <div class="host-card">
+                    <h4>Seguridad</h4>
+                    <p class="status-ok">✅ Firewall asimétrico</p>
+                    <p class="status-ok">✅ SSH hardening</p>
+                    <p class="status-ok">✅ Sistema hardening</p>
+                </div>
+                <div class="host-card">
+                    <h4>Evidencias</h4>
+                    <p class="status-ok">✅ Configuraciones guardadas</p>
+                    <p class="status-ok">✅ Tests de conectividad</p>
+                    <p class="status-ok">✅ Capturas de tráfico</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 5px;">
+            <p><strong>Proyecto:</strong> Red Académica IPv6 VMWARE-101001</p>
+            <p><strong>Automatización:</strong> Ansible</p>
+            <p><strong>Hosts Configurados:</strong> {{ groups['all'] | length }}</p>
+            <p><strong>Generado:</strong> {{ ansible_date_time.iso8601 }}</p>
+        </div>
+    </div>
+</body>
+</html>

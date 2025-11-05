@@ -3,9 +3,10 @@
 # ANSIBLE VAULT - Credenciales sensibles
 # ============================================================
 # IMPORTANTE: Renombrar a vault.yml y cifrar con:
-#   mv vault.yml.template vault.yml
+#   cp vault.yml.template vault.yml
 #   ansible-vault encrypt group_vars/all/vault.yml
 # EDITAR CON: ansible-vault edit group_vars/all/vault.yml
+# REKEY CON: ansible-vault rekey group_vars/all/vault.yml
 # ============================================================
 
 # === VMware/ESXi ===
@@ -17,7 +18,16 @@ vault_vcenter_validate_certs: "no"
 
 # === Credenciales SSH ===
 vault_ansible_user: "ansible"
-vault_ansible_ssh_public_key: "ssh-rsa AAAAB3NzaC... ansible@control"  # Reemplazar con clave real
+vault_ansible_ssh_password: "ansible_secure_2024!"
+vault_ansible_ssh_public_key: |
+  ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC7... ansible@control
+  # REEMPLAZAR con tu clave pública real generada
+
+vault_ansible_ssh_private_key: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAACFwAAAAdzc2gtcn
+  # REEMPLAZAR con tu clave privada real (solo si es necesario)
+  -----END OPENSSH PRIVATE KEY-----
 
 # === Routers Cisco IOS ===
 vault_cisco_user: "cisco"
@@ -25,11 +35,37 @@ vault_cisco_password: "cisco123"
 vault_cisco_enable_secret: "cisco123"
 
 # === Debian Router ===
-vault_debian_ansible_password: "ansible_secure_pass"
+vault_debian_root_password: "$6$rounds=4096$salt$hash..."  # Hash generado
+vault_debian_ansible_password: "ansible_secure_2024!"
 
 # === Windows hosts ===
+vault_windows_admin_user: "Administrator"
 vault_windows_admin_password: "Windows@2024!"
+vault_windows_ansible_user: "ansible"
+vault_windows_ansible_password: "ansible_win_2024!"
 
-# === FTP/HTTP Services ===
+# === Servicios de Aplicación ===
 vault_ftp_user: "ftpuser"
 vault_ftp_password: "ftppass123"
+vault_http_admin_user: "webadmin"
+vault_http_admin_password: "webadmin123"
+
+# === Base de Datos (si se usa) ===
+vault_db_root_password: "db_root_2024!"
+vault_db_app_user: "appuser"
+vault_db_app_password: "appuser_2024!"
+
+# === Certificados SSL/TLS (si se usan) ===
+vault_ssl_private_key: |
+  -----BEGIN PRIVATE KEY-----
+  # Clave privada SSL si es necesaria
+  -----END PRIVATE KEY-----
+
+vault_ssl_certificate: |
+  -----BEGIN CERTIFICATE-----
+  # Certificado SSL si es necesario
+  -----END CERTIFICATE-----
+
+# === Tokens y API Keys ===
+vault_monitoring_token: "mon_token_2024"
+vault_backup_encryption_key: "backup_key_2024"

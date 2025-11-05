@@ -1,6 +1,14 @@
 ---
+# Handlers para ssh-hardening
+
 - name: restart sshd
   systemd:
-    name: sshd
+    name: ssh
+    state: restarted
+  become: yes
+
+- name: restart fail2ban
+  systemd:
+    name: fail2ban
     state: restarted
   become: yes

@@ -1,185 +1,183 @@
 ---
 # Role: shared-folders
-# Descripción: Configura carpetas compartidas Samba en VMs Linux
+# Descripción: Configuración de carpetas compartidas con Samba
 
-- name: Instalar Samba y dependencias
-  apt:
+- name: Instalar Samba
+  package:
     name:
       - samba
       - samba-common-bin
-      - cifs-utils
     state: present
-    update_cache: yes
   become: yes
-  when: ansible_os_family == "Debian"
 
-# ==========================================
-# CREAR DIRECTORIO COMPARTIDO
-# ==========================================
-- name: Crear directorio compartido para informes
+- name: Crear directorio de carpetas compartidas
   file:
-    path: /srv/shared/reports
+    path: "{{ item }}"
     state: directory
-    owner: nobody
-    group: nogroup
-    mode: '0777'
+    mode: '0755'
+    owner: "{{ vault_ansible_user }}"
+    group: "{{ vault_ansible_user }}"
+  loop:
+    - /srv/samba/reports
+    - /srv/samba/evidence
+    - /srv/samba/public
   become: yes
 
-- name: Crear directorio compartido para evidencias
-  file:
-    path: /srv/shared/evidencias
-    state: directory
-    owner: nobody
-    group: nogroup
-    mode: '0777'
+- name: Copiar evidencias a carpeta compartida
+  shell: |
+    cp -r evidence/* /srv/samba/evidence/ 2>/dev/null || true
+    cp -r evidence/technical_reports/* /srv/samba/reports/ 2>/dev/null || true
+    chown -R {{ vault_ansible_user }}:{{ vault_ansible_user }} /srv/samba/
   become: yes
+  ignore_errors: yes
 
-- name: Crear directorio compartido general
-  file:
-    path: /srv/shared/publico
-    state: directory
-    owner: nobody
-    group: nogroup
-    mode: '0777'
-  become: yes
-
-# ==========================================
-# CONFIGURAR SAMBA
-# ==========================================
-- name: Configurar Samba para carpetas compartidas
-  blockinfile:
-    path: /etc/samba/smb.conf
-    block: |
+- name: Configurar Samba
+  copy:
+    dest: /etc/samba/smb.conf
+    mode: '0644'
+    content: |
+      [global]
+      workgroup = WORKGROUP
+      server string = {{ inventory_hostname }} - VMWARE-101001
+      netbios name = {{ inventory_hostname | upper }}
+      security = user
+      map to guest = bad user
+      dns proxy = no
+      
+      # IPv6 support
+      bind interfaces only = yes
+      interfaces = lo {{ lan_interface | default('eth0') }}
+      
+      # Logging
+      log file = /var/log/samba/log.%m
+      max log size = 1000
+      
+      # Performance
+      socket options = TCP_NODELAY IPTOS_LOWDELAY SO_RCVBUF=131072 SO_SNDBUF=131072
+      
       [reports]
-         comment = Informes Técnicos Ansible
-         path = /srv/shared/reports
-         browseable = yes
-         read only = no
-         guest ok = yes
-         create mask = 0777
-         directory mask = 0777
-         force user = nobody
+      comment = Technical Reports - VMWARE-101001
+      path = /srv/samba/reports
+      browseable = yes
+      read only = yes
+      guest ok = yes
+      create mask = 0644
+      directory mask = 0755
       
-      [evidencias]
-         comment = Evidencias de Red y Configuraciones
-         path = /srv/shared/evidencias
-         browseable = yes
-         read only = no
-         guest ok = yes
-         create mask = 0777
-         directory mask = 0777
-         force user = nobody
+      [evidence]
+      comment = Evidence Files - VMWARE-101001
+      path = /srv/samba/evidence
+      browseable = yes
+      read only = yes
+      guest ok = yes
+      create mask = 0644
+      directory mask = 0755
       
-      [publico]
-         comment = Carpeta Compartida Pública
-         path = /srv/shared/publico
-         browseable = yes
-         read only = no
-         guest ok = yes
-         create mask = 0777
-         directory mask = 0777
-         force user = nobody
-    marker: "# {mark} ANSIBLE MANAGED BLOCK - SHARED FOLDERS"
+      [public]
+      comment = Public Share - VMWARE-101001
+      path = /srv/samba/public
+      browseable = yes
+      read only = no
+      guest ok = yes
+      create mask = 0664
+      directory mask = 0775
   become: yes
   notify: restart samba
 
-# ==========================================
-# FIREWALL - PERMITIR SAMBA
-# ==========================================
-- name: Permitir Samba en firewall (si firewalld está activo)
-  ansible.posix.firewalld:
-    service: samba
-    permanent: yes
-    state: enabled
+- name: Crear usuario Samba
+  shell: |
+    (echo "{{ vault_ftp_password }}"; echo "{{ vault_ftp_password }}") | smbpasswd -a {{ vault_ansible_user }}
+    smbpasswd -e {{ vault_ansible_user }}
   become: yes
-  failed_when: false
-  notify: reload firewalld
+  ignore_errors: yes
 
-# ==========================================
-# INICIAR SERVICIOS
-# ==========================================
-- name: Iniciar y habilitar servicios Samba
+- name: Habilitar y iniciar servicios Samba
   systemd:
     name: "{{ item }}"
-    state: started
     enabled: yes
+    state: started
   loop:
     - smbd
     - nmbd
   become: yes
 
-# ==========================================
-# COPIAR INFORMES A CARPETA COMPARTIDA
-# ==========================================
-- name: Copiar informes técnicos a carpeta compartida
-  copy:
-    src: "/tmp/ansible_reports/{{ inventory_hostname }}_technical_report.{{ item }}"
-    dest: "/srv/shared/reports/{{ inventory_hostname }}_{{ ansible_date_time.date }}.{{ item }}"
-    remote_src: yes
-  loop:
-    - html
-    - txt
-  failed_when: false
+- name: Configurar firewall para Samba
+  firewalld:
+    service: samba
+    permanent: yes
+    immediate: yes
+    state: enabled
+    zone: internal
   become: yes
+  ignore_errors: yes
 
-- name: Copiar evidencias a carpeta compartida
-  synchronize:
-    src: "evidence/"
-    dest: "/srv/shared/evidencias/"
-    recursive: yes
-  delegate_to: localhost
-  failed_when: false
+- name: Verificar estado de Samba
+  command: systemctl status smbd --no-pager
+  register: samba_status
+  changed_when: false
 
-# ==========================================
-# INFORMACIÓN DE ACCESO
-# ==========================================
-- name: Obtener IP para acceso a carpeta compartida
+- name: Mostrar información de carpetas compartidas
   debug:
     msg:
-      - "✅ Carpetas compartidas configuradas en {{ inventory_hostname }}"
+      - "=========================================="
+      - "✅ Carpetas compartidas configuradas"
+      - "Estado Samba: {{ 'OK' if samba_status.rc == 0 else 'Verificar manualmente' }}"
       - ""
-      - "📁 Acceso desde Windows:"
-      - "   \\\\{{ ansible_default_ipv4.address | default(ansible_host) }}\\reports"
-      - "   \\\\{{ ansible_default_ipv4.address | default(ansible_host) }}\\evidencias"
-      - "   \\\\{{ ansible_default_ipv4.address | default(ansible_host) }}\\publico"
+      - "Acceso desde Windows:"
+      - "  \\\\{{ ansible_host }}\\reports"
+      - "  \\\\{{ ansible_host }}\\evidence"
+      - "  \\\\{{ ansible_host }}\\public"
       - ""
-      - "📁 Acceso desde Linux:"
-      - "   smb://{{ ansible_default_ipv4.address | default(ansible_host) }}/reports"
-      - "   smb://{{ ansible_default_ipv4.address | default(ansible_host) }}/evidencias"
-      - "   smb://{{ ansible_default_ipv4.address | default(ansible_host) }}/publico"
+      - "Acceso desde Linux:"
+      - "  smb://{{ ansible_host }}/reports"
+      - "  smb://{{ ansible_host }}/evidence"
+      - "  smb://{{ ansible_host }}/public"
       - ""
-      - "📁 Montar en Linux:"
-      - "   sudo mount -t cifs //{{ ansible_default_ipv4.address | default(ansible_host) }}/reports /mnt/reports -o guest"
+      - "Usuario: {{ vault_ansible_user }}"
+      - "Contraseña: (configurada en vault)"
+      - "=========================================="
 
-- name: Guardar información de acceso a carpetas compartidas
+- name: Crear archivo de información de acceso
   copy:
+    dest: /srv/samba/public/ACCESO_CARPETAS_COMPARTIDAS.txt
+    mode: '0644'
     content: |
-      ========================================================================
-      CARPETAS COMPARTIDAS - {{ inventory_hostname }}
-      ========================================================================
-      Generado: {{ ansible_date_time.iso8601 }}
+      ================================================================================
+                          CARPETAS COMPARTIDAS - VMWARE-101001
+      ================================================================================
       
-      === ACCESO DESDE WINDOWS ===
-      \\{{ ansible_default_ipv4.address | default(ansible_host) }}\reports
-      \\{{ ansible_default_ipv4.address | default(ansible_host) }}\evidencias
-      \\{{ ansible_default_ipv4.address | default(ansible_host) }}\publico
+      Host: {{ inventory_hostname }}
+      IP: {{ ansible_host }}
+      Fecha: {{ ansible_date_time.iso8601 }}
       
-      === ACCESO DESDE LINUX/MAC ===
-      smb://{{ ansible_default_ipv4.address | default(ansible_host) }}/reports
-      smb://{{ ansible_default_ipv4.address | default(ansible_host) }}/evidencias
-      smb://{{ ansible_default_ipv4.address | default(ansible_host) }}/publico
+      CARPETAS DISPONIBLES:
       
-      === MONTAR EN LINUX ===
-      sudo mkdir -p /mnt/reports /mnt/evidencias /mnt/publico
-      sudo mount -t cifs //{{ ansible_default_ipv4.address | default(ansible_host) }}/reports /mnt/reports -o guest
-      sudo mount -t cifs //{{ ansible_default_ipv4.address | default(ansible_host) }}/evidencias /mnt/evidencias -o guest
-      sudo mount -t cifs //{{ ansible_default_ipv4.address | default(ansible_host) }}/publico /mnt/publico -o guest
+      📊 /reports - Informes Técnicos
+         Contiene: Informes HTML generados automáticamente
+         Acceso: Solo lectura, sin autenticación
+         
+      📁 /evidence - Evidencias del Proyecto  
+         Contiene: Configuraciones, logs, capturas de tráfico
+         Acceso: Solo lectura, sin autenticación
+         
+      📂 /public - Carpeta Pública
+         Contiene: Archivos compartidos
+         Acceso: Lectura/escritura, sin autenticación
       
-      === CONTENIDO ===
-      /srv/shared/reports      - Informes técnicos generados por Ansible
-      /srv/shared/evidencias   - Evidencias de red y configuraciones
-      /srv/shared/publico      - Archivos compartidos generales
+      ACCESO DESDE WINDOWS:
+         \\{{ ansible_host }}\reports
+         \\{{ ansible_host }}\evidence  
+         \\{{ ansible_host }}\public
       
-      ========================================================================
-    dest: "evidence/reports/{{ inventory_hostname }}_shared_folders_access.txt"
-  delegate_to: localhost
+      ACCESO DESDE LINUX:
+         smb://{{ ansible_host }}/reports
+         smb://{{ ansible_host }}/evidence
+         smb://{{ ansible_host }}/public
+      
+      NAVEGADOR WEB (para informes):
+         http://{{ ansible_host }}/reports/
+         
+      ================================================================================
+    owner: "{{ vault_ansible_user }}"
+    group: "{{ vault_ansible_user }}"
+  become: yes

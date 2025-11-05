@@ -1,127 +1,274 @@
 ---
 # Role: hardening
-# Descripción: Hardening básico de seguridad en hosts Linux
+# Descripción: Hardening general del sistema Linux
 
-- name: Actualizar sistema
-  apt:
-    update_cache: yes
-    upgrade: safe
-  become: yes
-  when: ansible_os_family == "Debian"
-
-# ==========================================
-# USUARIOS Y PERMISOS
-# ==========================================
-- name: Crear usuario operador con permisos limitados
+- name: Crear usuario operator con permisos limitados
   user:
     name: operator
-    groups: sudo
+    comment: "Operator user for limited system access"
     shell: /bin/bash
     create_home: yes
-    password: "{{ 'operator123' | password_hash('sha512') }}"
+    groups: users
+    append: yes
   become: yes
 
-- name: Configurar sudoers para operator (requiere contraseña)
-  lineinfile:
-    path: /etc/sudoers.d/operator
-    line: "operator ALL=(ALL:ALL) ALL"
-    create: yes
-    mode: '0440'
-    validate: 'visudo -cf %s'
-  become: yes
-
-- name: Configurar sudoers para ansible (sin contraseña)
-  lineinfile:
-    path: /etc/sudoers.d/ansible
-    line: "ansible ALL=(ALL:ALL) NOPASSWD: ALL"
-    create: yes
-    mode: '0440'
-    validate: 'visudo -cf %s'
-  become: yes
-
-# ==========================================
-# FAIL2BAN
-# ==========================================
-- name: Instalar fail2ban
-  apt:
-    name: fail2ban
-    state: present
-  become: yes
-  when: ansible_os_family == "Debian"
-
-- name: Configurar fail2ban para SSH
+- name: Configurar sudoers para operator (comandos limitados)
   copy:
-    dest: /etc/fail2ban/jail.local
-    mode: '0644'
+    dest: /etc/sudoers.d/operator
+    mode: '0440'
     content: |
-      [DEFAULT]
-      bantime = 3600
-      findtime = 600
-      maxretry = 5
-      
-      [sshd]
-      enabled = true
-      port = ssh
-      logpath = /var/log/auth.log
-      maxretry = 3
-  become: yes
-  notify: restart fail2ban
-
-- name: Iniciar y habilitar fail2ban
-  systemd:
-    name: fail2ban
-    state: started
-    enabled: yes
+      # Operator user - limited sudo access
+      operator ALL=(ALL) /bin/systemctl status *
+      operator ALL=(ALL) /bin/systemctl restart apache2
+      operator ALL=(ALL) /bin/systemctl restart vsftpd
+      operator ALL=(ALL) /bin/systemctl restart radvd
+      operator ALL=(ALL) /bin/systemctl restart isc-dhcp-server
+      operator ALL=(ALL) /usr/bin/tail /var/log/*
+      operator ALL=(ALL) /bin/ping, /bin/ping6
+      operator ALL=(ALL) /usr/bin/tcpdump
+      operator ALL=(ALL) NOPASSWD: /bin/systemctl status *
   become: yes
 
-# ==========================================
-# LOGS Y AUDITORÍA
-# ==========================================
-- name: Configurar logrotate para logs de Ansible
+- name: Configurar sudoers para ansible (acceso completo sin password)
   copy:
-    dest: /etc/logrotate.d/ansible
-    mode: '0644'
+    dest: /etc/sudoers.d/ansible
+    mode: '0440'
     content: |
-      /var/log/ansible/*.log {
-        daily
-        rotate 7
-        compress
-        missingok
-        notifempty
-      }
+      # Ansible user - full sudo access without password
+      {{ vault_ansible_user }} ALL=(ALL) NOPASSWD: ALL
   become: yes
 
-- name: Asegurar permisos en /var/log
-  file:
-    path: /var/log
-    mode: '0755'
-    state: directory
-  become: yes
-
-# ==========================================
-# KERNEL HARDENING
-# ==========================================
-- name: Aplicar configuración de kernel hardening
+- name: Configurar kernel hardening (sysctl)
   sysctl:
     name: "{{ item.name }}"
     value: "{{ item.value }}"
     state: present
     reload: yes
+    sysctl_file: /etc/sysctl.d/99-hardening.conf
   loop:
-    - { name: 'net.ipv4.conf.all.rp_filter', value: '1' }
-    - { name: 'net.ipv4.conf.default.rp_filter', value: '1' }
-    - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
-    - { name: 'net.ipv4.conf.all.accept_source_route', value: '0' }
-    - { name: 'net.ipv6.conf.all.accept_source_route', value: '0' }
+    # Network security
+    - { name: 'net.ipv4.ip_forward', value: '0' }
     - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.default.send_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.default.accept_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.all.secure_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.default.secure_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+    - { name: 'net.ipv4.conf.default.accept_source_route', value: '0' }
     - { name: 'net.ipv4.conf.all.log_martians', value: '1' }
+    - { name: 'net.ipv4.conf.default.log_martians', value: '1' }
+    - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
+    - { name: 'net.ipv4.icmp_ignore_bogus_error_responses', value: '1' }
+    - { name: 'net.ipv4.tcp_syncookies', value: '1' }
+    # IPv6 security (except for router)
+    - { name: 'net.ipv6.conf.all.accept_redirects', value: '0' }
+    - { name: 'net.ipv6.conf.default.accept_redirects', value: '0' }
+    - { name: 'net.ipv6.conf.all.accept_source_route', value: '0' }
+    - { name: 'net.ipv6.conf.default.accept_source_route', value: '0' }
+    # Memory protection
+    - { name: 'kernel.dmesg_restrict', value: '1' }
+    - { name: 'kernel.kptr_restrict', value: '2' }
+    - { name: 'kernel.yama.ptrace_scope', value: '1' }
+    # File system protection
+    - { name: 'fs.protected_hardlinks', value: '1' }
+    - { name: 'fs.protected_symlinks', value: '1' }
+  become: yes
+  when: inventory_hostname != "debian-router"  # Router needs IPv6 forwarding
+
+- name: Configurar kernel hardening para router (IPv6 forwarding habilitado)
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+    sysctl_file: /etc/sysctl.d/99-hardening.conf
+  loop:
+    # Network security (IPv6 forwarding enabled for router)
+    - { name: 'net.ipv4.ip_forward', value: '0' }
+    - { name: 'net.ipv6.conf.all.forwarding', value: '1' }
+    - { name: 'net.ipv4.conf.all.send_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.default.send_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.all.accept_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.default.accept_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.all.secure_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.default.secure_redirects', value: '0' }
+    - { name: 'net.ipv4.conf.all.accept_source_route', value: '0' }
+    - { name: 'net.ipv4.conf.default.accept_source_route', value: '0' }
+    - { name: 'net.ipv4.conf.all.log_martians', value: '1' }
+    - { name: 'net.ipv4.conf.default.log_martians', value: '1' }
+    - { name: 'net.ipv4.icmp_echo_ignore_broadcasts', value: '1' }
+    - { name: 'net.ipv4.icmp_ignore_bogus_error_responses', value: '1' }
+    - { name: 'net.ipv4.tcp_syncookies', value: '1' }
+    # IPv6 security (router specific)
+    - { name: 'net.ipv6.conf.all.accept_redirects', value: '0' }
+    - { name: 'net.ipv6.conf.default.accept_redirects', value: '0' }
+    - { name: 'net.ipv6.conf.all.accept_source_route', value: '0' }
+    - { name: 'net.ipv6.conf.default.accept_source_route', value: '0' }
+    # Memory protection
+    - { name: 'kernel.dmesg_restrict', value: '1' }
+    - { name: 'kernel.kptr_restrict', value: '2' }
+    - { name: 'kernel.yama.ptrace_scope', value: '1' }
+    # File system protection
+    - { name: 'fs.protected_hardlinks', value: '1' }
+    - { name: 'fs.protected_symlinks', value: '1' }
+  become: yes
+  when: inventory_hostname == "debian-router"
+
+- name: Configurar límites de recursos
+  copy:
+    dest: /etc/security/limits.d/99-hardening.conf
+    mode: '0644'
+    content: |
+      # Security limits
+      * soft core 0
+      * hard core 0
+      * soft nproc 1000
+      * hard nproc 2000
+      * soft nofile 1024
+      * hard nofile 2048
+      
+      # Operator limits
+      operator soft nproc 100
+      operator hard nproc 200
+      operator soft nofile 512
+      operator hard nofile 1024
   become: yes
 
-- name: Resumen de hardening
+- name: Configurar logrotate para logs de Ansible
+  copy:
+    dest: /etc/logrotate.d/ansible
+    mode: '0644'
+    content: |
+      /var/log/ansible.log {
+          daily
+          rotate 30
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0644 root root
+      }
+      
+      /tmp/ansible*.log {
+          daily
+          rotate 7
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0644 root root
+      }
+  become: yes
+
+- name: Deshabilitar servicios innecesarios
+  systemd:
+    name: "{{ item }}"
+    enabled: no
+    state: stopped
+  loop:
+    - avahi-daemon
+    - cups
+    - bluetooth
+  become: yes
+  ignore_errors: yes
+
+- name: Configurar umask seguro
+  lineinfile:
+    path: /etc/profile
+    regexp: '^umask'
+    line: 'umask 027'
+  become: yes
+
+- name: Configurar umask para usuarios específicos
+  lineinfile:
+    path: "/home/{{ item }}/.bashrc"
+    regexp: '^umask'
+    line: 'umask 027'
+    create: yes
+    owner: "{{ item }}"
+    group: "{{ item }}"
+  loop:
+    - "{{ vault_ansible_user }}"
+    - operator
+  become: yes
+  ignore_errors: yes
+
+- name: Instalar herramientas de monitoreo básicas
+  package:
+    name:
+      - htop
+      - iotop
+      - nethogs
+      - ss
+      - lsof
+      - psmisc
+      - sysstat
+    state: present
+  become: yes
+
+- name: Configurar auditd (si está disponible)
+  package:
+    name: auditd
+    state: present
+  become: yes
+  ignore_errors: yes
+
+- name: Configurar reglas básicas de auditd
+  copy:
+    dest: /etc/audit/rules.d/99-hardening.rules
+    mode: '0640'
+    content: |
+      # Audit rules for security monitoring
+      -w /etc/passwd -p wa -k identity
+      -w /etc/group -p wa -k identity
+      -w /etc/shadow -p wa -k identity
+      -w /etc/sudoers -p wa -k identity
+      -w /etc/ssh/sshd_config -p wa -k sshd
+      -w /var/log/auth.log -p wa -k auth
+      -w /var/log/syslog -p wa -k syslog
+  become: yes
+  ignore_errors: yes
+  notify: restart auditd
+
+- name: Verificar configuración de hardening
+  shell: |
+    echo "=== Sysctl Hardening ===" > /tmp/hardening_status.txt
+    sysctl -a | grep -E "(net.ipv4|net.ipv6|kernel|fs)" | grep -E "(forward|redirect|source_route|log_martians|syncookies|dmesg_restrict|kptr_restrict|ptrace_scope|protected)" >> /tmp/hardening_status.txt
+    echo "" >> /tmp/hardening_status.txt
+    echo "=== Users and Groups ===" >> /tmp/hardening_status.txt
+    getent passwd | grep -E "(operator|{{ vault_ansible_user }})" >> /tmp/hardening_status.txt
+    echo "" >> /tmp/hardening_status.txt
+    echo "=== Sudoers Configuration ===" >> /tmp/hardening_status.txt
+    ls -la /etc/sudoers.d/ >> /tmp/hardening_status.txt
+    echo "" >> /tmp/hardening_status.txt
+    echo "=== Disabled Services ===" >> /tmp/hardening_status.txt
+    systemctl list-unit-files | grep -E "(avahi|cups|bluetooth)" >> /tmp/hardening_status.txt 2>/dev/null || echo "Services not found" >> /tmp/hardening_status.txt
+  register: hardening_status
+  changed_when: false
+
+- name: Copiar estado de hardening a evidencias
+  fetch:
+    src: /tmp/hardening_status.txt
+    dest: "evidence/configs/{{ inventory_hostname }}_hardening_status.txt"
+    flat: yes
+
+- name: Mostrar resumen de hardening
   debug:
     msg:
-      - "✅ Hardening aplicado"
-      - "  - Usuario operator creado"
-      - "  - Sudoers configurados"
-      - "  - Fail2ban activo"
-      - "  - Kernel hardening aplicado"
+      - "=========================================="
+      - "✅ Sistema hardening aplicado"
+      - ""
+      - "Usuarios creados:"
+      - "  • operator (permisos limitados)"
+      - "  • {{ vault_ansible_user }} (acceso completo)"
+      - ""
+      - "Configuraciones aplicadas:"
+      - "  • Kernel hardening (sysctl)"
+      - "  • Límites de recursos"
+      - "  • Logrotate configurado"
+      - "  • Servicios innecesarios deshabilitados"
+      - "  • Umask seguro (027)"
+      - "  • Herramientas de monitoreo instaladas"
+      - "  • Auditd configurado (si disponible)"
+      - "=========================================="

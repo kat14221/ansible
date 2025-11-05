@@ -1,0 +1,163 @@
+---
+# Playbook: Gestión de Ansible Vault
+# Descripción: Rekey, validación y gestión de credenciales cifradas
+
+- name: Gestión de Ansible Vault
+  hosts: localhost
+  gather_facts: no
+  vars:
+    vault_file: "group_vars/all/vault.yml"
+    vault_template: "group_vars/all/vault.yml.template"
+    vault_backup_dir: "backups/vault"
+  
+  tasks:
+    - name: Crear directorio de backups
+      file:
+        path: "{{ vault_backup_dir }}"
+        state: directory
+        mode: '0700'
+      
+    - name: Verificar si existe vault.yml
+      stat:
+        path: "{{ vault_file }}"
+      register: vault_exists
+      
+    - name: Verificar si vault.yml está cifrado
+      shell: head -1 "{{ vault_file }}" | grep -q "ANSIBLE_VAULT"
+      register: vault_encrypted
+      failed_when: false
+      changed_when: false
+      when: vault_exists.stat.exists
+      
+    - name: Mostrar estado del vault
+      debug:
+        msg:
+          - "Estado del Vault:"
+          - "  Archivo existe: {{ vault_exists.stat.exists }}"
+          - "  Está cifrado: {{ vault_encrypted.rc == 0 if vault_exists.stat.exists else 'N/A' }}"
+          - "  Ubicación: {{ vault_file }}"
+          
+    - name: Crear backup del vault actual
+      copy:
+        src: "{{ vault_file }}"
+        dest: "{{ vault_backup_dir }}/vault_{{ ansible_date_time.epoch }}.yml"
+        mode: '0600'
+      when: vault_exists.stat.exists
+      
+    - name: Instrucciones para crear vault inicial
+      debug:
+        msg:
+          - "Para crear vault inicial:"
+          - "  1. cp {{ vault_template }} {{ vault_file }}"
+          - "  2. vim {{ vault_file }}  # Editar credenciales"
+          - "  3. ansible-vault encrypt {{ vault_file }}"
+          - "  4. echo 'tu_password' > .vault_pass && chmod 600 .vault_pass"
+      when: not vault_exists.stat.exists
+      
+    - name: Instrucciones para rekey vault existente
+      debug:
+        msg:
+          - "Para cambiar password del vault:"
+          - "  ansible-vault rekey {{ vault_file }}"
+          - ""
+          - "Para editar vault:"
+          - "  ansible-vault edit {{ vault_file }}"
+          - ""
+          - "Para ver vault:"
+          - "  ansible-vault view {{ vault_file }}"
+          - ""
+          - "Para validar vault:"
+          - "  ansible-vault view {{ vault_file }} > /dev/null && echo 'OK' || echo 'ERROR'"
+      when: vault_exists.stat.exists
+      
+    - name: Validar sintaxis del vault (si está cifrado)
+      shell: ansible-vault view "{{ vault_file }}" | ansible-playbook --syntax-check --vault-password-file=.vault_pass -
+      register: vault_syntax
+      failed_when: false
+      changed_when: false
+      when: vault_exists.stat.exists and vault_encrypted.rc == 0
+      
+    - name: Resultado de validación
+      debug:
+        msg:
+          - "Validación de sintaxis: {{ 'OK' if vault_syntax.rc == 0 else 'ERROR' }}"
+          - "{{ vault_syntax.stderr if vault_syntax.rc != 0 else 'Vault válido' }}"
+      when: vault_syntax is defined
+      
+    - name: Generar script de gestión de vault
+      copy:
+        dest: "scripts/manage_vault.sh"
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          # Script de gestión de Ansible Vault
+          
+          VAULT_FILE="group_vars/all/vault.yml"
+          VAULT_TEMPLATE="group_vars/all/vault.yml.template"
+          
+          case "$1" in
+            create)
+              echo "Creando vault inicial..."
+              cp "$VAULT_TEMPLATE" "$VAULT_FILE"
+              echo "Edita el archivo con tus credenciales:"
+              ${EDITOR:-vim} "$VAULT_FILE"
+              echo "Cifrando vault..."
+              ansible-vault encrypt "$VAULT_FILE"
+              echo "Vault creado y cifrado."
+              ;;
+            edit)
+              echo "Editando vault..."
+              ansible-vault edit "$VAULT_FILE"
+              ;;
+            view)
+              echo "Visualizando vault..."
+              ansible-vault view "$VAULT_FILE"
+              ;;
+            rekey)
+              echo "Cambiando password del vault..."
+              ansible-vault rekey "$VAULT_FILE"
+              ;;
+            validate)
+              echo "Validando vault..."
+              if ansible-vault view "$VAULT_FILE" > /dev/null 2>&1; then
+                echo "✅ Vault válido"
+              else
+                echo "❌ Vault inválido o password incorrecto"
+                exit 1
+              fi
+              ;;
+            backup)
+              BACKUP_DIR="backups/vault"
+              mkdir -p "$BACKUP_DIR"
+              BACKUP_FILE="$BACKUP_DIR/vault_$(date +%Y%m%d_%H%M%S).yml"
+              cp "$VAULT_FILE" "$BACKUP_FILE"
+              echo "Backup creado: $BACKUP_FILE"
+              ;;
+            *)
+              echo "Uso: $0 {create|edit|view|rekey|validate|backup}"
+              echo ""
+              echo "Comandos:"
+              echo "  create   - Crear vault inicial desde template"
+              echo "  edit     - Editar vault existente"
+              echo "  view     - Ver contenido del vault"
+              echo "  rekey    - Cambiar password del vault"
+              echo "  validate - Validar vault"
+              echo "  backup   - Crear backup del vault"
+              exit 1
+              ;;
+          esac
+          
+    - name: Instrucciones finales
+      debug:
+        msg:
+          - "=========================================="
+          - "Script de gestión creado: scripts/manage_vault.sh"
+          - ""
+          - "Uso rápido:"
+          - "  ./scripts/manage_vault.sh create    # Crear vault inicial"
+          - "  ./scripts/manage_vault.sh edit      # Editar vault"
+          - "  ./scripts/manage_vault.sh validate  # Validar vault"
+          - "  ./scripts/manage_vault.sh backup    # Backup vault"
+          - ""
+          - "Backup automático guardado en: {{ vault_backup_dir }}/"
+          - "=========================================="

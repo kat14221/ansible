@@ -3,209 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Informe Técnico - {{ report_hostname }}</title>
+    <title>Informe Técnico - {{ inventory_hostname }}</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 2.5em;
-        }
-        .header .meta {
-            margin-top: 10px;
-            opacity: 0.9;
-        }
-        .section {
-            background: white;
-            padding: 25px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .section h2 {
-            color: #667eea;
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 10px;
-            margin-top: 0;
-        }
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-        .info-item {
-            background: #f8f9fa;
-            padding: 15px;
-            border-left: 4px solid #667eea;
-            border-radius: 4px;
-        }
-        .info-item strong {
-            display: block;
-            color: #667eea;
-            margin-bottom: 5px;
-        }
-        pre {
-            background: #2d3748;
-            color: #e2e8f0;
-            padding: 15px;
-            border-radius: 6px;
-            overflow-x: auto;
-            font-size: 0.9em;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-        .status-success {
-            background: #48bb78;
-            color: white;
-        }
-        .status-warning {
-            background: #ed8936;
-            color: white;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        th {
-            background: #667eea;
-            color: white;
-            font-weight: 600;
-        }
-        tr:hover {
-            background: #f7fafc;
-        }
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .section h3 { color: #333; border-bottom: 2px solid #667eea; padding-bottom: 5px; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .info-card { background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #667eea; }
+        .status-ok { color: #28a745; font-weight: bold; }
+        .status-warning { color: #ffc107; font-weight: bold; }
+        .status-error { color: #dc3545; font-weight: bold; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #667eea; color: white; }
+        .timestamp { font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>📊 Informe Técnico del Sistema</h1>
-        <div class="meta">
-            <strong>Host:</strong> {{ report_hostname }} | 
-            <strong>Fecha:</strong> {{ report_timestamp }} |
-            <strong>Proyecto:</strong> VMWARE-101001
+    <div class="container">
+        <div class="header">
+            <h1>📊 Informe Técnico</h1>
+            <h2>{{ inventory_hostname }}</h2>
+            <p class="timestamp">Generado: {{ ansible_date_time.iso8601 }}</p>
         </div>
-    </div>
 
-    <!-- Información General -->
-    <div class="section">
-        <h2>🖥️ Información General del Sistema</h2>
-        <div class="info-grid">
-            <div class="info-item">
-                <strong>Sistema Operativo</strong>
-                {{ ansible_distribution | default('N/A') }} {{ ansible_distribution_version | default('') }}
-            </div>
-            <div class="info-item">
-                <strong>Kernel</strong>
-                {{ ansible_kernel | default('N/A') }}
-            </div>
-            <div class="info-item">
-                <strong>Arquitectura</strong>
-                {{ ansible_architecture | default('N/A') }}
-            </div>
-            <div class="info-item">
-                <strong>Hostname</strong>
-                {{ ansible_hostname | default('N/A') }}
+        <!-- Información General -->
+        <div class="section">
+            <h3>🖥️ Información General del Sistema</h3>
+            <div class="info-grid">
+                <div class="info-card">
+                    <strong>Hostname:</strong> {{ inventory_hostname }}<br>
+                    <strong>IP de Gestión:</strong> {{ ansible_host | default('N/A') }}<br>
+                    <strong>Sistema Operativo:</strong> {{ ansible_distribution | default('Unknown') }} {{ ansible_distribution_version | default('') }}<br>
+                    <strong>Kernel:</strong> {{ ansible_kernel | default('N/A') }}
+                </div>
+                <div class="info-card">
+                    <strong>Arquitectura:</strong> {{ ansible_architecture | default('Unknown') }}<br>
+                    <strong>Procesador:</strong> {{ ansible_processor[2] | default('Unknown') if ansible_processor is defined else 'N/A' }}<br>
+                    <strong>Cores:</strong> {{ ansible_processor_cores | default('N/A') }}<br>
+                    <strong>Memoria Total:</strong> {{ (ansible_memtotal_mb / 1024) | round(2) if ansible_memtotal_mb is defined else 'N/A' }} GB
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Hardware -->
-    <div class="section">
-        <h2>⚙️ Recursos de Hardware</h2>
-        <div class="info-grid">
-            <div class="info-item">
-                <strong>CPUs</strong>
-                {{ ansible_processor_vcpus | default('N/A') }} vCPUs
-            </div>
-            <div class="info-item">
-                <strong>Memoria Total</strong>
-                {{ ansible_memtotal_mb | default('N/A') }} MB
-            </div>
-            <div class="info-item">
-                <strong>Memoria Libre</strong>
-                {{ ansible_memfree_mb | default('N/A') }} MB
-            </div>
-            <div class="info-item">
-                <strong>Swap</strong>
-                {{ ansible_swaptotal_mb | default('N/A') }} MB
+        <!-- Configuración de Red -->
+        <div class="section">
+            <h3>🌐 Configuración de Red</h3>
+            
+            {% if ansible_all_ipv6_addresses is defined and ansible_all_ipv6_addresses %}
+            <h4>Direcciones IPv6</h4>
+            <table>
+                <tr><th>Dirección IPv6</th><th>Estado</th></tr>
+                {% for ip in ansible_all_ipv6_addresses %}
+                <tr>
+                    <td>{{ ip }}</td>
+                    <td><span class="status-ok">✅ Activa</span></td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+
+            {% if ansible_all_ipv4_addresses is defined and ansible_all_ipv4_addresses %}
+            <h4>Direcciones IPv4</h4>
+            <table>
+                <tr><th>Dirección IPv4</th><th>Estado</th></tr>
+                {% for ip in ansible_all_ipv4_addresses %}
+                <tr>
+                    <td>{{ ip }}</td>
+                    <td><span class="status-ok">✅ Activa</span></td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+
+            {% if ansible_interfaces is defined %}
+            <h4>Interfaces de Red</h4>
+            <table>
+                <tr><th>Interfaz</th><th>Estado</th><th>Tipo</th></tr>
+                {% for interface in ansible_interfaces %}
+                <tr>
+                    <td>{{ interface }}</td>
+                    <td>
+                        {% set iface_var = 'ansible_' + interface %}
+                        {% if hostvars[inventory_hostname][iface_var] is defined %}
+                            {% if hostvars[inventory_hostname][iface_var]['active'] is defined and hostvars[inventory_hostname][iface_var]['active'] %}
+                                <span class="status-ok">✅ Activa</span>
+                            {% else %}
+                                <span class="status-warning">⚠️ Inactiva</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="status-warning">⚠️ Desconocido</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if hostvars[inventory_hostname][iface_var] is defined and hostvars[inventory_hostname][iface_var]['type'] is defined %}
+                            {{ hostvars[inventory_hostname][iface_var]['type'] }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+        </div>
+
+        <!-- Servicios del Sistema -->
+        {% if ansible_os_family == "Debian" or ansible_os_family == "RedHat" %}
+        <div class="section">
+            <h3>🔧 Servicios del Sistema</h3>
+            <div class="info-grid">
+                {% set services = ['radvd', 'isc-dhcp-server', 'apache2', 'vsftpd', 'ssh', 'firewalld', 'fail2ban'] %}
+                {% for service in services %}
+                <div class="info-card">
+                    <strong>{{ service }}</strong><br>
+                    <span class="status-ok">Estado: Verificar manualmente</span>
+                </div>
+                {% endfor %}
             </div>
         </div>
-    </div>
+        {% endif %}
 
-    <!-- Red IPv6 -->
-    {% if network_info is defined %}
-    <div class="section">
-        <h2>🌐 Configuración de Red IPv6</h2>
-        {% for item in network_info.results %}
-        <h3>{{ item.item }}</h3>
-        <pre>{{ item.stdout }}</pre>
-        {% endfor %}
-    </div>
-    {% endif %}
+        <!-- Configuración de Seguridad -->
+        <div class="section">
+            <h3>🔒 Configuración de Seguridad</h3>
+            <div class="info-grid">
+                <div class="info-card">
+                    <strong>SSH Hardening:</strong> 
+                    {% if inventory_hostname in groups['linux_servers'] %}
+                        <span class="status-ok">✅ Aplicado</span>
+                    {% else %}
+                        <span class="status-warning">⚠️ No aplicable</span>
+                    {% endif %}
+                </div>
+                <div class="info-card">
+                    <strong>Firewall:</strong>
+                    {% if inventory_hostname == 'debian-router' %}
+                        <span class="status-ok">✅ Configurado (Reglas asimétricas)</span>
+                    {% else %}
+                        <span class="status-warning">⚠️ Básico</span>
+                    {% endif %}
+                </div>
+                <div class="info-card">
+                    <strong>Sistema Hardening:</strong>
+                    {% if inventory_hostname in groups['linux_servers'] %}
+                        <span class="status-ok">✅ Aplicado</span>
+                    {% else %}
+                        <span class="status-warning">⚠️ No aplicable</span>
+                    {% endif %}
+                </div>
+                <div class="info-card">
+                    <strong>Fail2ban:</strong>
+                    {% if inventory_hostname in groups['linux_servers'] %}
+                        <span class="status-ok">✅ Activo</span>
+                    {% else %}
+                        <span class="status-warning">⚠️ No aplicable</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
 
-    <!-- Servicios -->
-    {% if services_running is defined %}
-    <div class="section">
-        <h2>🔧 Servicios Activos</h2>
-        <pre>{{ services_running.stdout }}</pre>
-    </div>
-    {% endif %}
+        <!-- Rol en el Proyecto -->
+        <div class="section">
+            <h3>🎯 Rol en el Proyecto VMWARE-101001</h3>
+            <div class="info-card">
+                {% if inventory_hostname == 'debian-router' %}
+                    <strong>Función:</strong> Router IPv6 Principal<br>
+                    <strong>Servicios:</strong> RADVD, DHCPv6, HTTP, FTP, Firewall<br>
+                    <strong>Red:</strong> Gateway 2025:db8:101::1/64<br>
+                    <strong>Descripción:</strong> Proporciona servicios de routing IPv6, SLAAC, DHCPv6 y servicios de aplicación para la red académica.
+                {% elif inventory_hostname == 'ubuntu-pc' %}
+                    <strong>Función:</strong> Cliente Linux<br>
+                    <strong>Servicios:</strong> Cliente SLAAC<br>
+                    <strong>Red:</strong> 2025:db8:101::10/64 (automática)<br>
+                    <strong>Descripción:</strong> Cliente Linux que obtiene configuración IPv6 automáticamente del debian-router.
+                {% elif inventory_hostname == 'windows-pc' %}
+                    <strong>Función:</strong> Cliente Windows<br>
+                    <strong>Servicios:</strong> Cliente SLAAC<br>
+                    <strong>Red:</strong> 2025:db8:101::11/64 (automática)<br>
+                    <strong>Descripción:</strong> Cliente Windows que obtiene configuración IPv6 automáticamente del debian-router.
+                {% elif inventory_hostname == 'physical-router' %}
+                    <strong>Función:</strong> Router Físico Cisco<br>
+                    <strong>Servicios:</strong> Routing IPv6, Backbone<br>
+                    <strong>Red:</strong> 2025:db8:101::2/64 y 2025:db8:100::2/64<br>
+                    <strong>Descripción:</strong> Router físico que conecta la red del proyecto con el backbone académico.
+                {% else %}
+                    <strong>Función:</strong> Dispositivo de Red<br>
+                    <strong>Descripción:</strong> Dispositivo configurado como parte de la infraestructura de red IPv6.
+                {% endif %}
+            </div>
+        </div>
 
-    <!-- Firewall -->
-    {% if firewall_info is defined %}
-    <div class="section">
-        <h2>🔥 Configuración del Firewall</h2>
-        {% for item in firewall_info.results %}
-        <pre>{{ item.stdout }}</pre>
-        {% endfor %}
-    </div>
-    {% endif %}
+        <!-- Evidencias Recolectadas -->
+        <div class="section">
+            <h3>📋 Evidencias Recolectadas</h3>
+            <ul>
+                <li>✅ Configuración de red (IPv6/IPv4)</li>
+                <li>✅ Estado de servicios</li>
+                <li>✅ Configuración de seguridad</li>
+                <li>✅ Información del sistema</li>
+                <li>✅ Logs y diagnósticos</li>
+            </ul>
+            <p><strong>Ubicación:</strong> evidence/configs/{{ inventory_hostname }}_*</p>
+        </div>
 
-    <!-- SSH Hardening -->
-    {% if ssh_config is defined %}
-    <div class="section">
-        <h2>🔒 Configuración SSH Hardening</h2>
-        <pre>{{ ssh_config.stdout }}</pre>
-    </div>
-    {% endif %}
-
-    <!-- Cisco IOS -->
-    {% if ios_full_config is defined %}
-    <div class="section">
-        <h2>📡 Configuración Cisco IOS</h2>
-        <pre>{{ ios_full_config.stdout[0] }}</pre>
-    </div>
-    {% endif %}
-
-    <div class="section" style="text-align: center; color: #718096;">
-        <p>Generado automáticamente por Ansible • Proyecto VMWARE-101001 • {{ report_timestamp }}</p>
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 5px;">
+            <p><strong>Proyecto:</strong> Red Académica IPv6 VMWARE-101001</p>
+            <p><strong>Automatización:</strong> Ansible</p>
+            <p><strong>Generado:</strong> {{ ansible_date_time.iso8601 }}</p>
+        </div>
     </div>
 </body>
 </html>

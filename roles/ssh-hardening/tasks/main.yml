@@ -1,66 +1,178 @@
 ---
 # Role: ssh-hardening
-# Descripción: Configurar SSH seguro con llaves, sin passwords
+# Descripción: Hardening de SSH para servidores Linux
 
-- name: Verificar si SSH hardening está habilitado
-  debug:
-    msg: "SSH Hardening aplicado en {{ inventory_hostname }}"
-  when: apply_ssh_hardening | default(true) | bool
-
-- name: Asegurar directorio .ssh para usuario ansible
-  file:
-    path: /home/ansible/.ssh
-    state: directory
-    owner: ansible
-    group: ansible
-    mode: '0700'
-  become: yes
-  when: apply_ssh_hardening | default(true) | bool
-
-- name: Copiar clave pública SSH desde Vault (si existe)
-  authorized_key:
-    user: ansible
-    key: "{{ vault_ansible_ssh_public_key }}"
+- name: Instalar OpenSSH Server
+  package:
+    name: openssh-server
     state: present
   become: yes
-  when:
-    - apply_ssh_hardening | default(true) | bool
-    - vault_ansible_ssh_public_key is defined
 
-- name: Configurar sshd_config de forma segura
+- name: Crear backup de configuración SSH
+  copy:
+    src: /etc/ssh/sshd_config
+    dest: "/etc/ssh/sshd_config.backup.{{ ansible_date_time.epoch }}"
+    remote_src: yes
+    mode: '0600'
+  become: yes
+
+- name: Configurar SSH hardening
   lineinfile:
     path: /etc/ssh/sshd_config
     regexp: "{{ item.regexp }}"
     line: "{{ item.line }}"
-    state: present
-    validate: 'sshd -t -f %s'
+    backup: yes
   loop:
     - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
     - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
     - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+    - { regexp: '^#?AuthorizedKeysFile', line: 'AuthorizedKeysFile .ssh/authorized_keys' }
     - { regexp: '^#?PermitEmptyPasswords', line: 'PermitEmptyPasswords no' }
     - { regexp: '^#?ChallengeResponseAuthentication', line: 'ChallengeResponseAuthentication no' }
-  notify: restart sshd
+    - { regexp: '^#?UsePAM', line: 'UsePAM yes' }
+    - { regexp: '^#?X11Forwarding', line: 'X11Forwarding no' }
+    - { regexp: '^#?PrintMotd', line: 'PrintMotd no' }
+    - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
+    - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
+    - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+    - { regexp: '^#?MaxSessions', line: 'MaxSessions 2' }
+    - { regexp: '^#?Protocol', line: 'Protocol 2' }
+    - { regexp: '^#?LogLevel', line: 'LogLevel VERBOSE' }
+    - { regexp: '^#?AllowUsers', line: 'AllowUsers {{ vault_ansible_user }}' }
   become: yes
-  when: apply_ssh_hardening | default(true) | bool
+  notify: restart sshd
 
-- name: Deshabilitar métodos de autenticación débiles
+- name: Configurar algoritmos de cifrado seguros
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    block: |
+      # Algoritmos de cifrado seguros
+      Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+      MACs hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha2-256,hmac-sha2-512
+      KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256
+    marker: "# {mark} ANSIBLE MANAGED SSH HARDENING"
+  become: yes
+  notify: restart sshd
+
+- name: Configurar banner SSH
+  copy:
+    dest: /etc/ssh/banner
+    mode: '0644'
+    content: |
+      ================================================================================
+                            SISTEMA RESTRINGIDO - ACCESO AUTORIZADO
+      ================================================================================
+      
+      Este sistema es para uso autorizado únicamente. Todas las actividades son
+      monitoreadas y registradas. El acceso no autorizado está prohibido.
+      
+      Proyecto: Red Académica IPv6 VMWARE-101001
+      Host: {{ inventory_hostname }}
+      Fecha: {{ ansible_date_time.iso8601 }}
+      
+      ================================================================================
+  become: yes
+
+- name: Habilitar banner SSH
   lineinfile:
     path: /etc/ssh/sshd_config
-    regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
-    state: present
-  loop:
-    - { regexp: '^#?Protocol', line: 'Protocol 2' }
-    - { regexp: '^#?X11Forwarding', line: 'X11Forwarding no' }
-  notify: restart sshd
+    regexp: '^#?Banner'
+    line: 'Banner /etc/ssh/banner'
   become: yes
-  when: apply_ssh_hardening | default(true) | bool
+  notify: restart sshd
 
-- name: Resumen de SSH hardening
+- name: Instalar fail2ban
+  package:
+    name: fail2ban
+    state: present
+  become: yes
+
+- name: Configurar fail2ban para SSH
+  copy:
+    dest: /etc/fail2ban/jail.local
+    mode: '0644'
+    content: |
+      [DEFAULT]
+      bantime = 3600
+      findtime = 600
+      maxretry = 3
+      backend = systemd
+      
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+      bantime = 3600
+      findtime = 600
+  become: yes
+  notify: restart fail2ban
+
+- name: Habilitar y iniciar fail2ban
+  systemd:
+    name: fail2ban
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Habilitar y iniciar SSH
+  systemd:
+    name: ssh
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Verificar configuración SSH
+  command: sshd -t
+  register: sshd_test
+  changed_when: false
+  become: yes
+
+- name: Verificar estado de fail2ban
+  command: fail2ban-client status sshd
+  register: fail2ban_status
+  changed_when: false
+  become: yes
+  ignore_errors: yes
+
+- name: Mostrar resumen de SSH hardening
   debug:
     msg:
+      - "=========================================="
       - "✅ SSH Hardening aplicado"
-      - "  - Root login deshabilitado"
-      - "  - Password authentication deshabilitada"
-      - "  - Solo autenticación por llave pública"
+      - "Configuración SSH: {{ 'OK' if sshd_test.rc == 0 else 'ERROR' }}"
+      - "Fail2ban SSH: {{ 'OK' if fail2ban_status.rc == 0 else 'Verificar manualmente' }}"
+      - ""
+      - "Configuraciones aplicadas:"
+      - "  • PermitRootLogin: no"
+      - "  • PasswordAuthentication: no"
+      - "  • PubkeyAuthentication: yes"
+      - "  • MaxAuthTries: 3"
+      - "  • ClientAliveInterval: 300"
+      - "  • Algoritmos seguros habilitados"
+      - "  • Banner configurado"
+      - "  • Fail2ban activo"
+      - "=========================================="
+
+- name: Guardar configuración SSH
+  shell: |
+    echo "=== SSH Configuration Test ===" > /tmp/ssh_hardening.txt
+    sshd -t >> /tmp/ssh_hardening.txt 2>&1 || echo "SSH config test failed" >> /tmp/ssh_hardening.txt
+    echo "" >> /tmp/ssh_hardening.txt
+    echo "=== SSH Service Status ===" >> /tmp/ssh_hardening.txt
+    systemctl status ssh --no-pager >> /tmp/ssh_hardening.txt
+    echo "" >> /tmp/ssh_hardening.txt
+    echo "=== Fail2ban Status ===" >> /tmp/ssh_hardening.txt
+    fail2ban-client status >> /tmp/ssh_hardening.txt 2>/dev/null || echo "Fail2ban not available" >> /tmp/ssh_hardening.txt
+    echo "" >> /tmp/ssh_hardening.txt
+    echo "=== SSH Configuration ===" >> /tmp/ssh_hardening.txt
+    grep -v "^#" /etc/ssh/sshd_config | grep -v "^$" >> /tmp/ssh_hardening.txt
+  register: ssh_config
+  changed_when: false
+
+- name: Copiar configuración SSH a evidencias
+  fetch:
+    src: /tmp/ssh_hardening.txt
+    dest: "evidence/configs/{{ inventory_hostname }}_ssh_hardening.txt"
+    flat: yes

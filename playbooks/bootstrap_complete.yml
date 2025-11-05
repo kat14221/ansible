@@ -1,0 +1,93 @@
+---
+# Playbook: Bootstrap Completo Automatizado
+# Descripción: Automatiza la creación de VMs y configuración inicial
+
+- name: Bootstrap Completo - Crear y Configurar VMs
+  hosts: localhost
+  gather_facts: no
+  vars:
+    vm_wait_timeout: 600  # 10 minutos
+    vm_boot_timeout: 300  # 5 minutos
+  
+  tasks:
+    - name: Crear todas las VMs en ESXi
+      include_tasks: tasks/create_vm_automated.yml
+      vars:
+        vm_config: "{{ item }}"
+      loop:
+        - name: vm-debian-router
+          guest_id: debian11_64Guest
+          memory_mb: 2048
+          num_cpus: 2
+          disk_size_gb: 20
+          iso_path: "[datastore1] debian/debian-12.12.0-amd64-netinst.iso"
+          networks:
+            - name: VM Network
+            - name: Red Fernandez
+        - name: vm-ubuntu-pc
+          guest_id: ubuntu64Guest
+          memory_mb: 4096
+          num_cpus: 2
+          disk_size_gb: 25
+          iso_path: "[datastore1] ubuntu/ubuntu-24.04.2-desktop-amd64.iso"
+          networks:
+            - name: Red Fernandez
+        - name: vm-windows-pc
+          guest_id: windows11_64Guest
+          memory_mb: 4096
+          num_cpus: 2
+          disk_size_gb: 40
+          iso_path: "[datastore1] W-11/Win11_24H2_Spanish_x64.iso"
+          networks:
+            - name: Red Fernandez
+
+    - name: Esperar a que las VMs estén disponibles
+      vmware_guest_info:
+        hostname: "{{ vault_vcenter_hostname }}"
+        username: "{{ vault_vcenter_username }}"
+        password: "{{ vault_vcenter_password }}"
+        datacenter: ha-datacenter
+        name: "{{ item }}"
+        validate_certs: no
+      register: vm_info
+      until: vm_info.instance.hw_power_state == "poweredOn"
+      retries: 30
+      delay: 20
+      loop:
+        - vm-debian-router
+        - vm-ubuntu-pc
+        - vm-windows-pc
+
+    - name: Configurar usuario ansible automáticamente (cloud-init)
+      include_tasks: tasks/setup_cloud_init.yml
+      vars:
+        vm_name: "{{ item }}"
+      loop:
+        - vm-debian-router
+        - vm-ubuntu-pc
+      when: enable_cloud_init | default(false)
+
+    - name: Mostrar instrucciones post-creación
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ VMs creadas exitosamente"
+          - ""
+          - "PASOS MANUALES REQUERIDOS:"
+          - ""
+          - "1. 🖥️ Instalar OS en cada VM:"
+          - "   • vm-debian-router: Debian 12"
+          - "   • vm-ubuntu-pc: Ubuntu 24.04"
+          - "   • vm-windows-pc: Windows 11"
+          - ""
+          - "2. 👤 Crear usuario 'ansible' en Linux VMs:"
+          - "   sudo adduser ansible"
+          - "   sudo usermod -aG sudo ansible"
+          - "   echo 'ansible ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/ansible"
+          - ""
+          - "3. 🔑 Copiar SSH key:"
+          - "   ssh-copy-id ansible@<VM-IP>"
+          - ""
+          - "4. 🚀 Ejecutar configuración:"
+          - "   ansible-playbook playbooks/site.yml"
+          - "=========================================="
