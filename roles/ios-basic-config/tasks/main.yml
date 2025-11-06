@@ -90,6 +90,7 @@
     mode: '0755'
   delegate_to: localhost
   run_once: true
+  ignore_errors: yes
 
 - name: Guardar running-config (evidencia académica)
   copy:
@@ -98,6 +99,7 @@
     mode: '0644'
   delegate_to: localhost
   when: running_config is defined and running_config.stdout is defined
+  ignore_errors: yes
 
 - name: Obtener información de interfaces IPv6
   cisco.ios.ios_command:
@@ -118,6 +120,7 @@
     mode: '0644'
   delegate_to: localhost
   when: ipv6_info is defined
+  ignore_errors: yes
 
 - name: Mostrar resumen
   debug:
