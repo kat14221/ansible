@@ -56,6 +56,7 @@ REQUIRED_PACKAGES=(
   "python3-requests"
   "python3-cryptography"
   "python3-jmespath"
+  "python3-paramiko"
 )
 
 for pkg in "${REQUIRED_PACKAGES[@]}"; do
