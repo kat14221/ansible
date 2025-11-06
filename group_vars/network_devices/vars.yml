@@ -7,10 +7,17 @@ ansible_user: "ansible"
 ansible_password: "Ansible123!"
 cisco_enable_secret: "Ansible123!"
 
-# Configuración de conexión
+# Configuración de conexión network_cli
 ansible_connection: network_cli
 ansible_network_os: ios
-ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+ansible_become: yes
+ansible_become_method: enable
+ansible_become_password: "{{ ansible_password }}"
+
+# Configuración SSH para network_cli
+ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+ansible_command_timeout: 30
+ansible_connect_timeout: 30
 
 # Configuración común de dispositivos
 domain_name: "lab.local"
