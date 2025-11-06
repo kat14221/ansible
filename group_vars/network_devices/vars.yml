@@ -1,0 +1,18 @@
+---
+# Variables específicas para dispositivos de red
+# Estas variables se cargan automáticamente para el grupo network_devices
+
+# Credenciales Cisco IOS (temporalmente directas)
+ansible_user: "ansible"
+ansible_password: "Ansible123!"
+cisco_enable_secret: "Ansible123!"
+
+# Configuración de conexión
+ansible_connection: network_cli
+ansible_network_os: ios
+ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+
+# Configuración común de dispositivos
+domain_name: "lab.local"
+ssh_version: 2
+ssh_timeout: 60
