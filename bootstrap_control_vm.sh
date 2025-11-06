@@ -57,6 +57,8 @@ REQUIRED_PACKAGES=(
   "python3-cryptography"
   "python3-jmespath"
   "python3-paramiko"
+  "python3-bcrypt"
+  "python3-nacl"
 )
 
 for pkg in "${REQUIRED_PACKAGES[@]}"; do
@@ -98,6 +100,20 @@ else
     echo "  ⚠️  Error al instalar pyvmomi, intentando método alternativo..."
     python3 -m pip install --break-system-packages pyvmomi>=8.0.0.1 || \
       echo "  ❌ No se pudo instalar pyvmomi. Instalar manualmente después."
+  fi
+fi
+
+# Verificar ansible-pylibssh (mejora rendimiento de conexiones SSH)
+if check_python_package "ansible_pylibssh"; then
+  echo "  ✅ ansible-pylibssh ya instalado"
+else
+  echo "  ⬇️  Instalando ansible-pylibssh..."
+  if pip3 install --break-system-packages ansible-pylibssh 2>/dev/null; then
+    echo "  ✅ ansible-pylibssh instalado con --break-system-packages"
+  elif pip3 install --user ansible-pylibssh 2>/dev/null; then
+    echo "  ✅ ansible-pylibssh instalado con --user"
+  else
+    echo "  ⚠️  No se pudo instalar ansible-pylibssh (opcional)"
   fi
 fi
 

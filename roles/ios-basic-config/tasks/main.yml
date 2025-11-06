@@ -22,7 +22,7 @@
       - "  {{ hostname if hostname is defined else inventory_hostname }}"
       - "  Red Académica IPv6 - VMWARE-101001"
       - "  Backbone: 2025:DB8:101::/64"
-      - "  Fecha: {{ ansible_date_time.iso8601 }}"
+      - "  Fecha: {{ ansible_date_time.iso8601 | default('2024-11-06') }}"
       - ================================================
       - ^C
 
