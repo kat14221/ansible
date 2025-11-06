@@ -52,57 +52,22 @@
     lines:
       - ipv6 unicast-routing
       - ipv6 cef
-    parents: configuration
 
 - name: Configurar interfaces de router
   cisco.ios.ios_config:
     lines:
-      - "description {{ item.description }}"
-      - "ipv6 address {{ item.ipv6_address }}/{{ item.ipv6_prefix }}"
+      - "description {{ item.value.description }}"
+      - "ipv6 address {{ item.value.ipv6_address }}/{{ item.value.ipv6_prefix }}"
       - ipv6 enable
       - no shutdown
-    parents: "interface {{ item.name }}"
-  loop: "{{ interfaces | default([]) }}"
-  when: interfaces is defined
+    parents: "interface {{ item.key }}"
+  loop: "{{ physical_router_interfaces | dict2items }}"
+  when: physical_router_interfaces is defined
 
-- name: Configurar SVI de gestión en switch
-  cisco.ios.ios_config:
-    lines:
-      - "ipv6 address {{ vlan_interfaces[0].ipv6_address }}/{{ vlan_interfaces[0].ipv6_prefix }}"
-      - ipv6 enable
-      - no shutdown
-    parents: "interface vlan {{ vlan_interfaces[0].id }}"
-  when: vlan_interfaces is defined and vlan_interfaces | length > 0
-
-- name: Crear VLAN en switch
-  cisco.ios.ios_config:
-    lines:
-      - "name {{ item.name }}"
-    parents: "vlan {{ item.id }}"
-  loop: "{{ vlan_interfaces | default([]) }}"
-  when: vlan_interfaces is defined
-
-- name: Configurar puertos de acceso
-  cisco.ios.ios_config:
-    lines:
-      - "description {{ item.description }}"
-      - switchport mode access
-      - "switchport access vlan {{ item.vlan }}"
-      - no shutdown
-    parents: "interface {{ item.port }}"
-  loop: "{{ access_ports | default([]) }}"
-  when: access_ports is defined
-
-- name: Configurar puertos troncales
-  cisco.ios.ios_config:
-    lines:
-      - "description {{ item.description }}"
-      - switchport mode trunk
-      - "switchport trunk allowed vlan {{ item.vlans | join(',') }}"
-      - no shutdown
-    parents: "interface {{ item.port }}"
-  loop: "{{ trunk_ports | default([]) }}"
-  when: trunk_ports is defined
+- name: Configuración de switch omitida (solo para routers)
+  debug:
+    msg: "Configuración de switch no aplicable para router físico"
+  when: inventory_hostname == "physical-router"
 
 - name: Guardar configuración final
   cisco.ios.ios_config:
