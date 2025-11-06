@@ -1,0 +1,40 @@
+---
+# Variables públicas que referencian al vault
+# Este archivo NO está cifrado y puede estar en el repositorio
+
+# === Credenciales de red (referencias al vault) ===
+cisco_user: "{{ vault_cisco_user }}"
+cisco_password: "{{ vault_cisco_password }}"
+cisco_enable_secret: "{{ vault_cisco_enable_secret }}"
+
+# === Credenciales ESXi ===
+vcenter_hostname: "{{ vault_vcenter_hostname }}"
+vcenter_username: "{{ vault_vcenter_username }}"
+vcenter_password: "{{ vault_vcenter_password }}"
+vcenter_port: "{{ vault_vcenter_port | default(443) }}"
+vcenter_validate_certs: "{{ vault_vcenter_validate_certs | default('no') }}"
+
+# === Usuario Ansible ===
+ansible_user: "{{ vault_ansible_user }}"
+ansible_ssh_public_key: "{{ vault_ansible_ssh_public_key }}"
+
+# === Servicios ===
+ftp_user: "{{ vault_ftp_user }}"
+ftp_password: "{{ vault_ftp_password }}"
+http_admin_user: "{{ vault_http_admin_user }}"
+http_admin_password: "{{ vault_http_admin_password }}"
+
+# === Configuración de red IPv6 ===
+ipv6_backbone_network: "2025:db8:101::/64"
+ipv6_lab_network: "2025:db8:100::/64"
+
+# === Configuración de interfaces ===
+physical_router_interfaces:
+  GigabitEthernet0/0/0:
+    ipv6_address: "2025:db8:100::2"
+    ipv6_prefix: "64"
+    description: "Enlace-Red-Quispe"
+  GigabitEthernet0/0/1:
+    ipv6_address: "2025:db8:101::2"
+    ipv6_prefix: "64"
+    description: "Enlace-Red-Fernandez"
