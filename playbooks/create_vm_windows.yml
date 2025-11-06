@@ -1,29 +1,50 @@
 ﻿---
-# Playbook: Crear VM Windows PC en ESXi
-# Descripción: Aprovisiona VM Windows como PC de usuario
-# Red: 2025:DB8:220::11/64 (SLAAC)
+# Crear VM Windows PC en ESXi
 
 - name: Crear VM Windows PC
-  hosts: windows-pc
+  hosts: esxi
   gather_facts: no
-  connection: local
   tasks:
-    - name: Incluir role vmware-windows
-      include_role:
-        name: vmware-windows
+    - name: Crear VM Windows PC
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: ha-datacenter
+        folder: /vm
+        name: vm-windows-pc
+        state: present
+        guest_id: windows11_64Guest
+        disk:
+          - size_gb: 40
+            type: thin
+            datastore: datastore1
+        hardware:
+          memory_mb: 4096
+          num_cpus: 2
+          scsi: paravirtual
+        networks:
+          - name: Red Fernandez
+            device_type: vmxnet3
+        cdrom:
+          - controller_number: 0
+            unit_number: 0
+            state: present
+            type: iso
+            iso_path: "[datastore1] W-11/Win11_24H2_Spanish_x64.iso"
+        wait_for_ip_address: no
+      register: vm_result
 
-    - name: Mostrar resumen
+    - name: Mostrar resultado
       debug:
         msg:
-          - "================================================"
-          - "  VM Windows PC Creada"
-          - "================================================"
+          - "=========================================="
+          - "✅ VM Windows PC creada"
+          - "Nombre: vm-windows-pc"
+          - "Estado: {{ vm_result.instance.hw_power_state }}"
           - ""
-          - "VM: vm-windows-pc"
-          - "IPv6: 2025:db8:220::11/64 (SLAAC)"
-          - "Gateway: 2025:db8:220::1"
-          - "Port-group: Red Fernandez"
-          - ""
-          - "Próximo paso: Instalar SO manualmente"
-          - "================================================"
-      when: inventory_hostname == "windows-pc"
+          - "SIGUIENTE PASO:"
+          - "1. Acceder a ESXi: https://172.17.25.1"
+          - "2. Instalar Windows 11 en vm-windows-pc"
+          - "=========================================="

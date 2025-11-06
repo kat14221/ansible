@@ -1,29 +1,51 @@
 ﻿---
-# Playbook: Crear VM Ubuntu PC en ESXi
-# Descripción: Aprovisiona VM Ubuntu como PC de usuario
-# Red: 2025:DB8:220::10/64 (SLAAC)
+# Crear VM Ubuntu PC en ESXi
 
 - name: Crear VM Ubuntu PC
-  hosts: ubuntu-pc
+  hosts: esxi
   gather_facts: no
-  connection: local
   tasks:
-    - name: Incluir role vmware-ubuntu
-      include_role:
-        name: vmware-ubuntu
+    - name: Crear VM Ubuntu PC
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: ha-datacenter
+        folder: /vm
+        name: vm-ubuntu-pc
+        state: present
+        guest_id: ubuntu64Guest
+        disk:
+          - size_gb: 25
+            type: thin
+            datastore: datastore1
+        hardware:
+          memory_mb: 4096
+          num_cpus: 2
+          scsi: paravirtual
+        networks:
+          - name: Red Fernandez
+            device_type: vmxnet3
+        cdrom:
+          - controller_number: 0
+            unit_number: 0
+            state: present
+            type: iso
+            iso_path: "[datastore1] ubuntu/ubuntu-24.04.2-desktop-amd64.iso"
+        wait_for_ip_address: no
+      register: vm_result
 
-    - name: Mostrar resumen
+    - name: Mostrar resultado
       debug:
         msg:
-          - "================================================"
-          - "  VM Ubuntu PC Creada"
-          - "================================================"
+          - "=========================================="
+          - "✅ VM Ubuntu PC creada"
+          - "Nombre: vm-ubuntu-pc"
+          - "Estado: {{ vm_result.instance.hw_power_state }}"
           - ""
-          - "VM: vm-ubuntu-pc"
-          - "IPv6: 2025:db8:220::10/64 (SLAAC)"
-          - "Gateway: 2025:db8:220::1"
-          - "Port-group: Red Fernandez"
-          - ""
-          - "Próximo paso: Instalar SO manualmente"
-          - "================================================"
-      when: inventory_hostname == "ubuntu-pc"
+          - "SIGUIENTE PASO:"
+          - "1. Acceder a ESXi: https://172.17.25.1"
+          - "2. Instalar Ubuntu 24.04 en vm-ubuntu-pc"
+          - "3. Configurar usuario ansible"
+          - "=========================================="

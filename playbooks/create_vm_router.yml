@@ -1,28 +1,54 @@
 ﻿---
-# Playbook: Crear VM Debian Router en ESXi
-# Descripción: Aprovisiona VM Debian como router IPv6
-# Red: 2025:DB8:220::1/64 (LAN) + 2025:DB8:101::a1/64 (Uplink)
+# Crear VM Debian Router en ESXi
 
 - name: Crear VM Debian Router
-  hosts: vm_router
+  hosts: esxi
   gather_facts: no
-  connection: local
   tasks:
-    - name: Incluir role vmware-router
-      include_role:
-        name: vmware-router
+    - name: Crear VM Router Debian
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: ha-datacenter
+        folder: /vm
+        name: vm-debian-router
+        state: present
+        guest_id: debian11_64Guest
+        disk:
+          - size_gb: 20
+            type: thin
+            datastore: datastore1
+        hardware:
+          memory_mb: 2048
+          num_cpus: 2
+          scsi: paravirtual
+        networks:
+          - name: VM Network
+            device_type: vmxnet3
+          - name: Red Fernandez
+            device_type: vmxnet3
+        cdrom:
+          - controller_number: 0
+            unit_number: 0
+            state: present
+            type: iso
+            iso_path: "[datastore1] debian/debian-12.12.0-amd64-netinst.iso"
+        wait_for_ip_address: no
+      register: vm_result
 
-    - name: Mostrar resumen
+    - name: Mostrar resultado
       debug:
         msg:
-          - "================================================"
-          - "  VM Debian Router Creada"
-          - "================================================"
+          - "=========================================="
+          - "✅ VM Debian Router creada"
+          - "Nombre: vm-debian-router"
+          - "Estado: {{ vm_result.instance.hw_power_state }}"
           - ""
-          - "VM: {{ vm_name }}"
-          - "IPv6 LAN: {{ networks[0].ipv6_address }}/{{ networks[0].ipv6_prefix }}"
-          - "Port-group: {{ networks[0].name }}"
-          - "ISO: {{ cdrom }}"
-          - ""
-          - "Próximo paso: Instalar SO manualmente en la VM"
-          - "================================================"
+          - "SIGUIENTE PASO:"
+          - "1. Acceder a ESXi: https://172.17.25.1"
+          - "2. Instalar Debian 12 en vm-debian-router"
+          - "3. Configurar usuario ansible"
+          - "4. Configurar red IPv6"
+          - "=========================================="
