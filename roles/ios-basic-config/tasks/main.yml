@@ -83,11 +83,21 @@
     commands: show running-config
   register: running_config
 
-- name: Guardar running-config
+- name: Crear directorio de evidencias
+  file:
+    path: "evidence/configs"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+
+- name: Guardar running-config (evidencia académica)
   copy:
     content: "{{ running_config.stdout[0] }}"
     dest: "evidence/configs/{{ inventory_hostname }}_running_config.txt"
+    mode: '0644'
   delegate_to: localhost
+  when: running_config is defined and running_config.stdout is defined
 
 - name: Obtener información de interfaces IPv6
   cisco.ios.ios_command:
@@ -96,16 +106,18 @@
       - show ipv6 route
   register: ipv6_info
 
-- name: Guardar información IPv6
+- name: Guardar información IPv6 (evidencia académica)
   copy:
     content: |
       === IPv6 Interfaces ===
-      {{ ipv6_info.stdout[0] }}
+      {{ ipv6_info.stdout[0] if ipv6_info.stdout is defined and ipv6_info.stdout|length > 0 else 'No disponible' }}
 
       === IPv6 Routes ===
-      {{ ipv6_info.stdout[1] }}
+      {{ ipv6_info.stdout[1] if ipv6_info.stdout is defined and ipv6_info.stdout|length > 1 else 'No disponible' }}
     dest: "evidence/configs/{{ inventory_hostname }}_ipv6_info.txt"
+    mode: '0644'
   delegate_to: localhost
+  when: ipv6_info is defined
 
 - name: Mostrar resumen
   debug:
