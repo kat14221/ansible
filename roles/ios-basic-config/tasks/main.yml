@@ -1,43 +1,46 @@
 ---
 # Role: ios-basic-config
-# Descripción: Configuración básica de routers y switches Cisco IOS con IPv6
+# Descripción: Configuración TEMPORAL de routers Cisco IOS con IPv6
+# IMPORTANTE: NO guarda cambios permanentes (router académico compartido)
 
-- name: Guardar configuración actual
-  cisco.ios.ios_config:
-    save_when: modified
-  register: saved_config
+- name: Verificar configuración actual (sin guardar)
+  debug:
+    msg: "Aplicando configuración temporal - NO se guardarán cambios permanentes"
 
-- name: Configurar hostname
+- name: Configurar hostname (temporal)
   cisco.ios.ios_config:
     lines:
       - "hostname {{ hostname }}"
-    save_when: always
+    save_when: never
   when: hostname is defined
 
-- name: Configurar banner
+- name: Configurar banner (temporal)
   cisco.ios.ios_config:
     lines:
-      - "banner motd # Red Academica IPv6 - VMWARE-101001 #"
-    save_when: modified
+      - "banner motd # Red Academica IPv6 - VMWARE-101001 - TEMPORAL #"
+    save_when: never
 
-- name: Configurar credenciales de usuario
+- name: Configurar credenciales de usuario (temporal)
   cisco.ios.ios_config:
     lines:
       - username cisco privilege 15 secret cisco123
       - username ansible privilege 15 secret Ansible123!
+    save_when: never
 
-- name: Configurar línea de consola
+- name: Configurar línea de consola (temporal)
   cisco.ios.ios_config:
     lines:
       - login local
     parents: line console 0
+    save_when: never
 
-- name: Configurar líneas VTY
+- name: Configurar líneas VTY (temporal)
   cisco.ios.ios_config:
     lines:
       - login local
       - transport input ssh
     parents: line vty 0 4
+    save_when: never
 
 - name: Configurar dominio (omitido - ya configurado)
   debug:
@@ -47,12 +50,14 @@
   debug:
     msg: "SSH ya configurado en el router"
 
-- name: Habilitar IPv6 unicast routing
+- name: Habilitar IPv6 unicast routing (temporal)
   cisco.ios.ios_config:
     lines:
       - ipv6 unicast-routing
+    save_when: never
+  ignore_errors: yes
 
-- name: Configurar interfaces de router
+- name: Configurar interfaces de router (temporal)
   cisco.ios.ios_config:
     lines:
       - "description {{ item.value.description }}"
@@ -60,6 +65,7 @@
       - ipv6 enable
       - no shutdown
     parents: "interface {{ item.key }}"
+    save_when: never
   loop: "{{ physical_router_interfaces | dict2items }}"
   when: physical_router_interfaces is defined
 
@@ -68,9 +74,9 @@
     msg: "Configuración de switch no aplicable para router físico"
   when: inventory_hostname == "physical-router"
 
-- name: Guardar configuración final
-  cisco.ios.ios_config:
-    save_when: always
+- name: Configuración NO guardada (router académico compartido)
+  debug:
+    msg: "IMPORTANTE: Configuración temporal aplicada - NO se guardan cambios permanentes"
 
 - name: Obtener configuración running
   cisco.ios.ios_command:
@@ -104,6 +110,11 @@
 - name: Mostrar resumen
   debug:
     msg:
-      - "Configuración aplicada a {{ hostname if hostname is defined else inventory_hostname }}"
-      - "IPv6 unicast routing: habilitado"
-      - "Configuración guardada en evidence/configs/"
+      - "=========================================="
+      - "✅ Configuración TEMPORAL aplicada a {{ hostname if hostname is defined else inventory_hostname }}"
+      - "⚠️  IMPORTANTE: Cambios NO guardados permanentemente"
+      - "⚠️  Router académico compartido - configuración temporal"
+      - "✅ IPv6 unicast routing: habilitado temporalmente"
+      - "✅ Interfaces IPv6: configuradas temporalmente"
+      - "📁 Evidencias guardadas en: evidence/configs/"
+      - "=========================================="
