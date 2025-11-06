@@ -7,9 +7,9 @@
   tasks:
     - name: Crear VM Router Debian
       community.vmware.vmware_guest:
-        hostname: "{{ vcenter_hostname }}"
-        username: "{{ vcenter_username }}"
-        password: "{{ vcenter_password }}"
+        hostname: "172.17.25.1"
+        username: "root"
+        password: "qwe123$"
         validate_certs: no
         datacenter: ha-datacenter
         folder: /vm
