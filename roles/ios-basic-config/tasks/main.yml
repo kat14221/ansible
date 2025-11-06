@@ -85,21 +85,21 @@
 
 - name: Crear directorio de evidencias
   file:
-    path: "evidence/configs"
+    path: "{{ playbook_dir }}/evidence/configs"
     state: directory
     mode: '0755'
   delegate_to: localhost
   run_once: true
-  ignore_errors: yes
+  become: no
 
 - name: Guardar running-config (evidencia académica)
   copy:
     content: "{{ running_config.stdout[0] }}"
-    dest: "evidence/configs/{{ inventory_hostname }}_running_config.txt"
+    dest: "{{ playbook_dir }}/evidence/configs/{{ inventory_hostname }}_running_config.txt"
     mode: '0644'
   delegate_to: localhost
   when: running_config is defined and running_config.stdout is defined
-  ignore_errors: yes
+  become: no
 
 - name: Obtener información de interfaces IPv6
   cisco.ios.ios_command:
@@ -116,11 +116,11 @@
 
       === IPv6 Routes ===
       {{ ipv6_info.stdout[1] if ipv6_info.stdout is defined and ipv6_info.stdout|length > 1 else 'No disponible' }}
-    dest: "evidence/configs/{{ inventory_hostname }}_ipv6_info.txt"
+    dest: "{{ playbook_dir }}/evidence/configs/{{ inventory_hostname }}_ipv6_info.txt"
     mode: '0644'
   delegate_to: localhost
   when: ipv6_info is defined
-  ignore_errors: yes
+  become: no
 
 - name: Mostrar resumen
   debug:
