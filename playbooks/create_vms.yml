@@ -56,7 +56,7 @@
             unit_number: 0
             state: present
             type: iso
-            iso_path: "[datastore1] debian/debian-12.12.0-amd64-netinst.iso"
+            iso_path: "[datastore1] debian/debian-13.1.0-amd64-netinst.iso"
         wait_for_ip_address: no
         force: no
       when: router_vm_info.virtual_machines is not defined or router_vm_info.virtual_machines | length == 0
