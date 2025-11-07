@@ -1,9 +1,18 @@
-# Proyecto Ansible: Red IPv6 Unificada con Debian Router
+# 🌐 Proyecto Ansible: Red IPv6 Académica VMWARE-101001
 
 ## 🎯 Descripción del Proyecto
 
-Proyecto de red IPv6 académica con **Debian Router** como gateway central de toda la topología.  
-Automatización completa usando Ansible para gestionar VMs en ESXi, router IPv6, servicios y equipos físicos Cisco IOS.
+Automatización completa con Ansible para desplegar una red IPv6 académica en la sala VMWARE-101001. 
+Incluye configuración de VMs en ESXi, router Debian IPv6, servicios de red y equipos Cisco IOS.
+
+**Características principales:**
+- ✅ Despliegue automatizado de VMs en ESXi
+- ✅ Configuración IPv6 con SLAAC/DHCPv6
+- ✅ Router Debian con RADVD y servicios
+- ✅ Configuración de equipos Cisco IOS
+- ✅ Firewall y hardening de seguridad
+- ✅ Generación automática de evidencias
+- ✅ Reportes técnicos completos
 
 ## 📊 Arquitectura de Red
 
@@ -61,113 +70,125 @@ Automatización completa usando Ansible para gestionar VMs en ESXi, router IPv6,
 - ✅ tcpdump/tshark (Análisis de tráfico)
 - ✅ nftables (Firewall)
 
-## Requisitos
+## 📋 Requisitos
 
-- Ansible 2.9+
-- Collections: `cisco.ios`, `community.vmware`, `ansible.netcommon`
-- Acceso al ESXi: 168.121.48.254
-- VM de control dentro del ESXi para ejecutar los playbooks
+- **ESXi Host**: 168.121.48.254 (accesible)
+- **VM de Control**: Debian 12 o Ubuntu 22.04+ dentro del ESXi
+- **Ansible**: 2.9+ (se instala automáticamente)
+- **Collections**: cisco.ios, community.vmware, ansible.netcommon (se instalan automáticamente)
 
-## Configuración
+## ⚡ Inicio Rápido
 
-### Credenciales ESXi (configuradas en inventory/hosts.yml)
-- URL: https://168.121.48.254:10101/ui/#/login
-- Usuario: root
-- Contraseña: qwe123$
+### 1. Preparar VM de Control
+- Crear VM en ESXi: `https://168.121.48.254:10101/ui/#/login`
+- Usuario ESXi: `root` / Contraseña: `qwe123$`
+- Instalar Debian 12 o Ubuntu 24.04 en la VM
 
-### ISOs (en datastore1)
-- Debian: `datastore1:debian/debian-12.12.0-amd64-netinst.iso`
-- Ubuntu: `datastore1:ubuntu/ubuntu-24.04.2-desktop-amd64.iso`
-- Windows: `datastore1:W-11/Win11_24H2_Spanish_x64.iso`
-
-## 🚀 Ejecución del Proyecto
-
-### 📋 Pre-requisitos
-
-1. **VM Debian Router ya creada e instalada** en ESXi con:
-   - 2 adaptadores de red:
-     - Adapter 1: `VM Network` (Gestión - 172.17.25.10)
-     - Adapter 2: `Red Fernandez` (Proyecto IPv6)
-   - Usuario `ansible` con sudo sin contraseña
-   - SSH habilitado
-
-2. **Máquina de control con Ansible** (Ubuntu/Debian):
+### 2. Ejecutar Bootstrap
 ```bash
-sudo apt update
-sudo apt install -y ansible git python3-pip
-pip3 install pyvmomi
-ansible-galaxy collection install community.vmware cisco.ios ansible.netcommon
+git clone <repositorio> ansible-ipv6
+cd ansible-ipv6
+./bootstrap_control_vm.sh
+ansible-playbook playbooks/bootstrap_control.yml
 ```
 
-### 🕹️ Paso 1: Clonar y Preparar
-
+### 3. Configurar Credenciales
 ```bash
-# Clonar repositorio
-git clone <tu-repo>
-cd ansible-debian
-
-# Verificar inventario
-cat inventory/hosts.yml | grep -A 20 debian_router
+./scripts/quick_setup.sh  # Setup automático
 ```
 
-### ⭐ Paso 2: Configurar Debian Router (PRINCIPAL)
-
+### 4. Ejecutar Proyecto
 ```bash
-# Configurar Debian Router completo
-ansible-playbook playbooks/configure_debian_ipv6.yml -vvv
+ansible-playbook playbooks/site.yml -vvv
 ```
 
-**Esto instala y configura:**
-- ✅ IPv6 Forwarding
-- ✅ radvd (Router Advertisement)
-- ✅ isc-dhcp-server6 (DHCPv6)
-- ✅ Apache2 (HTTP)
-- ✅ vsftpd (FTP)
-- ✅ nftables (Firewall)
-- ✅ tcpdump/tshark
+## 🎬 Opciones de Ejecución
 
-### 💻 Paso 3: Crear VMs Adicionales (Opcional)
-
+### Opción 1: Ejecución Completa (Recomendada)
 ```bash
-# Crear VM Ubuntu
-ansible-playbook playbooks/create_vm_ubuntu.yml -vvv
+ansible-playbook playbooks/site.yml -vvv
+```
 
-# Crear VM Windows
-ansible-playbook playbooks/create_vm_windows.yml -vvv
+### Opción 2: Ejecución por Fases
+```bash
+# Fase 1: Dispositivos de red
+ansible-playbook playbooks/site.yml --tags network -vvv
+
+# Fase 2: Crear VMs
+ansible-playbook playbooks/site.yml --tags vm_creation -vvv
+
+# Fase 3: Configurar router y servicios
+ansible-playbook playbooks/site.yml --tags debian,services -vvv
+
+# Fase 4: Firewall y seguridad
+ansible-playbook playbooks/site.yml --tags firewall,security -vvv
+
+# Fase 5: Tests y evidencias
+ansible-playbook playbooks/site.yml --tags tests,evidence -vvv
+```
+
+### Opción 3: Playbooks Individuales
+```bash
+# Crear VMs específicas
+ansible-playbook playbooks/create_vm_router.yml -vvv
 ansible-playbook playbooks/create_vm_ubuntu.yml -vvv
 ansible-playbook playbooks/create_vm_windows.yml -vvv
 
-# Configurar IOS
+# Configurar componentes específicos
 ansible-playbook playbooks/configure_ios_router.yml -vvv
-ansible-playbook playbooks/configure_switch_svi.yml -vvv
-
-# Configurar Debian
 ansible-playbook playbooks/configure_debian_ipv6.yml -vvv
-ansible-playbook playbooks/configure_dhcpv6.yml -vvv
-
-# Desplegar servicios HTTP/FTP
 ansible-playbook playbooks/deploy_http_service.yml -vvv
 
-# Tests y capturas
+# Tests y validación
 ansible-playbook playbooks/test_connectivity.yml -vvv
 ansible-playbook playbooks/capture_traffic.yml -vvv
-ansible-playbook playbooks/deploy_all.yml --tags step1  # IOS
-ansible-playbook playbooks/deploy_all.yml --tags step2  # VMs
-ansible-playbook playbooks/deploy_all.yml --tags step3  # Router
-ansible-playbook playbooks/deploy_all.yml --tags step4  # Servicios
-# Después de crear las VMs:
-# 1. Instalar el SO en cada VM manualmente
-# 2. Configurar IPv6 según el inventario
-# 3. Agregar adaptador físico a "Red Fernandez" en el ESXi
-# 4. Verificar conectividad
-
-# Ejecutar configuración de router y tests
-ansible-playbook playbooks/deploy_all.yml --tags step3,step4
 ```
 
-## Documentación
+## 📚 Documentación
 
-- `README.md` - Este archivo
-- `NOTA_EJECUCION.md` - Instrucciones detalladas de ejecución
-- `RESUMEN_CONFIGURACION.md` - Resumen de configuración
-- `GUIA_USO.md` - Guía de uso rápida
+- **`README.md`** - Este archivo (visión general)
+- **`GUIA_COMPLETA.md`** - Guía paso a paso completa ⭐
+- **`CONFIGURACION.md`** - Configuración técnica detallada ⭐
+- **`NOTA_EJECUCION.md`** - Instrucciones críticas de ejecución ⭐
+
+## 🔍 Verificación
+
+### Conectividad IPv6
+```bash
+# Desde debian-router
+ssh ansible@172.17.25.126
+ping6 -c 4 2025:db8:101::10  # Ubuntu PC
+ping6 -c 4 2025:db8:101::2   # Router físico
+
+# Servicios web
+curl -6 http://[2025:db8:101::1]
+```
+
+### Evidencias Generadas
+```bash
+# Ver evidencias
+ls -la evidence/configs/
+ls -la evidence/pings/
+ls -la evidence/pcaps/
+ls -la evidence/technical_reports/
+
+# Abrir reportes
+firefox evidence/technical_reports/index.html
+```
+
+## 🆘 Troubleshooting
+
+### Problemas Comunes
+- **Vault password**: `echo "password" > .vault_pass && chmod 600 .vault_pass`
+- **Collections**: `ansible-galaxy collection install -r requirements.yml --force`
+- **SSH keys**: `./scripts/copy_ssh_keys.sh`
+- **Logs**: `tail -f evidence/logs/ansible.log`
+
+### Soporte
+- Consulta `GUIA_COMPLETA.md` para troubleshooting detallado
+- Revisa logs en `evidence/logs/ansible.log`
+- Ejecuta con `-vvvv` para debug máximo
+
+---
+
+**🎯 Proyecto listo para desplegar. Consulta `GUIA_COMPLETA.md` para instrucciones detalladas.**

@@ -209,7 +209,7 @@ echo -e "${GREEN}✅ Contraseña guardada en .vault_pass${NC}"
 # Cifrar el Vault
 echo ""
 echo "Cifrando vault.yml con Ansible Vault..."
-ansible-vault encrypt "$VAULT_FILE" --vault-password-file .vault_pass
+ansible-vault encrypt "$VAULT_FILE" --vault-id default@.vault_pass
 
 if [ $? -eq 0 ]; then
   echo -e "${GREEN}✅ Vault cifrado exitosamente${NC}"
