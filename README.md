@@ -77,32 +77,34 @@ Incluye configuración de VMs en ESXi, router Debian IPv6, servicios de red y eq
 - **Ansible**: 2.9+ (se instala automáticamente)
 - **Collections**: cisco.ios, community.vmware, ansible.netcommon (se instalan automáticamente)
 
-## ⚡ Inicio Súper Rápido
+## ⚡ Inicio Rápido
 
-### 🚀 Opción 1: Completamente Automático (Recomendado)
-```bash
-git clone <repositorio> ansible-ipv6
-cd ansible-ipv6
-./inicio_rapido.sh
-```
-**¡Un solo comando hace todo!** Usa configuración por defecto y ejecuta el proyecto completo.
+### 1. Preparar VM de Control
+- Crear VM en ESXi: `https://168.121.48.254:10101/ui/#/login`
+- Usuario ESXi: `root` / Contraseña: `qwe123$`
+- Instalar Debian 12 o Ubuntu 24.04 en la VM
 
-### ⚙️ Opción 2: Automático con Personalización
-```bash
-git clone <repositorio> ansible-ipv6
-cd ansible-ipv6
-./setup_completo.sh
-```
-**Te pregunta solo lo básico** (IP ESXi, credenciales) y automatiza el resto.
-
-### 📋 Opción 3: Manual (Para expertos)
+### 2. Clonar y Ejecutar
 ```bash
 git clone <repositorio> ansible-ipv6
 cd ansible-ipv6
 chmod +x *.sh scripts/*.sh
 ./bootstrap_control_vm.sh
 ansible-playbook playbooks/bootstrap_control.yml
-./scripts/quick_setup.sh
+```
+
+### 3. Configurar Vault (SOLUCIÓN AL ERROR)
+```bash
+# Crear contraseña del vault
+echo "tu_password_aqui" > .vault_pass
+chmod 600 .vault_pass
+
+# Configurar vault automáticamente
+./scripts/setup_vault.sh
+```
+
+### 4. Ejecutar Proyecto
+```bash
 ansible-playbook playbooks/site.yml -vvv
 ```
 
