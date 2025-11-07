@@ -1,0 +1,58 @@
+---
+# Playbook para encender VMs que ya están creadas
+# Uso: ansible-playbook playbooks/power_on_vms.yml -vvv
+
+- name: Encender todas las VMs
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Encender VM Debian Router
+      community.vmware.vmware_guest:
+        hostname: "172.17.25.1"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        name: vm-debian-router
+        state: poweredon
+      register: router_power
+      ignore_errors: yes
+
+    - name: Encender VM Ubuntu PC
+      community.vmware.vmware_guest:
+        hostname: "172.17.25.1"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        name: vm-ubuntu-pc
+        state: poweredon
+      register: ubuntu_power
+      ignore_errors: yes
+
+    - name: Encender VM Windows PC
+      community.vmware.vmware_guest:
+        hostname: "172.17.25.1"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        name: vm-windows-pc
+        state: poweredon
+      register: windows_power
+      ignore_errors: yes
+
+    - name: Mostrar resultado
+      debug:
+        msg:
+          - "================================================"
+          - "⚡ ENCENDIDO DE VMs COMPLETADO"
+          - "================================================"
+          - ""
+          - "✅ vm-debian-router: {{ 'Encendida' if not router_power.failed else 'Error (verificar manualmente)' }}"
+          - "✅ vm-ubuntu-pc: {{ 'Encendida' if not ubuntu_power.failed else 'Error (verificar manualmente)' }}"
+          - "✅ vm-windows-pc: {{ 'Encendida' if not windows_power.failed else 'Error (verificar manualmente)' }}"
+          - ""
+          - "📋 PRÓXIMO PASO:"
+          - "1. Acceder a ESXi: https://172.17.25.1/ui/"
+          - "2. Verificar que las VMs estén encendidas"
+          - "3. Instalar SOs manualmente en cada VM"
+          - "4. Seguir guía: INSTALACION_VMS.md"
+          - "================================================"
