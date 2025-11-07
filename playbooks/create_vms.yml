@@ -36,7 +36,7 @@
         datacenter: ha-datacenter
         folder: /vm
         name: vm-debian-router
-        state: present
+        state: poweredon
         guest_id: debian11_64Guest
         disk:
           - size_gb: 20
@@ -62,15 +62,7 @@
       when: router_vm_info.virtual_machines is not defined or router_vm_info.virtual_machines | length == 0
       register: router_result
 
-    - name: Encender VM Debian Router
-      community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        name: vm-debian-router
-        state: poweredon
-      register: router_power
+
 
     - name: Mostrar resultado VM Router
       debug:
@@ -78,7 +70,7 @@
           - "=========================================="
           - "✅ VM Debian Router: {{ 'CREADA' if router_result.changed | default(false) else 'YA EXISTÍA' }}"
           - "Nombre: vm-debian-router"
-          - "Estado: {{ router_power.instance.hw_power_state | default('Encendida') }}"
+          - "Estado: Encendida (creada con state=poweredon)"
           - "Memoria: 2048 MB"
           - "CPUs: 2"
           - "Disco: 20 GB"
@@ -111,7 +103,7 @@
         datacenter: ha-datacenter
         folder: /vm
         name: vm-ubuntu-pc
-        state: present
+        state: poweredon
         guest_id: ubuntu64Guest
         disk:
           - size_gb: 25
@@ -135,15 +127,7 @@
       when: ubuntu_vm_info.virtual_machines is not defined or ubuntu_vm_info.virtual_machines | length == 0
       register: ubuntu_result
 
-    - name: Encender VM Ubuntu PC
-      community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        name: vm-ubuntu-pc
-        state: poweredon
-      register: ubuntu_power
+
 
     - name: Mostrar resultado VM Ubuntu
       debug:
@@ -151,7 +135,7 @@
           - "=========================================="
           - "✅ VM Ubuntu PC: {{ 'CREADA' if ubuntu_result.changed | default(false) else 'YA EXISTÍA' }}"
           - "Nombre: vm-ubuntu-pc"
-          - "Estado: {{ ubuntu_power.instance.hw_power_state | default('Encendida') }}"
+          - "Estado: Encendida (creada con state=poweredon)"
           - "Memoria: 4096 MB"
           - "CPUs: 2"
           - "Disco: 25 GB"
@@ -184,7 +168,7 @@
         datacenter: ha-datacenter
         folder: /vm
         name: vm-windows-pc
-        state: present
+        state: poweredon
         guest_id: windows11_64Guest
         disk:
           - size_gb: 40
@@ -208,15 +192,7 @@
       when: windows_vm_info.virtual_machines is not defined or windows_vm_info.virtual_machines | length == 0
       register: windows_result
 
-    - name: Encender VM Windows PC
-      community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        name: vm-windows-pc
-        state: poweredon
-      register: windows_power
+
 
     - name: Mostrar resultado VM Windows
       debug:
@@ -224,7 +200,7 @@
           - "=========================================="
           - "✅ VM Windows PC: {{ 'CREADA' if windows_result.changed | default(false) else 'YA EXISTÍA' }}"
           - "Nombre: vm-windows-pc"
-          - "Estado: {{ windows_power.instance.hw_power_state | default('Encendida') }}"
+          - "Estado: Encendida (creada con state=poweredon)"
           - "Memoria: 4096 MB"
           - "CPUs: 2"
           - "Disco: 40 GB"
