@@ -7,16 +7,25 @@
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: Verificar si VM Router ya existe
-      community.vmware.vmware_guest_info:
+    - name: Verificar conectividad con ESXi
+      uri:
+        url: "https://172.17.25.1/ui/"
+        method: GET
+        validate_certs: no
+        timeout: 10
+      register: esxi_check
+      failed_when: false
+
+    - name: Verificar si VM Router ya existe (método alternativo)
+      community.vmware.vmware_vm_info:
         hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
-        datacenter: ha-datacenter
-        name: vm-debian-router
+        vm_name: "vm-debian-router"
       register: router_vm_info
       failed_when: false
+      ignore_errors: yes
 
     - name: Crear VM Debian Router (si no existe)
       community.vmware.vmware_guest:
@@ -49,7 +58,8 @@
             type: iso
             iso_path: "[datastore1] debian/debian-12.12.0-amd64-netinst.iso"
         wait_for_ip_address: no
-      when: router_vm_info.instance is not defined
+        force: no
+      when: router_vm_info.virtual_machines is not defined or router_vm_info.virtual_machines | length == 0
       register: router_result
 
     - name: Encender VM Debian Router
@@ -66,14 +76,15 @@
       debug:
         msg:
           - "=========================================="
-          - "✅ VM Debian Router: {{ 'CREADA' if router_vm_info.instance is not defined else 'YA EXISTÍA' }}"
+          - "✅ VM Debian Router: {{ 'CREADA' if router_result.changed | default(false) else 'YA EXISTÍA' }}"
           - "Nombre: vm-debian-router"
-          - "Estado: {{ router_power.instance.hw_power_state | default('poweredon') }}"
+          - "Estado: {{ router_power.instance.hw_power_state | default('Encendida') }}"
           - "Memoria: 2048 MB"
           - "CPUs: 2"
           - "Disco: 20 GB"
           - "Redes: VM Network, Red Fernandez"
           - "ISO: debian-12.12.0-amd64-netinst.iso"
+          - "Verificación: {{ 'VM encontrada' if router_vm_info.virtual_machines is defined and router_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
           - "=========================================="
 
 - name: Crear VM Ubuntu PC
@@ -81,15 +92,15 @@
   gather_facts: no
   tasks:
     - name: Verificar si VM Ubuntu ya existe
-      community.vmware.vmware_guest_info:
+      community.vmware.vmware_vm_info:
         hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
-        datacenter: ha-datacenter
-        name: vm-ubuntu-pc
+        vm_name: "vm-ubuntu-pc"
       register: ubuntu_vm_info
       failed_when: false
+      ignore_errors: yes
 
     - name: Crear VM Ubuntu PC (si no existe)
       community.vmware.vmware_guest:
@@ -120,7 +131,8 @@
             type: iso
             iso_path: "[datastore1] ubuntu/ubuntu-24.04.2-desktop-amd64.iso"
         wait_for_ip_address: no
-      when: ubuntu_vm_info.instance is not defined
+        force: no
+      when: ubuntu_vm_info.virtual_machines is not defined or ubuntu_vm_info.virtual_machines | length == 0
       register: ubuntu_result
 
     - name: Encender VM Ubuntu PC
@@ -137,14 +149,15 @@
       debug:
         msg:
           - "=========================================="
-          - "✅ VM Ubuntu PC: {{ 'CREADA' if ubuntu_vm_info.instance is not defined else 'YA EXISTÍA' }}"
+          - "✅ VM Ubuntu PC: {{ 'CREADA' if ubuntu_result.changed | default(false) else 'YA EXISTÍA' }}"
           - "Nombre: vm-ubuntu-pc"
-          - "Estado: {{ ubuntu_power.instance.hw_power_state | default('poweredon') }}"
+          - "Estado: {{ ubuntu_power.instance.hw_power_state | default('Encendida') }}"
           - "Memoria: 4096 MB"
           - "CPUs: 2"
           - "Disco: 25 GB"
           - "Red: Red Fernandez"
           - "ISO: ubuntu-24.04.2-desktop-amd64.iso"
+          - "Verificación: {{ 'VM encontrada' if ubuntu_vm_info.virtual_machines is defined and ubuntu_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
           - "=========================================="
 
 - name: Crear VM Windows PC
@@ -152,15 +165,15 @@
   gather_facts: no
   tasks:
     - name: Verificar si VM Windows ya existe
-      community.vmware.vmware_guest_info:
+      community.vmware.vmware_vm_info:
         hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
-        datacenter: ha-datacenter
-        name: vm-windows-pc
+        vm_name: "vm-windows-pc"
       register: windows_vm_info
       failed_when: false
+      ignore_errors: yes
 
     - name: Crear VM Windows PC (si no existe)
       community.vmware.vmware_guest:
@@ -191,7 +204,8 @@
             type: iso
             iso_path: "[datastore1] W-11/Win11_25H2_Spanish_Mexico_x64.iso"
         wait_for_ip_address: no
-      when: windows_vm_info.instance is not defined
+        force: no
+      when: windows_vm_info.virtual_machines is not defined or windows_vm_info.virtual_machines | length == 0
       register: windows_result
 
     - name: Encender VM Windows PC
@@ -208,14 +222,15 @@
       debug:
         msg:
           - "=========================================="
-          - "✅ VM Windows PC: {{ 'CREADA' if windows_vm_info.instance is not defined else 'YA EXISTÍA' }}"
+          - "✅ VM Windows PC: {{ 'CREADA' if windows_result.changed | default(false) else 'YA EXISTÍA' }}"
           - "Nombre: vm-windows-pc"
-          - "Estado: {{ windows_power.instance.hw_power_state | default('poweredon') }}"
+          - "Estado: {{ windows_power.instance.hw_power_state | default('Encendida') }}"
           - "Memoria: 4096 MB"
           - "CPUs: 2"
           - "Disco: 40 GB"
           - "Red: Red Fernandez"
           - "ISO: Win11_24H2_Spanish_x64.iso"
+          - "Verificación: {{ 'VM encontrada' if windows_vm_info.virtual_machines is defined and windows_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
           - "=========================================="
 
 - name: Resumen Final de Creación
