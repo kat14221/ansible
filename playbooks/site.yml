@@ -14,57 +14,11 @@
     - network
     - ios_config
 
-- name: Crear VM Router Debian en ESXi
-  hosts: debian_router
-  gather_facts: no
-  tasks:
-    - name: Crear VM Router Debian
-      include_role:
-        name: vmware-router
-      vars:
-        vm_name: "{{ hostvars[inventory_hostname]['vm_name'] }}"
-        vm_folder: "{{ hostvars[inventory_hostname]['vm_folder'] }}"
-        cdrom: "{{ hostvars[inventory_hostname]['cdrom'] }}"
-        networks: "{{ hostvars[inventory_hostname]['networks'] }}"
-      delegate_to: localhost
-  tags:
-    - vm_creation
-    - vm_router
-
-- name: Crear VM Ubuntu PC en ESXi
-  hosts: vm_hosts
-  gather_facts: no
-  tasks:
-    - name: Crear VM Ubuntu PC
-      include_role:
-        name: vmware-ubuntu
-      vars:
-        vm_name: "{{ hostvars[inventory_hostname]['vm_name'] }}"
-        vm_folder: "{{ hostvars[inventory_hostname]['vm_folder'] }}"
-        cdrom: "{{ hostvars[inventory_hostname]['cdrom'] }}"
-        networks: "{{ hostvars[inventory_hostname]['networks'] }}"
-      when: inventory_hostname == "ubuntu-pc"
-      delegate_to: localhost
-      tags:
-        - vm_creation
-        - vm_ubuntu
-
-    - name: Crear VM Windows PC
-      include_role:
-        name: vmware-windows
-      vars:
-        vm_name: "{{ hostvars[inventory_hostname]['vm_name'] }}"
-        vm_folder: "{{ hostvars[inventory_hostname]['vm_folder'] }}"
-        cdrom: "{{ hostvars[inventory_hostname]['cdrom'] }}"
-        networks: "{{ hostvars[inventory_hostname]['networks'] }}"
-      when: inventory_hostname == "windows-pc"
-      delegate_to: localhost
-      tags:
-        - vm_creation
-        - vm_windows
+# NOTA: La creación de VMs se hace por separado con:
+# ansible-playbook playbooks/create_vms.yml -vvv
 
 - name: Configurar Router Debian
-  hosts: vm_router
+  hosts: debian_router
   become: yes
   gather_facts: yes
   roles:
@@ -76,7 +30,7 @@
     - services
 
 - name: Tests de Conectividad
-  hosts: vm_router
+  hosts: debian_router
   become: yes
   roles:
     - connectivity-tests
@@ -85,7 +39,7 @@
     - connectivity
 
 - name: Captura de Tráfico
-  hosts: vm_router
+  hosts: debian_router
   become: yes
   roles:
     - traffic-capture
@@ -94,7 +48,7 @@
     - traffic
 
 - name: Aplicar Firewall Policy (Reglas Asimétricas)
-  hosts: vm_router
+  hosts: debian_router
   become: yes
   gather_facts: yes
   roles:
@@ -163,7 +117,7 @@
           - "================================================"
           - ""
           - "✅ Equipos IOS configurados"
-          - "✅ VMs creadas en ESXi"
+          - "✅ VMs configuradas (creadas por separado)"
           - "✅ Router Debian configurado con IPv6"
           - "✅ Servicios HTTP desplegados"
           - "✅ Firewall configurado (reglas asimétricas)"

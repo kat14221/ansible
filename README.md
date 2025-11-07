@@ -109,7 +109,15 @@ chmod 600 .vault_pass
 ansible-playbook playbooks/create_vms.yml -vvv
 ```
 
-### 5. Ejecutar Proyecto Completo
+### 5. Instalar SOs Manualmente
+Seguir `INSTALACION_VMS.md` para instalar sistemas operativos
+
+### 6. Configurar Router y Servicios
+```bash
+ansible-playbook playbooks/site.yml --tags debian,services -vvv
+```
+
+### 7. Ejecutar Proyecto Completo
 ```bash
 ansible-playbook playbooks/site.yml -vvv
 ```
