@@ -19,6 +19,36 @@ Esta guía te llevará paso a paso desde la instalación inicial hasta la ejecuc
 
 ## 🚀 Instalación Desde Cero
 
+### ⚡ OPCIÓN RÁPIDA: Setup Completamente Automático
+
+```bash
+# 1. Clonar proyecto
+git clone <repositorio> ansible-ipv6
+cd ansible-ipv6
+
+# 2. Ejecutar setup automático (¡UN SOLO COMANDO!)
+./inicio_rapido.sh
+```
+
+**¡Eso es todo!** El script hace todo automáticamente:
+- ✅ Bootstrap y dependencias
+- ✅ Configuración de vault con valores por defecto
+- ✅ Generación de claves SSH
+- ✅ Ejecución completa del proyecto
+
+### ⚙️ OPCIÓN PERSONALIZADA: Setup con Configuración
+
+```bash
+# 1. Clonar proyecto
+git clone <repositorio> ansible-ipv6
+cd ansible-ipv6
+
+# 2. Setup personalizado (te pregunta solo lo básico)
+./setup_completo.sh
+```
+
+### 📋 OPCIÓN MANUAL: Paso a Paso
+
 ### Paso 1: Preparar VM de Control
 
 #### 1.1 Crear VM en ESXi
