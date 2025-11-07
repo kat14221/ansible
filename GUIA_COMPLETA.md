@@ -170,12 +170,14 @@ show ipv6 route
 
 #### Fase 2: Crear VMs en ESXi
 ```bash
-ansible-playbook playbooks/site.yml --tags vm_creation -vvv
+ansible-playbook playbooks/create_vms.yml -vvv
 ```
 **Qué hace:**
 - Crea VM debian-router (si no existe)
 - Crea VM ubuntu-pc (si no existe)
 - Crea VM windows-pc (si no existe)
+- Enciende todas las VMs automáticamente
+- Monta ISOs para instalación
 
 **⚠️ Pasos Manuales Requeridos:**
 1. **Instalar OS en las VMs** (vía consola ESXi)
@@ -262,10 +264,8 @@ firefox evidence/technical_reports/index.html
 ### Opción 3: Playbooks Individuales
 
 ```bash
-# Solo crear VMs
-ansible-playbook playbooks/create_vm_router.yml -vvv
-ansible-playbook playbooks/create_vm_ubuntu.yml -vvv
-ansible-playbook playbooks/create_vm_windows.yml -vvv
+# Crear todas las VMs
+ansible-playbook playbooks/create_vms.yml -vvv
 
 # Solo configurar IOS
 ansible-playbook playbooks/configure_ios_router.yml -vvv

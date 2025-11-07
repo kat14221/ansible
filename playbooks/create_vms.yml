@@ -1,182 +1,311 @@
 ---
-# Playbook específico para crear VMs en ESXi
+# Playbook unificado para crear todas las VMs en ESXi
+# Basado en los playbooks individuales existentes
 # Uso: ansible-playbook playbooks/create_vms.yml -vvv
 
 - name: Crear VM Debian Router
   hosts: localhost
   gather_facts: no
-  vars:
-    esxi_host: "{{ hostvars['esxi-vmware-host'] }}"
-    router_config: "{{ hostvars['debian-router'] }}"
   tasks:
-    - name: Debug - Mostrar configuración
-      debug:
-        msg:
-          - "ESXi Host: {{ esxi_host.vcenter_hostname }}"
-          - "VM Name: {{ router_config.vm_name }}"
-          - "ISO: {{ router_config.cdrom }}"
-
     - name: Verificar si VM Router ya existe
       community.vmware.vmware_guest_info:
-        hostname: "{{ esxi_host.vcenter_hostname }}"
-        username: "{{ esxi_host.vcenter_username }}"
-        password: "{{ esxi_host.vcenter_password }}"
-        validate_certs: "{{ esxi_host.vcenter_validate_certs }}"
-        datacenter: "{{ esxi_host.datacenter }}"
-        name: "{{ router_config.vm_name }}"
+        hostname: "168.121.48.254"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        datacenter: ha-datacenter
+        name: vm-debian-router
       register: router_vm_info
       failed_when: false
 
-    - name: Crear VM Debian Router si no existe
+    - name: Crear VM Debian Router (si no existe)
       community.vmware.vmware_guest:
-        hostname: "{{ esxi_host.vcenter_hostname }}"
-        username: "{{ esxi_host.vcenter_username }}"
-        password: "{{ esxi_host.vcenter_password }}"
-        validate_certs: "{{ esxi_host.vcenter_validate_certs }}"
-        datacenter: "{{ esxi_host.datacenter }}"
-        name: "{{ router_config.vm_name }}"
+        hostname: "168.121.48.254"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        datacenter: ha-datacenter
+        folder: /vm
+        name: vm-debian-router
         state: present
-        folder: "{{ router_config.vm_folder }}"
-        datastore: "{{ esxi_host.datastore }}"
         guest_id: debian11_64Guest
-        hardware:
-          memory_mb: 2048
-          num_cpus: 2
-          scsi: paravirtual
         disk:
           - size_gb: 20
             type: thin
-        cdrom:
-          - controller_number: 0
-            controller_type: ide
-            type: iso
-            iso_path: "{{ router_config.cdrom }}"
-            state: present
-            unit_number: 0
-        networks:
-          - name: "{{ router_config.networks[0].name }}"
-            device_type: vmxnet3
-          - name: "{{ router_config.networks[1].name }}"
-            device_type: vmxnet3
-        force: yes
-      when: router_vm_info.instance is not defined
-      register: router_creation
-
-    - name: Encender VM Router
-      community.vmware.vmware_guest:
-        hostname: "{{ esxi_host.vcenter_hostname }}"
-        username: "{{ esxi_host.vcenter_username }}"
-        password: "{{ esxi_host.vcenter_password }}"
-        validate_certs: "{{ esxi_host.vcenter_validate_certs }}"
-        name: "{{ router_config.vm_name }}"
-        state: poweredon
-
-    - name: Mostrar resultado
-      debug:
-        msg:
-          - "================================================"
-          - "VM Debian Router: {{ 'CREADA' if router_vm_info.instance is not defined else 'YA EXISTÍA' }}"
-          - "Nombre: {{ router_config.vm_name }}"
-          - "Estado: Encendida"
-          - "ISO montada: {{ router_config.cdrom }}"
-          - "Redes: {{ router_config.networks[0].name }}, {{ router_config.networks[1].name }}"
-          - ""
-          - "⚠️  SIGUIENTE PASO MANUAL:"
-          - "1. Conectar a ESXi Web UI"
-          - "2. Abrir consola de la VM"
-          - "3. Instalar Debian 12 desde ISO"
-          - "4. Configurar usuario 'ansible' con sudo"
-          - "5. Configurar SSH"
-          - "6. Configurar red de gestión (172.17.25.126)"
-          - "================================================"
-
-- name: Crear VMs de Usuario
-  hosts: localhost
-  gather_facts: no
-  vars:
-    esxi_host: "{{ hostvars['esxi-vmware-host'] }}"
-    ubuntu_config: "{{ hostvars['ubuntu-pc'] }}"
-    windows_config: "{{ hostvars['windows-pc'] }}"
-  tasks:
-    - name: Crear VM Ubuntu PC
-      community.vmware.vmware_guest:
-        hostname: "{{ esxi_host.vcenter_hostname }}"
-        username: "{{ esxi_host.vcenter_username }}"
-        password: "{{ esxi_host.vcenter_password }}"
-        validate_certs: "{{ esxi_host.vcenter_validate_certs }}"
-        datacenter: "{{ esxi_host.datacenter }}"
-        name: "{{ ubuntu_config.vm_name }}"
-        state: present
-        folder: "{{ ubuntu_config.vm_folder }}"
-        datastore: "{{ esxi_host.datastore }}"
-        guest_id: ubuntu64Guest
+            datastore: datastore1
         hardware:
           memory_mb: 2048
           num_cpus: 2
           scsi: paravirtual
+        networks:
+          - name: VM Network
+            device_type: vmxnet3
+          - name: Red Fernandez
+            device_type: vmxnet3
+        cdrom:
+          - controller_number: 0
+            unit_number: 0
+            state: present
+            type: iso
+            iso_path: "[datastore1] debian/debian-12.12.0-amd64-netinst.iso"
+        wait_for_ip_address: no
+      when: router_vm_info.instance is not defined
+      register: router_result
+
+    - name: Encender VM Debian Router
+      community.vmware.vmware_guest:
+        hostname: "168.121.48.254"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        name: vm-debian-router
+        state: poweredon
+      register: router_power
+
+    - name: Mostrar resultado VM Router
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ VM Debian Router: {{ 'CREADA' if router_vm_info.instance is not defined else 'YA EXISTÍA' }}"
+          - "Nombre: vm-debian-router"
+          - "Estado: {{ router_power.instance.hw_power_state | default('poweredon') }}"
+          - "Memoria: 2048 MB"
+          - "CPUs: 2"
+          - "Disco: 20 GB"
+          - "Redes: VM Network, Red Fernandez"
+          - "ISO: debian-12.12.0-amd64-netinst.iso"
+          - "=========================================="
+
+- name: Crear VM Ubuntu PC
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Verificar si VM Ubuntu ya existe
+      community.vmware.vmware_guest_info:
+        hostname: "168.121.48.254"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        datacenter: ha-datacenter
+        name: vm-ubuntu-pc
+      register: ubuntu_vm_info
+      failed_when: false
+
+    - name: Crear VM Ubuntu PC (si no existe)
+      community.vmware.vmware_guest:
+        hostname: "168.121.48.254"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        datacenter: ha-datacenter
+        folder: /vm
+        name: vm-ubuntu-pc
+        state: present
+        guest_id: ubuntu64Guest
         disk:
           - size_gb: 25
             type: thin
-        cdrom:
-          - controller_number: 0
-            controller_type: ide
-            type: iso
-            iso_path: "{{ ubuntu_config.cdrom }}"
-            state: present
-            unit_number: 0
-        networks:
-          - name: "{{ ubuntu_config.networks[0].name }}"
-            device_type: vmxnet3
-        force: yes
-
-    - name: Crear VM Windows PC
-      community.vmware.vmware_guest:
-        hostname: "{{ esxi_host.vcenter_hostname }}"
-        username: "{{ esxi_host.vcenter_username }}"
-        password: "{{ esxi_host.vcenter_password }}"
-        validate_certs: "{{ esxi_host.vcenter_validate_certs }}"
-        datacenter: "{{ esxi_host.datacenter }}"
-        name: "{{ windows_config.vm_name }}"
-        state: present
-        folder: "{{ windows_config.vm_folder }}"
-        datastore: "{{ esxi_host.datastore }}"
-        guest_id: windows11_64Guest
+            datastore: datastore1
         hardware:
           memory_mb: 4096
           num_cpus: 2
           scsi: paravirtual
+        networks:
+          - name: Red Fernandez
+            device_type: vmxnet3
+        cdrom:
+          - controller_number: 0
+            unit_number: 0
+            state: present
+            type: iso
+            iso_path: "[datastore1] ubuntu/ubuntu-24.04.2-desktop-amd64.iso"
+        wait_for_ip_address: no
+      when: ubuntu_vm_info.instance is not defined
+      register: ubuntu_result
+
+    - name: Encender VM Ubuntu PC
+      community.vmware.vmware_guest:
+        hostname: "168.121.48.254"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        name: vm-ubuntu-pc
+        state: poweredon
+      register: ubuntu_power
+
+    - name: Mostrar resultado VM Ubuntu
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ VM Ubuntu PC: {{ 'CREADA' if ubuntu_vm_info.instance is not defined else 'YA EXISTÍA' }}"
+          - "Nombre: vm-ubuntu-pc"
+          - "Estado: {{ ubuntu_power.instance.hw_power_state | default('poweredon') }}"
+          - "Memoria: 4096 MB"
+          - "CPUs: 2"
+          - "Disco: 25 GB"
+          - "Red: Red Fernandez"
+          - "ISO: ubuntu-24.04.2-desktop-amd64.iso"
+          - "=========================================="
+
+- name: Crear VM Windows PC
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Verificar si VM Windows ya existe
+      community.vmware.vmware_guest_info:
+        hostname: "168.121.48.254"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        datacenter: ha-datacenter
+        name: vm-windows-pc
+      register: windows_vm_info
+      failed_when: false
+
+    - name: Crear VM Windows PC (si no existe)
+      community.vmware.vmware_guest:
+        hostname: "168.121.48.254"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        datacenter: ha-datacenter
+        folder: /vm
+        name: vm-windows-pc
+        state: present
+        guest_id: windows11_64Guest
         disk:
           - size_gb: 40
             type: thin
+            datastore: datastore1
+        hardware:
+          memory_mb: 4096
+          num_cpus: 2
+          scsi: paravirtual
+        networks:
+          - name: Red Fernandez
+            device_type: vmxnet3
         cdrom:
           - controller_number: 0
-            controller_type: ide
-            type: iso
-            iso_path: "{{ windows_config.cdrom }}"
-            state: present
             unit_number: 0
-        networks:
-          - name: "{{ windows_config.networks[0].name }}"
-            device_type: vmxnet3
-        force: yes
+            state: present
+            type: iso
+            iso_path: "[datastore1] W-11/Win11_24H2_Spanish_x64.iso"
+        wait_for_ip_address: no
+      when: windows_vm_info.instance is not defined
+      register: windows_result
 
-    - name: Mostrar resumen final
+    - name: Encender VM Windows PC
+      community.vmware.vmware_guest:
+        hostname: "168.121.48.254"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        name: vm-windows-pc
+        state: poweredon
+      register: windows_power
+
+    - name: Mostrar resultado VM Windows
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ VM Windows PC: {{ 'CREADA' if windows_vm_info.instance is not defined else 'YA EXISTÍA' }}"
+          - "Nombre: vm-windows-pc"
+          - "Estado: {{ windows_power.instance.hw_power_state | default('poweredon') }}"
+          - "Memoria: 4096 MB"
+          - "CPUs: 2"
+          - "Disco: 40 GB"
+          - "Red: Red Fernandez"
+          - "ISO: Win11_24H2_Spanish_x64.iso"
+          - "=========================================="
+
+- name: Resumen Final de Creación
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Mostrar resumen completo
       debug:
         msg:
           - "================================================"
-          - "✅ CREACIÓN DE VMs COMPLETADA"
+          - "🎉 CREACIÓN DE VMs COMPLETADA"
           - "================================================"
           - ""
-          - "VMs creadas:"
-          - "  • {{ ubuntu_config.vm_name }} (Ubuntu)"
-          - "  • {{ windows_config.vm_name }} (Windows)"
-          - "  • {{ hostvars['debian-router'].vm_name }} (Debian Router)"
+          - "✅ VMs creadas y encendidas:"
+          - "   • vm-debian-router (Debian 12) - 2GB RAM, 20GB disk"
+          - "   • vm-ubuntu-pc (Ubuntu 24.04) - 4GB RAM, 25GB disk"
+          - "   • vm-windows-pc (Windows 11) - 4GB RAM, 40GB disk"
           - ""
-          - "📋 Próximos pasos manuales:"
-          - "1. Instalar SO en cada VM desde consola ESXi"
-          - "2. Configurar usuario 'ansible' en VMs Linux"
-          - "3. Configurar SSH en VMs Linux"
-          - "4. Configurar IPs de gestión"
-          - "5. Copiar claves SSH: ./scripts/copy_ssh_keys.sh"
-          - "6. Continuar con: ansible-playbook playbooks/site.yml --tags debian,services"
+          - "🌐 Todas conectadas a 'Red Fernandez'"
+          - "📀 ISOs montadas automáticamente"
+          - "⚡ VMs encendidas y listas para instalación"
+          - ""
+          - "📋 PRÓXIMOS PASOS MANUALES:"
+          - "================================================"
+          - ""
+          - "1. 🖥️  ACCEDER A ESXi:"
+          - "   URL: https://168.121.48.254:10101/ui/#/login"
+          - "   Usuario: root"
+          - "   Contraseña: qwe123$"
+          - ""
+          - "2. 💿 INSTALAR SISTEMAS OPERATIVOS (MANUAL):"
+          - "   ⚠️  IMPORTANTE: Consultar INSTALACION_VMS.md para configuración detallada"
+          - ""
+          - "   📀 vm-debian-router (Debian 12):"
+          - "   • Hostname: debian-router"
+          - "   • Usuario: ansible / Password: Ansible123!"
+          - "   • Particiones: /boot(512MB), swap(2GB), /(15GB), /home(2.5GB)"
+          - "   • IP estática: 172.17.25.126/24"
+          - "   • SSH server + utilidades estándar"
+          - ""
+          - "   📀 vm-ubuntu-pc (Ubuntu 24.04):"
+          - "   • Hostname: ubuntu-pc"
+          - "   • Usuario: ansible / Password: Ansible123!"
+          - "   • Particiones: /boot/efi(1GB), swap(2GB), /(20GB), /home(2GB)"
+          - "   • OpenSSH server"
+          - ""
+          - "   📀 vm-windows-pc (Windows 11):"
+          - "   • Hostname: windows-pc"
+          - "   • Usuario: ansible / Password: Ansible123!"
+          - "   • Particionamiento automático (40GB)"
+          - "   • Configurar WinRM para Ansible"
+          - ""
+          - "3. ⚙️  POST-INSTALACIÓN (DESPUÉS del SO):"
+          - "   Solo en VMs Linux (Debian y Ubuntu):"
+          - ""
+          - "   • Crear usuario ansible:"
+          - "     sudo adduser ansible"
+          - "     sudo usermod -aG sudo ansible"
+          - ""
+          - "   • Configurar sudo sin contraseña:"
+          - "     echo 'ansible ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/ansible"
+          - ""
+          - "   • Verificar SSH:"
+          - "     sudo systemctl status ssh"
+          - "     sudo systemctl enable ssh"
+          - ""
+          - "4. 🌐 CONFIGURAR RED EN vm-debian-router (POST-INSTALACIÓN):"
+          - "   Editar /etc/network/interfaces:"
+          - ""
+          - "   # Interfaz de gestión"
+          - "   auto ens160"
+          - "   iface ens160 inet static"
+          - "   address 172.17.25.126"
+          - "   netmask 255.255.255.0"
+          - "   gateway 172.17.25.1"
+          - ""
+          - "   # Interfaz del proyecto (se configurará con Ansible)"
+          - "   auto ens192"
+          - "   iface ens192 inet6 static"
+          - "   address 2025:db8:101::1"
+          - "   netmask 64"
+          - ""
+          - "5. 🔑 COPIAR CLAVES SSH (cuando VMs estén listas):"
+          - "   ./scripts/copy_ssh_keys.sh"
+          - ""
+          - "6. 🚀 CONTINUAR CON CONFIGURACIÓN AUTOMÁTICA:"
+          - "   ansible-playbook playbooks/site.yml --tags debian,services -vvv"
+          - ""
+          - "================================================"
+          - "📖 GUÍA DETALLADA: Ver archivo INSTALACION_VMS.md"
+          - "⏱️  Tiempo estimado de instalación manual: 60-90 min"
+          - "🎯 Después de esto, todo será automático con Ansible"
           - "================================================"

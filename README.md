@@ -103,13 +103,10 @@ chmod 600 .vault_pass
 ./scripts/setup_vault.sh
 ```
 
-### 4. Crear VMs (SOLUCIÓN AL PROBLEMA)
+### 4. Crear VMs
 ```bash
-# Usar el playbook específico para crear VMs
+# Crear todas las VMs (Router, Ubuntu, Windows)
 ansible-playbook playbooks/create_vms.yml -vvv
-
-# O usar el tag correcto en el playbook principal
-ansible-playbook playbooks/site.yml --tags vm_router -vvv
 ```
 
 ### 5. Ejecutar Proyecto Completo
@@ -163,6 +160,7 @@ ansible-playbook playbooks/capture_traffic.yml -vvv
 
 - **`README.md`** - Este archivo (visión general)
 - **`GUIA_COMPLETA.md`** - Guía paso a paso completa ⭐
+- **`INSTALACION_VMS.md`** - Configuración detallada para instalar VMs ⭐
 - **`CONFIGURACION.md`** - Configuración técnica detallada ⭐
 - **`NOTA_EJECUCION.md`** - Instrucciones críticas de ejecución ⭐
 
