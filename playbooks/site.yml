@@ -14,25 +14,37 @@
     - network
     - ios_config
 
-- name: Crear VMs en ESXi
-  hosts: esxi
+- name: Crear VM Router Debian en ESXi
+  hosts: debian_router
   gather_facts: no
   tasks:
     - name: Crear VM Router Debian
       include_role:
         name: vmware-router
-      when: inventory_hostname == "esxi-vmware-host"
-      tags:
-        - vm_creation
+      vars:
+        vm_name: "{{ hostvars[inventory_hostname]['vm_name'] }}"
+        vm_folder: "{{ hostvars[inventory_hostname]['vm_folder'] }}"
+        cdrom: "{{ hostvars[inventory_hostname]['cdrom'] }}"
+        networks: "{{ hostvars[inventory_hostname]['networks'] }}"
+      delegate_to: localhost
+  tags:
+    - vm_creation
+    - vm_router
 
-- name: Crear VMs de Usuario
+- name: Crear VM Ubuntu PC en ESXi
   hosts: vm_hosts
   gather_facts: no
   tasks:
     - name: Crear VM Ubuntu PC
       include_role:
         name: vmware-ubuntu
+      vars:
+        vm_name: "{{ hostvars[inventory_hostname]['vm_name'] }}"
+        vm_folder: "{{ hostvars[inventory_hostname]['vm_folder'] }}"
+        cdrom: "{{ hostvars[inventory_hostname]['cdrom'] }}"
+        networks: "{{ hostvars[inventory_hostname]['networks'] }}"
       when: inventory_hostname == "ubuntu-pc"
+      delegate_to: localhost
       tags:
         - vm_creation
         - vm_ubuntu
@@ -40,7 +52,13 @@
     - name: Crear VM Windows PC
       include_role:
         name: vmware-windows
+      vars:
+        vm_name: "{{ hostvars[inventory_hostname]['vm_name'] }}"
+        vm_folder: "{{ hostvars[inventory_hostname]['vm_folder'] }}"
+        cdrom: "{{ hostvars[inventory_hostname]['cdrom'] }}"
+        networks: "{{ hostvars[inventory_hostname]['networks'] }}"
       when: inventory_hostname == "windows-pc"
+      delegate_to: localhost
       tags:
         - vm_creation
         - vm_windows

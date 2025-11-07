@@ -103,7 +103,16 @@ chmod 600 .vault_pass
 ./scripts/setup_vault.sh
 ```
 
-### 4. Ejecutar Proyecto
+### 4. Crear VMs (SOLUCIÓN AL PROBLEMA)
+```bash
+# Usar el playbook específico para crear VMs
+ansible-playbook playbooks/create_vms.yml -vvv
+
+# O usar el tag correcto en el playbook principal
+ansible-playbook playbooks/site.yml --tags vm_router -vvv
+```
+
+### 5. Ejecutar Proyecto Completo
 ```bash
 ansible-playbook playbooks/site.yml -vvv
 ```
