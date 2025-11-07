@@ -9,7 +9,7 @@
   tasks:
     - name: Verificar si VM Router ya existe
       community.vmware.vmware_guest_info:
-        hostname: "168.121.48.254"
+        hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
@@ -20,7 +20,7 @@
 
     - name: Crear VM Debian Router (si no existe)
       community.vmware.vmware_guest:
-        hostname: "168.121.48.254"
+        hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
@@ -54,7 +54,7 @@
 
     - name: Encender VM Debian Router
       community.vmware.vmware_guest:
-        hostname: "168.121.48.254"
+        hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
@@ -82,7 +82,7 @@
   tasks:
     - name: Verificar si VM Ubuntu ya existe
       community.vmware.vmware_guest_info:
-        hostname: "168.121.48.254"
+        hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
@@ -93,7 +93,7 @@
 
     - name: Crear VM Ubuntu PC (si no existe)
       community.vmware.vmware_guest:
-        hostname: "168.121.48.254"
+        hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
@@ -125,7 +125,7 @@
 
     - name: Encender VM Ubuntu PC
       community.vmware.vmware_guest:
-        hostname: "168.121.48.254"
+        hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
@@ -153,7 +153,7 @@
   tasks:
     - name: Verificar si VM Windows ya existe
       community.vmware.vmware_guest_info:
-        hostname: "168.121.48.254"
+        hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
@@ -164,7 +164,7 @@
 
     - name: Crear VM Windows PC (si no existe)
       community.vmware.vmware_guest:
-        hostname: "168.121.48.254"
+        hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
@@ -196,7 +196,7 @@
 
     - name: Encender VM Windows PC
       community.vmware.vmware_guest:
-        hostname: "168.121.48.254"
+        hostname: "172.17.25.1"
         username: "root"
         password: "qwe123$"
         validate_certs: no
@@ -242,7 +242,7 @@
           - "================================================"
           - ""
           - "1. 🖥️  ACCEDER A ESXi:"
-          - "   URL: https://168.121.48.254:10101/ui/#/login"
+          - "   URL: https://172.17.25.1/ui/"
           - "   Usuario: root"
           - "   Contraseña: qwe123$"
           - ""

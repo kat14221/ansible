@@ -9,7 +9,7 @@ Después de ejecutar `ansible-playbook playbooks/create_vms.yml -vvv`, sigue est
 ## 🖥️ VM 1: vm-debian-router (Debian 12)
 
 ### **Acceso a la VM:**
-1. ESXi Web UI: `https://168.121.48.254:10101/ui/#/login`
+1. ESXi Web UI: `https://172.17.25.1/ui/`
 2. Buscar VM: `vm-debian-router`
 3. Clic derecho → "Open Console"
 
@@ -89,7 +89,7 @@ sudo systemctl enable ssh
 ## 🖥️ VM 2: vm-ubuntu-pc (Ubuntu 24.04)
 
 ### **Acceso a la VM:**
-1. ESXi Web UI → `vm-ubuntu-pc` → "Open Console"
+1. ESXi Web UI: `https://172.17.25.1/ui/` → `vm-ubuntu-pc` → "Open Console"
 
 ### **Configuración durante la instalación:**
 
@@ -152,7 +152,7 @@ sudo apt install -y net-tools iputils-ping curl wget
 ## 🖥️ VM 3: vm-windows-pc (Windows 11)
 
 ### **Acceso a la VM:**
-1. ESXi Web UI → `vm-windows-pc` → "Open Console"
+1. ESXi Web UI: `https://172.17.25.1/ui/` → `vm-windows-pc` → "Open Console"
 
 ### **Configuración durante la instalación:**
 
