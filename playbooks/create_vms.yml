@@ -189,7 +189,7 @@
             unit_number: 0
             state: present
             type: iso
-            iso_path: "[datastore1] W-11/Win11_24H2_Spanish_x64.iso"
+            iso_path: "[datastore1] W-11/Win11_25H2_Spanish_Mexico_x64.iso"
         wait_for_ip_address: no
       when: windows_vm_info.instance is not defined
       register: windows_result
