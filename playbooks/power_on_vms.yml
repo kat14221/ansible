@@ -1,58 +1,72 @@
 ---
-# Playbook para encender VMs que ya están creadas
+# Playbook para encender VMs usando comandos SSH directos a ESXi
+# Evita problemas de compatibilidad con librerías VMware
 # Uso: ansible-playbook playbooks/power_on_vms.yml -vvv
 
-- name: Encender todas las VMs
+- name: Encender VMs via SSH a ESXi
   hosts: localhost
   gather_facts: no
+  vars:
+    esxi_host: "172.17.25.1"
+    esxi_user: "root"
+    esxi_pass: "qwe123$"
   tasks:
-    - name: Encender VM Debian Router
-      community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        name: vm-debian-router
-        state: poweredon
-      register: router_power
+    - name: Obtener lista de VMs y sus IDs
+      shell: |
+        sshpass -p '{{ esxi_pass }}' ssh -o StrictHostKeyChecking=no {{ esxi_user }}@{{ esxi_host }} "vim-cmd vmsvc/getallvms"
+      register: vm_list
       ignore_errors: yes
 
-    - name: Encender VM Ubuntu PC
-      community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        name: vm-ubuntu-pc
-        state: poweredon
-      register: ubuntu_power
+    - name: Mostrar VMs encontradas
+      debug:
+        msg: "{{ vm_list.stdout_lines }}"
+
+    - name: Encender vm-debian-router
+      shell: |
+        VM_ID=$(sshpass -p '{{ esxi_pass }}' ssh -o StrictHostKeyChecking=no {{ esxi_user }}@{{ esxi_host }} "vim-cmd vmsvc/getallvms | grep 'vm-debian-router' | awk '{print \$1}'")
+        if [ ! -z "$VM_ID" ]; then
+          sshpass -p '{{ esxi_pass }}' ssh -o StrictHostKeyChecking=no {{ esxi_user }}@{{ esxi_host }} "vim-cmd vmsvc/power.on $VM_ID"
+          echo "VM Debian Router (ID: $VM_ID) encendida"
+        else
+          echo "VM Debian Router no encontrada"
+        fi
+      register: router_result
       ignore_errors: yes
 
-    - name: Encender VM Windows PC
-      community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        name: vm-windows-pc
-        state: poweredon
-      register: windows_power
+    - name: Encender vm-ubuntu-pc
+      shell: |
+        VM_ID=$(sshpass -p '{{ esxi_pass }}' ssh -o StrictHostKeyChecking=no {{ esxi_user }}@{{ esxi_host }} "vim-cmd vmsvc/getallvms | grep 'vm-ubuntu-pc' | awk '{print \$1}'")
+        if [ ! -z "$VM_ID" ]; then
+          sshpass -p '{{ esxi_pass }}' ssh -o StrictHostKeyChecking=no {{ esxi_user }}@{{ esxi_host }} "vim-cmd vmsvc/power.on $VM_ID"
+          echo "VM Ubuntu PC (ID: $VM_ID) encendida"
+        else
+          echo "VM Ubuntu PC no encontrada"
+        fi
+      register: ubuntu_result
       ignore_errors: yes
 
-    - name: Mostrar resultado
+    - name: Encender vm-windows-pc
+      shell: |
+        VM_ID=$(sshpass -p '{{ esxi_pass }}' ssh -o StrictHostKeyChecking=no {{ esxi_user }}@{{ esxi_host }} "vim-cmd vmsvc/getallvms | grep 'vm-windows-pc' | awk '{print \$1}'")
+        if [ ! -z "$VM_ID" ]; then
+          sshpass -p '{{ esxi_pass }}' ssh -o StrictHostKeyChecking=no {{ esxi_user }}@{{ esxi_host }} "vim-cmd vmsvc/power.on $VM_ID"
+          echo "VM Windows PC (ID: $VM_ID) encendida"
+        else
+          echo "VM Windows PC no encontrada"
+        fi
+      register: windows_result
+      ignore_errors: yes
+
+    - name: Mostrar resultados
       debug:
         msg:
           - "================================================"
-          - "⚡ ENCENDIDO DE VMs COMPLETADO"
+          - "⚡ ENCENDIDO DE VMs VIA SSH"
           - "================================================"
           - ""
-          - "✅ vm-debian-router: {{ 'Encendida' if not router_power.failed else 'Error (verificar manualmente)' }}"
-          - "✅ vm-ubuntu-pc: {{ 'Encendida' if not ubuntu_power.failed else 'Error (verificar manualmente)' }}"
-          - "✅ vm-windows-pc: {{ 'Encendida' if not windows_power.failed else 'Error (verificar manualmente)' }}"
+          - "Debian Router: {{ router_result.stdout }}"
+          - "Ubuntu PC: {{ ubuntu_result.stdout }}"
+          - "Windows PC: {{ windows_result.stdout }}"
           - ""
-          - "📋 PRÓXIMO PASO:"
-          - "1. Acceder a ESXi: https://172.17.25.1/ui/"
-          - "2. Verificar que las VMs estén encendidas"
-          - "3. Instalar SOs manualmente en cada VM"
-          - "4. Seguir guía: INSTALACION_VMS.md"
+          - "📋 Verificar en ESXi: https://172.17.25.1/ui/"
           - "================================================"
