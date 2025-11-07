@@ -1,0 +1,80 @@
+---
+# Playbook para reconfigurar VM Windows con TPM y Secure Boot
+# Uso: ansible-playbook playbooks/fix_windows_vm.yml -vvv
+
+- name: Reconfigurar VM Windows para Windows 11
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Apagar VM Windows (si está encendida)
+      community.vmware.vmware_guest:
+        hostname: "172.17.25.1"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        name: vm-windows-pc
+        state: shutdownguest
+      register: shutdown_result
+      ignore_errors: yes
+
+    - name: Esperar 10 segundos
+      pause:
+        seconds: 10
+
+    - name: Reconfigurar VM Windows con requisitos de Windows 11
+      community.vmware.vmware_guest:
+        hostname: "172.17.25.1"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        datacenter: ha-datacenter
+        name: vm-windows-pc
+        state: present
+        hardware:
+          boot_firmware: efi
+          secure_boot: yes
+          virt_based_security: yes
+          version: 14
+        cdrom:
+          - controller_number: 0
+            unit_number: 0
+            state: present
+            type: iso
+            iso_path: "[datastore1] W-11/Win11_25H2_Spanish_x64.iso"
+      register: reconfig_result
+      ignore_errors: yes
+
+    - name: Encender VM Windows
+      community.vmware.vmware_guest:
+        hostname: "172.17.25.1"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        name: vm-windows-pc
+        state: poweredon
+      register: poweron_result
+      ignore_errors: yes
+
+    - name: Mostrar resultado
+      debug:
+        msg:
+          - "================================================"
+          - "✅ VM Windows reconfigurada"
+          - "================================================"
+          - ""
+          - "Cambios aplicados:"
+          - "  • Firmware: EFI"
+          - "  • Secure Boot: Habilitado"
+          - "  • TPM 2.0: Habilitado (virt_based_security)"
+          - "  • ISO actualizada: Win11_25H2_Spanish_x64.iso"
+          - ""
+          - "📋 IMPORTANTE:"
+          - "Si el mouse no funciona en la consola:"
+          - "1. Apagar la VM"
+          - "2. En ESXi Web UI → Editar VM"
+          - "3. Agregar dispositivo → USB Controller"
+          - "4. Agregar dispositivo → Mouse USB"
+          - "5. Encender VM"
+          - ""
+          - "O usar VMware Remote Console (VMRC) en lugar de web console"
+          - "================================================"

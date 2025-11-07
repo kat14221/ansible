@@ -169,7 +169,7 @@
         folder: /vm
         name: vm-windows-pc
         state: poweredon
-        guest_id: windows11_64Guest
+        guest_id: windows9Server64Guest
         disk:
           - size_gb: 40
             type: thin
@@ -178,6 +178,13 @@
           memory_mb: 4096
           num_cpus: 2
           scsi: paravirtual
+          boot_firmware: efi
+          secure_boot: yes
+          virt_based_security: yes
+          version: 14
+        customvalues:
+          - key: "firmware"
+            value: "efi"
         networks:
           - name: Red Fernandez
             device_type: vmxnet3
@@ -186,7 +193,7 @@
             unit_number: 0
             state: present
             type: iso
-            iso_path: "[datastore1] W-11/Win11_25H2_Spanish_Mexico_x64.iso"
+            iso_path: "[datastore1] W-11/Win11_25H2_Spanish_x64.iso"
         wait_for_ip_address: no
         force: no
       when: windows_vm_info.virtual_machines is not defined or windows_vm_info.virtual_machines | length == 0
@@ -205,7 +212,9 @@
           - "CPUs: 2"
           - "Disco: 40 GB"
           - "Red: Red Fernandez"
-          - "ISO: Win11_24H2_Spanish_x64.iso"
+          - "ISO: Win11_25H2_Spanish_x64.iso"
+          - "Firmware: EFI con Secure Boot habilitado"
+          - "TPM: Habilitado (virt_based_security)"
           - "Verificación: {{ 'VM encontrada' if windows_vm_info.virtual_machines is defined and windows_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
           - "=========================================="
 

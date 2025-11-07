@@ -4,6 +4,18 @@
 
 Después de ejecutar `ansible-playbook playbooks/create_vms.yml -vvv`, sigue esta guía para instalar manualmente cada VM con la configuración correcta.
 
+## ⚠️ CONFIGURACIÓN CRÍTICA - HOSTNAMES
+
+**IMPORTANTE: Usa estos hostnames exactos durante la instalación:**
+
+| VM | Hostname | Domain |
+|----|----------|--------|
+| **Debian Router** | `debian-router` | `vmware-101001.local` |
+| **Ubuntu PC** | `ubuntu-pc` | `vmware-101001.local` |
+| **Windows PC** | `windows-pc` | `VMWARE101001` (workgroup) |
+
+**⭐ Estos nombres son críticos para que Ansible pueda conectarse después.**
+
 ---
 
 ## 🖥️ VM 1: vm-debian-router (Debian 12)
@@ -15,8 +27,16 @@ Después de ejecutar `ansible-playbook playbooks/create_vms.yml -vvv`, sigue est
 
 ### **Configuración durante la instalación:**
 
-#### **🌐 Configuración de Red:**
-- **Hostname**: `debian-router`
+#### **🌐 Configuración de Red (IMPORTANTE):**
+
+**Durante la instalación, cuando te pida el hostname:**
+
+```
+Hostname: debian-router
+Domain name: vmware-101001.local
+```
+
+- **Hostname**: `debian-router` ⭐ **IMPORTANTE: Usar exactamente este nombre**
 - **Domain**: `vmware-101001.local`
 - **Interfaz primaria**: ens160 (VM Network)
   - Configurar con DHCP temporalmente
@@ -93,8 +113,16 @@ sudo systemctl enable ssh
 
 ### **Configuración durante la instalación:**
 
-#### **🌐 Configuración de Red:**
-- **Hostname**: `ubuntu-pc`
+#### **🌐 Configuración de Red (IMPORTANTE):**
+
+**Durante la instalación, cuando te pida el hostname:**
+
+```
+Hostname: ubuntu-pc
+Domain name: vmware-101001.local
+```
+
+- **Hostname**: `ubuntu-pc` ⭐ **IMPORTANTE: Usar exactamente este nombre**
 - **Domain**: `vmware-101001.local`
 - **Interfaz**: ens160 (Red Fernandez)
   - Configurar con DHCP temporalmente
@@ -154,10 +182,23 @@ sudo apt install -y net-tools iputils-ping curl wget
 ### **Acceso a la VM:**
 1. ESXi Web UI: `https://172.17.25.1/ui/` → `vm-windows-pc` → "Open Console"
 
+⚠️ **PROBLEMA DEL MOUSE**: Si el mouse no funciona en la consola web:
+- **Solución 1**: Usar VMware Remote Console (VMRC) - Descargar desde ESXi
+- **Solución 2**: Navegar con teclado (Tab, Enter, flechas)
+- **Solución 3**: Agregar USB Controller manualmente en configuración de VM
+
 ### **Configuración durante la instalación:**
 
-#### **🌐 Configuración de Red:**
-- **Hostname**: `windows-pc`
+#### **🌐 Configuración de Red (IMPORTANTE):**
+
+**Durante la instalación, cuando te pida el nombre del equipo:**
+
+```
+Computer name: windows-pc
+Workgroup: VMWARE101001
+```
+
+- **Hostname**: `windows-pc` ⭐ **IMPORTANTE: Usar exactamente este nombre**
 - **Workgroup**: `VMWARE101001`
 - **Interfaz**: Ethernet (Red Fernandez)
   - Se configurará automáticamente con IPv6
