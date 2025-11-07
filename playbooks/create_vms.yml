@@ -179,12 +179,7 @@
           num_cpus: 2
           scsi: paravirtual
           boot_firmware: efi
-          secure_boot: yes
-          virt_based_security: yes
           version: 14
-        customvalues:
-          - key: "firmware"
-            value: "efi"
         networks:
           - name: Red Fernandez
             device_type: vmxnet3
@@ -213,8 +208,8 @@
           - "Disco: 40 GB"
           - "Red: Red Fernandez"
           - "ISO: Win11_25H2_Spanish_x64.iso"
-          - "Firmware: EFI con Secure Boot habilitado"
-          - "TPM: Habilitado (virt_based_security)"
+          - "Firmware: EFI (compatible con Windows 11)"
+          - "Nota: TPM se omite para evitar requisitos de virtualización anidada"
           - "Verificación: {{ 'VM encontrada' if windows_vm_info.virtual_machines is defined and windows_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
           - "=========================================="
 

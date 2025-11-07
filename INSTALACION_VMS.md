@@ -218,6 +218,22 @@ C:\ - 40GB (sistema y datos)
 - No crear particiones adicionales
 
 #### **📦 Configuración de Windows:**
+
+⚠️ **IMPORTANTE - Saltarse requisitos de TPM:**
+
+Si aparece el error "Este equipo no cumple los requisitos":
+1. Presionar **Shift + F10** para abrir CMD
+2. Escribir: `regedit` y presionar Enter
+3. Navegar a: `HKEY_LOCAL_MACHINE\SYSTEM\Setup`
+4. Crear nueva clave: Clic derecho → Nuevo → Clave → Nombrar: `LabConfig`
+5. Dentro de `LabConfig`, crear estos valores DWORD (32-bit):
+   - `BypassTPMCheck` = `1`
+   - `BypassSecureBootCheck` = `1`
+   - `BypassRAMCheck` = `1`
+6. Cerrar regedit y CMD
+7. Clic en "Atrás" y luego "Siguiente" para continuar
+
+**Configuración normal:**
 - **Región**: España o tu región
 - **Idioma**: Español
 - **Teclado**: Español
