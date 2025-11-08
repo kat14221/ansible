@@ -141,6 +141,15 @@ chmod 600 .vault_pass
 ansible-playbook playbooks/create_vms.yml -vvv
 ```
 
+> **⚠️ Si aparece error "Use pyVmomi.VmomiJSONEncoder instead"**:
+> ```bash
+> # Solución rápida
+> ./fix_pyvmomi.sh
+> 
+> # O ver guía completa
+> cat TROUBLESHOOTING_PYVMOMI.md
+> ```
+
 ### 5. Instalar SOs Manualmente
 Seguir `INSTALACION_VMS.md` para instalar sistemas operativos
 
