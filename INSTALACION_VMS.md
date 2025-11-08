@@ -8,13 +8,37 @@ Después de ejecutar `ansible-playbook playbooks/create_vms.yml -vvv`, sigue est
 
 **IMPORTANTE: Usa estos hostnames exactos durante la instalación:**
 
-| VM | Hostname | Domain |
+| VM | Hostname (Nombre de máquina) | Domain |
 |----|----------|--------|
 | **Debian Router** | `debian-router` | `vmware-101001.local` |
 | **Ubuntu PC** | `ubuntu-pc` | `vmware-101001.local` |
 | **Windows PC** | `windows-pc` | `VMWARE101001` (workgroup) |
 
 **⭐ Estos nombres son críticos para que Ansible pueda conectarse después.**
+
+---
+
+## 🚨 RESPUESTA RÁPIDA
+
+**¿Te pide el nombre de la máquina en Debian?**
+```
+Hostname: debian-router
+Domain name: vmware-101001.local
+```
+
+**¿Te pide el nombre en Ubuntu?**
+```
+Hostname: ubuntu-pc
+Domain name: vmware-101001.local
+```
+
+**¿Te pide el nombre en Windows?**
+```
+Computer name: windows-pc
+Workgroup: VMWARE101001
+```
+
+---
 
 ---
 
@@ -38,7 +62,7 @@ Domain name: vmware-101001.local
 
 - **Hostname**: `debian-router` ⭐ **IMPORTANTE: Usar exactamente este nombre**
 - **Domain**: `vmware-101001.local`
-- **Interfaz primaria**: ens160 (VM Network)
+- **Interfaz primaria**: ens192 (VM Network)
   - Configurar con DHCP temporalmente
   - IP esperada: 172.17.25.x (se configurará después como .126)
 
@@ -67,11 +91,23 @@ Esquema de particiones:
    - Partición 3: 15GB, primaria, ext4, punto montaje /
    - Partición 4: resto, primaria, ext4, punto montaje /home
 
-#### **📦 Selección de Software:**
-- ✅ SSH server
-- ✅ Standard system utilities
-- ❌ Desktop environment (no instalar)
-- ❌ Web server (se instalará con Ansible)
+#### **📦 Selección de Software (IMPORTANTE):**
+
+**Solo marcar estos dos:**
+- ✅ **SSH server** (CRÍTICO - necesario para Ansible)
+- ✅ **Utilidades estándar del sistema** (Standard system utilities)
+
+**Desmarcar todo lo demás:**
+- ❌ Entorno de escritorio Debian (y todos los escritorios)
+- ❌ web server (se instalará después con Ansible)
+- ❌ print server
+- ❌ Cualquier otro servicio
+
+**Navegación:**
+- Flechas: Mover
+- Espacio: Marcar/Desmarcar
+- Tab: Ir a botón Continuar
+- Enter: Confirmar
 
 #### **🔧 Configuración Post-Instalación:**
 ```bash

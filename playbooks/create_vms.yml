@@ -37,7 +37,7 @@
         folder: /vm
         name: vm-debian-router
         state: poweredon
-        guest_id: debian11_64Guest
+        guest_id: otherLinux64Guest
         disk:
           - size_gb: 20
             type: thin
@@ -46,6 +46,8 @@
           memory_mb: 2048
           num_cpus: 2
           scsi: paravirtual
+          usb_controller:
+            - usb2: true
         networks:
           - name: VM Network
             device_type: vmxnet3
@@ -113,6 +115,8 @@
           memory_mb: 4096
           num_cpus: 2
           scsi: paravirtual
+          usb_controller:
+            - usb2: true
         networks:
           - name: Red Fernandez
             device_type: vmxnet3
@@ -169,20 +173,26 @@
         folder: /vm
         name: vm-windows-pc
         state: poweredon
-        guest_id: windows9Server64Guest
+        guest_id: windows11_64Guest
         disk:
           - size_gb: 40
-            type: thin
+            type: thick
             datastore: datastore1
         hardware:
-          memory_mb: 4096
-          num_cpus: 2
-          scsi: paravirtual
+          memory_mb: 8192
+          num_cpus: 4
+          scsi: lsilogicsas
           boot_firmware: efi
-          version: 14
+          version: 20
+          usb_controller:
+            - usb2: true
         networks:
+          - name: VM Network
+            device_type: e1000e
           - name: Red Fernandez
-            device_type: vmxnet3
+            device_type: e1000e
+        customization:
+          hostname: windows-pc
         cdrom:
           - controller_number: 0
             unit_number: 0
@@ -194,6 +204,20 @@
       when: windows_vm_info.virtual_machines is not defined or windows_vm_info.virtual_machines | length == 0
       register: windows_result
 
+    - name: Agregar controlador USB 2.0 a VM Windows
+      community.vmware.vmware_guest:
+        hostname: "172.17.25.1"
+        username: "root"
+        password: "qwe123$"
+        validate_certs: no
+        name: vm-windows-pc
+        state: present
+        hardware:
+          usb_controller:
+            - usb2: true
+      register: usb_result
+      ignore_errors: yes
+
 
 
     - name: Mostrar resultado VM Windows
@@ -202,14 +226,17 @@
           - "=========================================="
           - "✅ VM Windows PC: {{ 'CREADA' if windows_result.changed | default(false) else 'YA EXISTÍA' }}"
           - "Nombre: vm-windows-pc"
-          - "Estado: Encendida (creada con state=poweredon)"
-          - "Memoria: 4096 MB"
-          - "CPUs: 2"
-          - "Disco: 40 GB"
-          - "Red: Red Fernandez"
+          - "Estado: Encendida"
+          - "Sistema: Microsoft Windows 11 (64 bits)"
+          - "Memoria: 8192 MB (8 GB)"
+          - "CPUs: 4"
+          - "Disco: 40 GB (thick provisioning)"
+          - "Controladora: LSI Logic SAS"
+          - "Redes: VM Network (E1000e), Red Fernandez (E1000e)"
           - "ISO: Win11_25H2_Spanish_x64.iso"
-          - "Firmware: EFI (compatible con Windows 11)"
-          - "Nota: TPM se omite para evitar requisitos de virtualización anidada"
+          - "Firmware: EFI"
+          - "USB: Controlador USB 2.0 {{ 'agregado' if usb_result.changed | default(false) else 'configurado' }}"
+          - "Compatibilidad: ESXi 8.0 U2 (version 20)"
           - "Verificación: {{ 'VM encontrada' if windows_vm_info.virtual_machines is defined and windows_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
           - "=========================================="
 
