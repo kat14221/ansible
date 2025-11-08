@@ -46,8 +46,6 @@
           memory_mb: 2048
           num_cpus: 2
           scsi: paravirtual
-          usb_controller:
-            - usb2: true
         networks:
           - name: VM Network
             device_type: vmxnet3
@@ -115,8 +113,6 @@
           memory_mb: 4096
           num_cpus: 2
           scsi: paravirtual
-          usb_controller:
-            - usb2: true
         networks:
           - name: Red Fernandez
             device_type: vmxnet3
@@ -184,8 +180,6 @@
           scsi: lsilogicsas
           boot_firmware: efi
           version: 20
-          usb_controller:
-            - usb2: true
         networks:
           - name: VM Network
             device_type: e1000e
@@ -204,20 +198,6 @@
       when: windows_vm_info.virtual_machines is not defined or windows_vm_info.virtual_machines | length == 0
       register: windows_result
 
-    - name: Agregar controlador USB 2.0 a VM Windows
-      community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        name: vm-windows-pc
-        state: present
-        hardware:
-          usb_controller:
-            - usb2: true
-      register: usb_result
-      ignore_errors: yes
-
 
 
     - name: Mostrar resultado VM Windows
@@ -235,7 +215,7 @@
           - "Redes: VM Network (E1000e), Red Fernandez (E1000e)"
           - "ISO: Win11_25H2_Spanish_x64.iso"
           - "Firmware: EFI"
-          - "USB: Controlador USB 2.0 {{ 'agregado' if usb_result.changed | default(false) else 'configurado' }}"
+          - "USB: Configurar manualmente si es necesario"
           - "Compatibilidad: ESXi 8.0 U2 (version 20)"
           - "Verificación: {{ 'VM encontrada' if windows_vm_info.virtual_machines is defined and windows_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
           - "=========================================="
