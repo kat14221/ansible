@@ -1,17 +1,41 @@
 ---
-# Ansible Collections requeridas para el proyecto
+# ============================================================================
+# Ansible Collections - Proyecto IPv6 con VMware y Cisco
+# ============================================================================
+# Instalación: ansible-galaxy collection install -r requirements.yml
+# Actualización: ansible-galaxy collection install -r requirements.yml --force
+# Verificación: ansible-galaxy collection list
+#
+# Consultar: BUENAS_PRACTICAS_DEPENDENCIAS.md para compatibilidad
+# ============================================================================
+
 collections:
+  # VMware vSphere/ESXi Management
+  # Requiere: pyvmomi==8.0.3.0.1
   - name: community.vmware
-    version: ">=3.0.0"
-  
-  - name: cisco.ios
     version: ">=4.0.0"
+    source: https://galaxy.ansible.com
   
+  # Cisco IOS/IOS-XE Management
+  # Compatible con routers Cisco 2911, switches, etc.
+  - name: cisco.ios
+    version: ">=6.0.0"
+    source: https://galaxy.ansible.com
+  
+  # Network Common Modules
+  # Dependencia de cisco.ios y otros módulos de red
   - name: ansible.netcommon
-    version: ">=5.0.0"
+    version: ">=6.0.0"
+    source: https://galaxy.ansible.com
   
+  # POSIX Utilities
+  # Módulos para sistemas Unix/Linux (mount, sysctl, etc.)
   - name: ansible.posix
     version: ">=1.5.0"
+    source: https://galaxy.ansible.com
   
+  # Ansible Utilities
+  # Filtros y plugins útiles (validate, fact_diff, etc.)
   - name: ansible.utils
-    version: ">=2.0.0"
+    version: ">=3.0.0"
+    source: https://galaxy.ansible.com

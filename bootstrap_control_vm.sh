@@ -1,9 +1,27 @@
 #!/usr/bin/env bash
+# ============================================================================
 # Bootstrap script para VM de control Ansible
-# Instala dependencias, Python, Ansible, collections y prepara evidencias
-# IDEMPOTENTE: Solo instala lo que falta
+# ============================================================================
+# Propósito: Instalar y configurar todas las dependencias necesarias para
+#            ejecutar playbooks Ansible con VMware y Cisco
+#
+# Características:
+#   - IDEMPOTENTE: Solo instala lo que falta
+#   - VERIFICACIÓN: Comprueba versiones antes de instalar
+#   - FEEDBACK: Muestra claramente qué se instala y qué ya existe
+#   - ROBUSTO: Maneja errores y ofrece alternativas
+#
+# Uso: ./bootstrap_control_vm.sh
+#
+# Requisitos previos:
+#   - Ubuntu 24.04 LTS o Debian 12 (Bookworm)
+#   - Acceso a internet
+#   - Usuario con permisos sudo
+#
+# Consultar: BUENAS_PRACTICAS_DEPENDENCIAS.md para más información
+# ============================================================================
 
-set -euo pipefail
+set -euo pipefail  # Salir en error, variables no definidas, errores en pipes
 
 echo "=========================================="
 echo "🚀 Bootstrap de VM de Control Ansible"
@@ -87,19 +105,34 @@ sudo update-ca-certificates 2>/dev/null || true
 echo "[4/6] Verificando dependencias Python..."
 
 # Verificar pyvmomi (no está en apt, necesita pip)
+# Versión recomendada: 8.0.3.0.1 (compatible con ESXi 8.0 y evita deprecation warnings)
+PYVMOMI_VERSION_REQUIRED="8.0.3.0.1"
+
 if check_python_package "pyVmomi"; then
   PYVMOMI_VERSION=$(python3 -c "import pyVmomi; print(pyVmomi.__version__)" 2>/dev/null || echo "desconocida")
   echo "  ✅ pyvmomi ya instalado (versión: $PYVMOMI_VERSION)"
+  
+  # Verificar si la versión es antigua y necesita actualización
+  if [[ "$PYVMOMI_VERSION" < "8.0.3" ]]; then
+    echo "  ⚠️  Versión antigua detectada, actualizando a $PYVMOMI_VERSION_REQUIRED..."
+    if pip3 install --break-system-packages --upgrade "pyvmomi==$PYVMOMI_VERSION_REQUIRED" 2>/dev/null; then
+      echo "  ✅ pyvmomi actualizado exitosamente"
+    elif pip3 install --user --upgrade "pyvmomi==$PYVMOMI_VERSION_REQUIRED" 2>/dev/null; then
+      echo "  ✅ pyvmomi actualizado con --user"
+    else
+      echo "  ⚠️  No se pudo actualizar automáticamente"
+    fi
+  fi
 else
-  echo "  ⬇️  Instalando pyvmomi..."
-  if pip3 install --break-system-packages pyvmomi>=8.0.0.1 2>/dev/null; then
+  echo "  ⬇️  Instalando pyvmomi $PYVMOMI_VERSION_REQUIRED..."
+  if pip3 install --break-system-packages "pyvmomi==$PYVMOMI_VERSION_REQUIRED" 2>/dev/null; then
     echo "  ✅ pyvmomi instalado con --break-system-packages"
-  elif pip3 install --user pyvmomi>=8.0.0.1 2>/dev/null; then
+  elif pip3 install --user "pyvmomi==$PYVMOMI_VERSION_REQUIRED" 2>/dev/null; then
     echo "  ✅ pyvmomi instalado con --user"
   else
     echo "  ⚠️  Error al instalar pyvmomi, intentando método alternativo..."
-    python3 -m pip install --break-system-packages pyvmomi>=8.0.0.1 || \
-      echo "  ❌ No se pudo instalar pyvmomi. Instalar manualmente después."
+    python3 -m pip install --break-system-packages "pyvmomi==$PYVMOMI_VERSION_REQUIRED" || \
+      echo "  ❌ No se pudo instalar pyvmomi. Instalar manualmente: pip3 install pyvmomi==$PYVMOMI_VERSION_REQUIRED"
   fi
 fi
 

@@ -95,9 +95,9 @@
       loop: "{{ pip_check.results }}"
       when: item.rc != 0
 
-    - name: Instalar pyvmomi si falta
+    - name: Instalar pyvmomi si falta (versión específica compatible)
       pip:
-        name: pyvmomi>=8.0.0.1
+        name: pyvmomi==8.0.3.0.1
         state: present
         extra_args: --break-system-packages
       when: pip_check.results[0].rc != 0

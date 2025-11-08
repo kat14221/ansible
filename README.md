@@ -72,10 +72,31 @@ Incluye configuración de VMs en ESXi, router Debian IPv6, servicios de red y eq
 
 ## 📋 Requisitos
 
-- **ESXi Host**: 168.121.48.254 (accesible)
-- **VM de Control**: Debian 12 o Ubuntu 22.04+ dentro del ESXi
-- **Ansible**: 2.9+ (se instala automáticamente)
-- **Collections**: cisco.ios, community.vmware, ansible.netcommon (se instalan automáticamente)
+### Hardware
+- **ESXi Host**: 172.17.25.1 (accesible desde red universidad)
+- **VM de Control**: Debian 12 o Ubuntu 24.04 LTS dentro del ESXi
+- **Recursos mínimos VM Control**: 2 vCPU, 4GB RAM, 20GB disco
+
+### Software (se instala automáticamente)
+- **Sistema Operativo**: Ubuntu 24.04 LTS o Debian 12 (Bookworm)
+- **Python**: 3.11+ (incluido en Ubuntu 24.04)
+- **Ansible**: 2.16+ (core)
+- **PyVmomi**: 8.0.3.0.1 (⚠️ versión específica requerida)
+- **Collections**: 
+  - community.vmware >= 4.0.0
+  - cisco.ios >= 6.0.0
+  - ansible.netcommon >= 6.0.0
+  - ansible.posix >= 1.5.0
+  - ansible.utils >= 3.0.0
+
+### Verificación de Dependencias
+```bash
+# Verificar todas las dependencias
+./verify_dependencies.sh
+
+# Ver guía completa de dependencias
+cat BUENAS_PRACTICAS_DEPENDENCIAS.md
+```
 
 ## ⚡ Inicio Rápido
 
@@ -84,14 +105,25 @@ Incluye configuración de VMs en ESXi, router Debian IPv6, servicios de red y eq
 - Usuario ESXi: `root` / Contraseña: `qwe123$`
 - Instalar Debian 12 o Ubuntu 24.04 en la VM
 
-### 2. Clonar y Ejecutar
+### 2. Clonar y Ejecutar Bootstrap
 ```bash
 git clone <repositorio> ansible-ipv6
 cd ansible-ipv6
 chmod +x *.sh scripts/*.sh
+
+# Instalar todas las dependencias (idempotente)
 ./bootstrap_control_vm.sh
+
+# Verificar instalación
+./verify_dependencies.sh
+
+# Configurar VM de control
 ansible-playbook playbooks/bootstrap_control.yml
 ```
+
+> **💡 Nota sobre PyVmomi**: El script instala automáticamente `pyvmomi==8.0.3.0.1`, 
+> la versión específica compatible con ESXi 8.0 U2 que evita errores de deprecación.
+> Ver `BUENAS_PRACTICAS_DEPENDENCIAS.md` para más detalles.
 
 ### 3. Configurar Vault (SOLUCIÓN AL ERROR)
 ```bash

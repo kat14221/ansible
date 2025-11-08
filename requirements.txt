@@ -1,27 +1,42 @@
-# Requirements para Ansible IPv6 Project
-# Instalar con: pip3 install -r requirements.txt
+# ============================================================================
+# Python Requirements - Proyecto Ansible IPv6
+# ============================================================================
+# Este archivo especifica las dependencias Python necesarias para el proyecto
+#
+# Instalación:
+#   pip3 install -r requirements.txt --break-system-packages
+#   O: pip3 install -r requirements.txt --user
+#
+# Nota: Preferir instalación vía apt cuando esté disponible
+# Ver: BUENAS_PRACTICAS_DEPENDENCIAS.md
+# ============================================================================
 
-# Ansible y collections
-ansible>=2.9
-ansible-core>=2.9
+# VMware SDK - VERSIÓN ESPECÍFICA REQUERIDA
+# Compatible con ESXi 8.0 U2, sin deprecation warnings
+pyvmomi==8.0.3.0.1
 
-# Collections (instalar con ansible-galaxy)
-# ansible-galaxy collection install cisco.ios
-# ansible-galaxy collection install community.vmware
+# Ansible SSH Performance (opcional pero recomendado)
+# Mejora significativamente el rendimiento de conexiones SSH
+ansible-pylibssh>=1.1.0
 
-# Bibliotecas Python para Ansible
-pyvmomi>=7.0
-netaddr>=0.8.0
-jmespath>=0.10.0
-jinja2>=3.0.0
-
-# Para conexiones SSH a Cisco IOS
-ncclient>=0.6.0
-paramiko>=2.7.0
-ansible-pylibssh>=1.0.0
-
-# Análisis de red (opcional)
-scapy>=2.4.0
-
-# Utilidades
-ipython>=7.0.0
+# Las siguientes dependencias DEBERÍAN instalarse vía apt:
+# - netaddr (python3-netaddr)
+# - jinja2 (python3-jinja2)
+# - passlib (python3-passlib)
+# - requests (python3-requests)
+# - cryptography (python3-cryptography)
+# - jmespath (python3-jmespath)
+# - paramiko (python3-paramiko)
+# - bcrypt (python3-bcrypt)
+# - PyNaCl (python3-nacl)
+#
+# Solo instalar desde pip si no están disponibles en apt:
+# netaddr>=0.8.0
+# Jinja2>=3.1.0
+# passlib>=1.7.4
+# requests>=2.28.0
+# cryptography>=38.0.0
+# jmespath>=1.0.0
+# paramiko>=2.12.0
+# bcrypt>=4.0.0
+# PyNaCl>=1.5.0
