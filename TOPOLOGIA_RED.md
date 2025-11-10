@@ -3,10 +3,8 @@
 ## Diagrama de Red
 
 ```
-                    Internet/Backbone
-                           │
-                           │
-                    ┌──────▼──────┐
+                   
+                    ┌────────-────┐
                     │  Router      │
                     │  Físico      │ ← physical-router
                     │              │
