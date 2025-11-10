@@ -1,0 +1,195 @@
+---
+# Role: debian-ipv6-gateway
+# Descripción: Configura debian-router como gateway IPv6
+
+- name: Verificar que estamos en debian-router
+  assert:
+    that:
+      - inventory_hostname == "debian-router"
+    fail_msg: "Este role solo debe ejecutarse en debian-router"
+
+- name: Instalar paquetes gateway IPv6
+  package:
+    name:
+      - radvd
+      - isc-dhcp-server6
+      - dnsmasq
+      - firewalld
+      - traceroute
+      - mtr
+      - tcpdump
+      - ndisc6
+      - net-tools
+      - curl
+      - wget
+      - iperf3
+    state: present
+  become: yes
+
+- name: Habilitar forwarding IPv6
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+    sysctl_file: /etc/sysctl.d/99-ipv6-gateway.conf
+  loop:
+    - { name: 'net.ipv6.conf.all.forwarding', value: '1' }
+    - { name: 'net.ipv6.conf.all.accept_ra', value: '2' }
+    - { name: 'net.ipv6.conf.default.forwarding', value: '1' }
+    - { name: 'net.ipv6.conf.default.accept_ra', value: '2' }
+  become: yes
+
+- name: Crear RADVD config
+  template:
+    src: radvd.conf.j2
+    dest: /etc/radvd.conf
+    owner: root
+    group: root
+    mode: '0644'
+  become: yes
+  notify: restart radvd
+
+- name: Crear DHCPv6 config
+  template:
+    src: dhcpd6.conf.j2
+    dest: /etc/dhcp/dhcpd6.conf
+    owner: root
+    group: root
+    mode: '0644'
+  become: yes
+  notify: restart isc-dhcp-server6
+
+- name: Crear dnsmasq config
+  template:
+    src: dnsmasq.conf.j2
+    dest: /etc/dnsmasq.conf
+    owner: root
+    group: root
+    mode: '0644'
+  become: yes
+  notify: restart dnsmasq
+
+- name: Habilitar servicios gateway
+  systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  loop:
+    - radvd
+    - isc-dhcp-server6
+    - dnsmasq
+    - firewalld
+  become: yes
+
+- name: Configurar firewall zonas
+  firewalld:
+    zone: "{{ item }}"
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop:
+    - 'internal'
+    - 'external'
+  become: yes
+  notify: reload firewalld
+
+- name: Permitir servicios en internal
+  firewalld:
+    zone: internal
+    service: "{{ item }}"
+    permanent: yes
+    immediate: yes
+    state: enabled
+  loop:
+    - ssh
+    - http
+    - https
+    - dns
+    - dhcpv6-client
+    - dhcpv6
+  become: yes
+  notify: reload firewalld
+
+- name: Configurar masquerade
+  firewalld:
+    zone: external
+    masquerade: yes
+    permanent: yes
+    immediate: yes
+    state: enabled
+  become: yes
+  notify: reload firewalld
+
+- name: Crear ruta a Red Laboratorio
+  shell: |
+    ip -6 route add 2025:db8:100::/64 via 2025:db8:101::2 dev {{ lan_interface }} 2>/dev/null || true
+  become: yes
+  changed_when: false
+
+- name: Hacer permanente la ruta
+  copy:
+    dest: /etc/network/if-up.d/ipv6-routes
+    owner: root
+    group: root
+    mode: '0755'
+    content: "#!/bin/bash\nip -6 route add 2025:db8:100::/64 via 2025:db8:101::2 dev {{ lan_interface }} 2>/dev/null || true"
+  become: yes
+
+- name: Crear script de monitoreo
+  copy:
+    dest: /usr/local/bin/monitor-gateway.sh
+    owner: root
+    group: root
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      echo "IPv6 Gateway Status - $(date)"
+      echo "===================================="
+      systemctl status radvd isc-dhcp-server6 dnsmasq --no-pager
+      echo "===================================="
+      ip -6 addr show {{ lan_interface }}
+      ip -6 route show
+  become: yes
+
+- name: Verificar gateway
+  shell: |
+    {
+      echo "=== IPv6 Gateway Status ==="
+      ip -6 addr show {{ lan_interface }}
+      echo ""
+      echo "=== IPv6 Routes ==="
+      ip -6 route show
+      echo ""
+      echo "=== Services ==="
+      systemctl status radvd --no-pager 2>&1 | head -5
+    } > /tmp/gateway_status.txt 2>&1
+  become: yes
+  changed_when: false
+
+- name: Copiar estado
+  fetch:
+    src: /tmp/gateway_status.txt
+    dest: evidence/gateway/{{ inventory_hostname }}_gateway_status.txt
+    flat: yes
+  ignore_errors: yes
+
+- name: Resumen gateway
+  debug:
+    msg:
+      - "=========================================="
+      - "✅ Gateway IPv6 Configurado"
+      - "Network: 2025:db8:101::/64"
+      - "Gateway: 2025:db8:101::1"
+      - ""
+      - "Servicios:"
+      - "  • RADVD (RA)"
+      - "  • DHCPv6"
+      - "  • DNS/dnsmasq"
+      - "  • Firewall asimétrico"
+      - ""
+      - "Conectividad:"
+      - "  ✅ Red Local: 101::/64"
+      - "  ✅ Red Lab: 100::/64 (via 101::2)"
+      - "  ✅ Internet: IPv4 NAT"
+      - "=========================================="

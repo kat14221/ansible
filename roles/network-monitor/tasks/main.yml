@@ -1,0 +1,132 @@
+---
+# Network Monitor - Installation and Configuration
+
+- name: "📡 Network Monitor - Instalación de dependencias del sistema"
+  apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+      - iputils-ping
+      - net-tools
+      - nmap
+      - arp-scan
+      - curl
+      - supervisor
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: "📡 Network Monitor - Crear directorio de la aplicación"
+  file:
+    path: /opt/network-monitor
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+
+- name: "📡 Network Monitor - Crear virtualenv"
+  pip:
+    name:
+      - pip
+      - setuptools
+      - wheel
+    state: latest
+    virtualenv: /opt/network-monitor/venv
+    virtualenv_command: python3 -m venv
+  become: yes
+
+- name: "📡 Network Monitor - Instalar paquetes Python"
+  pip:
+    requirements: /opt/network-monitor/requirements.txt
+    virtualenv: /opt/network-monitor/venv
+  become: yes
+  when: lookup('file', '/opt/network-monitor/requirements.txt', errors='ignore')
+
+- name: "📡 Network Monitor - Copiar aplicación Flask"
+  copy:
+    src: app.py
+    dest: /opt/network-monitor/app.py
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+
+- name: "📡 Network Monitor - Copiar templates"
+  copy:
+    src: templates/
+    dest: /opt/network-monitor/templates/
+    mode: '0644'
+    owner: root
+    group: root
+  become: yes
+
+- name: "📡 Network Monitor - Copiar static files"
+  copy:
+    src: static/
+    dest: /opt/network-monitor/static/
+    mode: '0644'
+    owner: root
+    group: root
+  become: yes
+
+- name: "📡 Network Monitor - Copiar script de monitoreo"
+  copy:
+    src: network_scanner.py
+    dest: /opt/network-monitor/network_scanner.py
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+
+- name: "📡 Network Monitor - Configurar supervisord"
+  template:
+    src: network-monitor.conf.j2
+    dest: /etc/supervisor/conf.d/network-monitor.conf
+    mode: '0644'
+    owner: root
+    group: root
+  become: yes
+  notify: restart supervisord
+
+- name: "📡 Network Monitor - Crear servicio systemd"
+  template:
+    src: network-monitor.service.j2
+    dest: /etc/systemd/system/network-monitor.service
+    mode: '0644'
+    owner: root
+    group: root
+  become: yes
+  notify: reload systemd
+
+- name: "📡 Network Monitor - Habilitar servicio"
+  systemd:
+    name: network-monitor
+    enabled: yes
+    daemon_reload: yes
+  become: yes
+
+- name: "📡 Network Monitor - Iniciar servicio"
+  systemd:
+    name: network-monitor
+    state: started
+  become: yes
+
+- name: "📡 Network Monitor - Crear entrada firewall"
+  firewalld:
+    port: 5000/tcp
+    permanent: yes
+    state: enabled
+    zone: internal
+  become: yes
+  when: ansible_facts.packages | selectattr('name', 'match', 'firewalld') | list | length > 0
+
+- name: "📡 Network Monitor - Verificar que la aplicación está corriendo"
+  uri:
+    url: "http://localhost:5000/"
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 10
+  delay: 2

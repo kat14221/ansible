@@ -1,0 +1,9 @@
+[program:network-monitor]
+directory=/opt/network-monitor
+command=/opt/network-monitor/venv/bin/python3 /opt/network-monitor/app.py
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/network-monitor/app.log
+user=root
+priority=999

@@ -1,0 +1,23 @@
+---
+- name: "🔄 Restart network-monitor service"
+  systemd:
+    name: network-monitor
+    state: restarted
+  become: yes
+
+- name: "🔄 Restart supervisord"
+  systemd:
+    name: supervisor
+    state: restarted
+  become: yes
+
+- name: "🔄 Reload systemd daemon"
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: "🔥 Reload firewalld"
+  systemd:
+    name: firewalld
+    state: reloaded
+  become: yes

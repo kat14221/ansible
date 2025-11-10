@@ -1,0 +1,32 @@
+---
+# Handlers for debian-ipv6-gateway role
+
+- name: restart radvd
+  systemd:
+    name: radvd
+    state: restarted
+  become: yes
+
+- name: restart isc-dhcp-server6
+  systemd:
+    name: isc-dhcp-server6
+    state: restarted
+  become: yes
+
+- name: restart dnsmasq
+  systemd:
+    name: dnsmasq
+    state: restarted
+  become: yes
+
+- name: reload firewalld
+  systemd:
+    name: firewalld
+    state: reloaded
+  become: yes
+
+- name: restart networking
+  systemd:
+    name: networking
+    state: restarted
+  become: yes

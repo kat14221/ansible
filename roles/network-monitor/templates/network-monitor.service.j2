@@ -1,0 +1,25 @@
+[Unit]
+Description=Network Monitor Dashboard Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/network-monitor
+Environment="PATH=/opt/network-monitor/venv/bin"
+ExecStart=/opt/network-monitor/venv/bin/python3 /opt/network-monitor/app.py
+Restart=always
+RestartSec=10
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=network-monitor
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

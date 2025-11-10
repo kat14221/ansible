@@ -1,0 +1,68 @@
+---
+# 📡 Playbook: Desplegar Network Monitor en debian-router
+
+- name: "🖥️  Desplegar Network Monitor Dashboard"
+  hosts: debian-router
+  become: yes
+  gather_facts: yes
+
+  vars:
+    monitor_port: 5000
+    monitor_path: /opt/network-monitor
+    monitor_user: root
+
+  pre_tasks:
+    - name: "ℹ️  Mostrar información del sistema"
+      debug:
+        msg: |
+          Sistema: {{ ansible_os_family }}
+          Versión: {{ ansible_distribution_version }}
+          Python: {{ ansible_python_version }}
+
+    - name: "📋 Verificar requerimientos"
+      assert:
+        that:
+          - ansible_distribution == 'Debian'
+          - ansible_python_version is version('3.8', '>=')
+        fail_msg: "Requerimientos no cumplidos"
+
+  roles:
+    - role: network-monitor
+      tags: ["monitor"]
+
+  post_tasks:
+    - name: "✅ Verificar que el servicio está activo"
+      systemd:
+        name: network-monitor
+        state: started
+        enabled: yes
+
+    - name: "🧪 Test de acceso al dashboard"
+      uri:
+        url: "http://localhost:{{ monitor_port }}/"
+        status_code: 200
+      retries: 5
+      delay: 2
+      register: monitor_test
+
+    - name: "📊 Mostrar información de acceso"
+      debug:
+        msg: |
+          ✅ Network Monitor instalado exitosamente!
+          
+          🌐 Acceso Web: http://debian-router:{{ monitor_port }}
+                        http://2025:db8:101::1:{{ monitor_port }}
+          
+          📋 Ver logs:
+             - tail -f /var/log/network-monitor/app.log
+             - journalctl -u network-monitor -f
+          
+          🔍 Red monitorizada: 2025:db8:101::/64
+          📡 Interfaz: ens192
+          
+          ⚡ Características:
+             ✓ Detección automática de dispositivos
+             ✓ Conexión SSH integrada
+             ✓ Visualización en tiempo real
+             ✓ Estadísticas de tráfico
+             ✓ Exportación JSON

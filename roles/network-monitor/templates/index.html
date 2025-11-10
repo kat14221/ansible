@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🖥️ Network Monitor - VMWARE-101001</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark sticky-top">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-router"></i> Network Monitor Dashboard
+            </span>
+            <span class="navbar-text text-light" id="status-badge">
+                <span class="badge bg-secondary">Cargando...</span>
+            </span>
+        </div>
+    </nav>
+
+    <div class="container-fluid p-4">
+        <!-- Sección de Controles -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <button class="btn btn-primary" id="btn-scan" type="button">
+                        <i class="bi bi-arrow-repeat"></i> Escanear Red
+                    </button>
+                    <button class="btn btn-success" id="btn-refresh" type="button">
+                        <i class="bi bi-bootstrap-reboot"></i> Auto Refresh (OFF)
+                    </button>
+                    <button class="btn btn-info" id="btn-export" type="button">
+                        <i class="bi bi-download"></i> Exportar JSON
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="search-box" placeholder="Buscar dispositivo...">
+                    <button class="btn btn-outline-secondary" type="button" id="btn-clear-search">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards de Estadísticas -->
+        <div class="row mb-4" id="stats-row">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-wifi"></i> Total Dispositivos
+                        </h5>
+                        <p class="card-text fs-3" id="stat-total">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-check-circle"></i> En Línea
+                        </h5>
+                        <p class="card-text fs-3" id="stat-online">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-x-circle"></i> Fuera de Línea
+                        </h5>
+                        <p class="card-text fs-3" id="stat-offline">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-cpu"></i> Última Actualización
+                        </h5>
+                        <p class="card-text small" id="stat-updated">--:--:--</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de Dispositivos -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-check"></i> Dispositivos en la Red
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="devices-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th><i class="bi bi-hash"></i></th>
+                                        <th>Hostname</th>
+                                        <th>Dirección IPv6</th>
+                                        <th>MAC</th>
+                                        <th>S.O.</th>
+                                        <th>Latencia</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="devices-tbody">
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted py-4">
+                                            <i class="bi bi-hourglass-split"></i> Presiona "Escanear Red" para comenzar
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de SSH -->
+    <div class="modal fade" id="sshModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-terminal"></i> Conexión SSH
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Dispositivo:</label>
+                        <p class="form-control-plaintext" id="ssh-device">--</p>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Usuario:</label>
+                        <input type="text" class="form-control" id="ssh-user" value="ansible">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Comando SSH:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="ssh-command" readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="btn-copy-ssh">
+                                <i class="bi bi-clipboard"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Instrucciones:</strong> Copia el comando SSH y ejecuta en tu terminal local.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalles -->
+    <div class="modal fade" id="detailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-info-circle"></i> Detalles del Dispositivo
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="details-body">
+                    <!-- Cargado dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast de Notificaciones -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="notification-toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto" id="toast-title">Notificación</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toast-message">
+                --
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

@@ -60,12 +60,16 @@
 ### **🔀 Switch 3 (switch-3)**
 - **Tipo:** Cisco IOS Switch (físico)
 - **Hostname:** SWITCH-3
-- **IP Gestión:** `192.168.1.3` (⚠️ ajustar según tu configuración real)
-- **Función:** Puente entre physical-router G0/0/1 y ESXi
+- **Función:** **PUENTE TRANSPARENTE** (bridge)
+  - ⚠️ **Sin configuración IPv6** - solo conecta físicamente
+  - G0/0/1 (uplink) ↔ G0/2 (downlink a ESXi)
 - **Puertos:**
-  - **G0/1:** Uplink a physical-router G0/0/1
-  - **G0/2:** Downlink a ESXi
-- **Acceso:** `network_cli` (Cisco IOS)
+  - **G0/1:** Uplink a physical-router G0/0/1 (recibe tráfico)
+  - **G0/2:** Downlink a ESXi (distribuye a Red Fernandez)
+- **Configuración Mínima:**
+  - Spanning Tree habilitado
+  - Sin VLAN en estos puertos (trunk mode)
+  - ⚠️ **Sin IP IPv6 asignada**
 
 ---
 
