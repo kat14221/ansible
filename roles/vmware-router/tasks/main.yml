@@ -1,6 +1,7 @@
 ---
 # Role: vmware-router
 # Descripción: Crear y aprovisionar VM Debian Router en ESXi con configuración IPv6
+# Datos vienen directamente de inventory/hosts.yml -> debian-router
 
 - name: Verificar conectividad con ESXi
   community.vmware.vmware_host_facts:
@@ -11,14 +12,6 @@
   register: esxi_facts
   delegate_to: localhost
 
-- name: Asegurar variables de VM (tomar desde hostvars 'debian-router' si no están definidas)
-  set_fact:
-    vm_name: "{{ vm_name | default(hostvars['debian-router']['vm_name'] | default('vm-debian-router')) }}"
-    vm_folder: "{{ vm_folder | default(hostvars['debian-router']['vm_folder'] | default('/vm')) }}"
-    cdrom: "{{ cdrom | default(hostvars['debian-router']['cdrom'] | default('')) }}"
-    networks: "{{ networks | default(hostvars['debian-router']['networks'] | default([])) }}"
-  delegate_to: localhost
-
 - name: Verificar si la VM ya existe
   community.vmware.vmware_guest_info:
     hostname: "{{ hostvars['esxi-vmware-host']['vcenter_hostname'] }}"
@@ -26,11 +19,10 @@
     password: "{{ hostvars['esxi-vmware-host']['vcenter_password'] }}"
     validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
     datacenter: "{{ hostvars['esxi-vmware-host']['datacenter'] }}"
-    name: "{{ vm_name }}"
+    name: "{{ hostvars['debian-router']['vm_name'] }}"
   register: vm_info
   failed_when: false
   delegate_to: localhost
-
 
 - name: Marcar existencia de VM
   set_fact:
@@ -43,11 +35,11 @@
     password: "{{ hostvars['esxi-vmware-host']['vcenter_password'] }}"
     validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
     datacenter: "{{ hostvars['esxi-vmware-host']['datacenter'] }}"
-    name: "{{ vm_name }}"
+    name: "{{ hostvars['debian-router']['vm_name'] }}"
     state: present
-    folder: "{{ vm_folder }}"
+    folder: "{{ hostvars['debian-router']['vm_folder'] }}"
     datastore: "{{ hostvars['esxi-vmware-host']['datastore'] }}"
-    guest_id: "{{ guest_id | default('debian11_64Guest') }}"
+    guest_id: "debian11_64Guest"
     hardware:
       memory_mb: 1024
       num_cpus: 1
@@ -59,11 +51,11 @@
       - controller_number: 0
         controller_type: ide
         type: iso
-        iso_path: "{{ cdrom }}"
+        iso_path: "{{ hostvars['debian-router']['cdrom'] }}"
         state: present
         unit_number: 0
     networks:
-      - name: "{{ networks[0].name }}"
+      - name: "{{ hostvars['debian-router']['networks'][0].name }}"
     force: yes
   when: not vm_exists | default(false)
   delegate_to: localhost
@@ -75,15 +67,15 @@
     username: "{{ hostvars['esxi-vmware-host']['vcenter_username'] }}"
     password: "{{ hostvars['esxi-vmware-host']['vcenter_password'] }}"
     validate_certs: "{{ hostvars['esxi-vmware-host']['vcenter_validate_certs'] }}"
-    name: "{{ vm_name }}"
+    name: "{{ hostvars['debian-router']['vm_name'] }}"
     state: poweredon
   delegate_to: localhost
 
 - name: Resumen de creación/reuso
   debug:
     msg:
-      - "VM {{ vm_name }} {{ 'reutilizada' if vm_exists | default(false) else 'creada' }}"
+      - "VM {{ hostvars['debian-router']['vm_name'] }} {{ 'reutilizada' if vm_exists | default(false) else 'creada' }}"
       - "Estado: Encendida para instalación desde ISO"
-      - "ISO: {{ cdrom }}"
+      - "ISO: {{ hostvars['debian-router']['cdrom'] }}"
       - "NOTA: La instalación del SO debe completarse manualmente"
-      - "Después de instalar, configurar IPv6: {{ networks[0].ipv6_address }}/{{ networks[0].ipv6_prefix }}"
+      - "Red: {{ hostvars['debian-router']['networks'][0].name }}"
