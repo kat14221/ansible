@@ -1,0 +1,11 @@
+---
+# Valores por defecto para el rol vmware-windows
+# Estos se pueden sobrescribir en el inventario o en vars
+
+vm_name: "vm-windows-pc"
+vm_folder: "/vm"
+cdrom: "[datastore1] W-11/Win11_25H2_Spanish_Mexico_x64.iso"
+guest_id: "windows11_64Guest"
+
+networks:
+  - name: "Red Fernandez"

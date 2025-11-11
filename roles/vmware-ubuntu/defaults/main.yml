@@ -1,0 +1,11 @@
+---
+# Valores por defecto para el rol vmware-ubuntu
+# Estos se pueden sobrescribir en el inventario o en vars
+
+vm_name: "vm-ubuntu-pc"
+vm_folder: "/vm"
+cdrom: "[datastore1] ubuntu/ubuntu-24.04.2-desktop-amd64.iso"
+guest_id: "ubuntu64Guest"
+
+networks:
+  - name: "Red Fernandez"

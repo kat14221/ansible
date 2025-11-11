@@ -3,27 +3,48 @@
 # Descripción: Automatiza la creación de VMs usando roles existentes
 
 - name: Crear VM Debian Router
-  hosts: esxi
+  hosts: debian_router
   gather_facts: no
   tasks:
     - name: Crear VM Router Debian
       include_role:
         name: vmware-router
-      when: inventory_hostname == "esxi-vmware-host"
+      vars:
+        vm_name: "{{ vm_name }}"
+        vm_folder: "{{ vm_folder }}"
+        cdrom: "{{ cdrom }}"
+        networks: "{{ networks }}"
+      delegate_to: localhost
+      become: false
+      when: "'debian-router' in group_names"
 
 - name: Crear VMs de Usuario
-  hosts: esxi
+  hosts: vm_hosts
   gather_facts: no
   tasks:
     - name: Crear VM Ubuntu PC
       include_role:
         name: vmware-ubuntu
-      when: inventory_hostname == "esxi-vmware-host"
+      vars:
+        vm_name: "{{ vm_name }}"
+        vm_folder: "{{ vm_folder }}"
+        cdrom: "{{ cdrom }}"
+        networks: "{{ networks }}"
+      delegate_to: localhost
+      become: false
+      when: inventory_hostname == "ubuntu-pc"
 
     - name: Crear VM Windows PC
       include_role:
         name: vmware-windows
-      when: inventory_hostname == "esxi-vmware-host"
+      vars:
+        vm_name: "{{ vm_name }}"
+        vm_folder: "{{ vm_folder }}"
+        cdrom: "{{ cdrom }}"
+        networks: "{{ networks }}"
+      delegate_to: localhost
+      become: false
+      when: inventory_hostname == "windows-pc"
 
 - name: Mostrar Resumen de Creación
   hosts: localhost
