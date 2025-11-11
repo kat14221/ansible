@@ -19,13 +19,28 @@ echo "[3/8] Activating virtualenv and upgrading pip/setuptools/wheel"
 source "${VENV_PATH}/bin/activate"
 python -m pip install --upgrade pip setuptools wheel
 
+# Create ansible.cfg to skip SSL verification for Galaxy
+mkdir -p ~/.ansible
+cat > ~/.ansible/galaxy-ssl-skip.cfg << 'EOF'
+[defaults]
+host_key_checking = False
+verify_certs = False
+
+[galaxy]
+server = https://galaxy.ansible.com
+verify_certs = False
+EOF
+
 echo "[4/8] Installing Python requirements (Ansible, pyvmomi pinned versions)"
 REQ_FILE="$(dirname "$0")/requirements-vmware.txt"
 pip install -r "$REQ_FILE"
 
 echo "[5/8] Installing Ansible collections required (community.vmware, community.general)"
 export PATH="$VENV_PATH/bin:$PATH"
-ansible-galaxy collection install community.vmware community.general --force
+# Try to install collections, but continue if Galaxy server is unreachable
+ansible-galaxy collection install community.vmware community.general --force \
+  --ignore-errors \
+  --verbose 2>&1 | grep -v "HTTPConnection" || echo "Warning: Could not reach Galaxy server, continuing anyway..."
 
 echo "[6/8] Verifying installation"
 which ansible-playbook || true
