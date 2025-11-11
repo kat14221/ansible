@@ -37,17 +37,27 @@ pip install -r "$REQ_FILE"
 
 echo "[5/8] Installing Ansible collections required (community.vmware, community.general)"
 export PATH="$VENV_PATH/bin:$PATH"
-# Try to install collections, but continue if Galaxy server is unreachable
-ansible-galaxy collection install community.vmware community.general --force \
-  --ignore-errors \
-  --verbose 2>&1 | grep -v "HTTPConnection" || echo "Warning: Could not reach Galaxy server, continuing anyway..."
+export ANSIBLE_CONFIG="$HOME/.ansible/ansible.cfg"
+
+# Try to install collections with multiple fallback options
+echo "Attempting to install collections..."
+if ansible-galaxy collection install community.vmware community.general --force 2>/dev/null; then
+    echo "✓ Collections installed successfully"
+else
+    echo "⚠ Could not install collections from Galaxy, they may be missing"
+    echo "  You can install them later manually with:"
+    echo "  ansible-galaxy collection install community.vmware community.general"
+fi
 
 echo "[6/8] Verifying installation"
 which ansible-playbook || true
 ansible-playbook --version || true
 python - <<'PY'
-import pyVmomi
-print('pyvmomi version:', pyVmomi.__version__)
+try:
+    import pyVmomi
+    print('✓ pyvmomi imported successfully')
+except Exception as e:
+    print(f'✗ Error importing pyvmomi: {e}')
 PY
 
 echo "[7/8] Ensure evidence log dir exists (optional)"
