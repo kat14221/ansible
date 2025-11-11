@@ -12,20 +12,18 @@
       when: inventory_hostname == "esxi-vmware-host"
 
 - name: Crear VMs de Usuario
-  hosts: vm_hosts
+  hosts: esxi
   gather_facts: no
   tasks:
     - name: Crear VM Ubuntu PC
       include_role:
         name: vmware-ubuntu
-      when: inventory_hostname == "ubuntu-pc"
-      delegate_to: esxi-vmware-host
+      when: inventory_hostname == "esxi-vmware-host"
 
     - name: Crear VM Windows PC
       include_role:
         name: vmware-windows
-      when: inventory_hostname == "windows-pc"
-      delegate_to: esxi-vmware-host
+      when: inventory_hostname == "esxi-vmware-host"
 
 - name: Mostrar Resumen de Creación
   hosts: localhost
