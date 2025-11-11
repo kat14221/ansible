@@ -5,45 +5,42 @@
 - name: Crear VM Debian Router
   hosts: debian_router
   gather_facts: no
+  connection: local
   tasks:
+    - name: Debug - Mostrar variables
+      debug:
+        msg:
+          - "vm_name: {{ vm_name }}"
+          - "vm_folder: {{ vm_folder }}"
+          - "cdrom: {{ cdrom }}"
+          - "networks: {{ networks }}"
+
     - name: Crear VM Router Debian
       include_role:
         name: vmware-router
-      vars:
-        vm_name: "{{ vm_name }}"
-        vm_folder: "{{ vm_folder }}"
-        cdrom: "{{ cdrom }}"
-        networks: "{{ networks }}"
-      delegate_to: localhost
-      become: false
-      when: "'debian-router' in group_names"
 
 - name: Crear VMs de Usuario
   hosts: vm_hosts
   gather_facts: no
+  connection: local
   tasks:
+    - name: Debug - Mostrar variables
+      debug:
+        msg:
+          - "hostname: {{ inventory_hostname }}"
+          - "vm_name: {{ vm_name }}"
+          - "vm_folder: {{ vm_folder }}"
+          - "cdrom: {{ cdrom }}"
+          - "networks: {{ networks }}"
+
     - name: Crear VM Ubuntu PC
       include_role:
         name: vmware-ubuntu
-      vars:
-        vm_name: "{{ vm_name }}"
-        vm_folder: "{{ vm_folder }}"
-        cdrom: "{{ cdrom }}"
-        networks: "{{ networks }}"
-      delegate_to: localhost
-      become: false
       when: inventory_hostname == "ubuntu-pc"
 
     - name: Crear VM Windows PC
       include_role:
         name: vmware-windows
-      vars:
-        vm_name: "{{ vm_name }}"
-        vm_folder: "{{ vm_folder }}"
-        cdrom: "{{ cdrom }}"
-        networks: "{{ networks }}"
-      delegate_to: localhost
-      become: false
       when: inventory_hostname == "windows-pc"
 
 - name: Mostrar Resumen de Creación
