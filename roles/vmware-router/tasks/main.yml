@@ -23,6 +23,14 @@
   failed_when: false
   delegate_to: localhost
 
+- name: Asegurar variables de VM (tomar desde hostvars 'debian-router' si no están definidas)
+  set_fact:
+    vm_name: "{{ vm_name | default(hostvars['debian-router']['vm_name'] | default('vm-debian-router')) }}"
+    vm_folder: "{{ vm_folder | default(hostvars['debian-router']['vm_folder'] | default('/vm')) }}"
+    cdrom: "{{ cdrom | default(hostvars['debian-router']['cdrom'] | default('')) }}"
+    networks: "{{ networks | default(hostvars['debian-router']['networks'] | default([])) }}"
+  delegate_to: localhost
+
 - name: Marcar existencia de VM
   set_fact:
     vm_exists: "{{ (vm_info is defined) and (vm_info.instance is defined) }}"
