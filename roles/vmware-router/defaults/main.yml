@@ -1,0 +1,12 @@
+---
+# Defaults for vmware-router role
+# These defaults ensure vm_name and related vars exist even if inventory doesn't provide them
+vm_name: "vm-debian-router"
+vm_folder: "/vm"
+cdrom: ""
+networks: []
+guest_id: "debian11_64Guest"
+datastore: "datastore1"
+# sensible default resources
+default_memory_mb: 1024
+default_num_cpus: 1
