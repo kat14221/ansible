@@ -107,8 +107,8 @@
           debug:
             msg: "Servicios validados en {{ inventory_hostname }}"
       when: 
-        - ansible_os_family == "Debian" or ansible_os_family == "RedHat"
-        - inventory_hostname != "localhost"
+        - ansible_os_family is defined
+        - ansible_os_family in ['Debian', 'RedHat']
 
     # ============================================
     # SECCIÓN 4: VALIDACIÓN DE SEGURIDAD
@@ -145,8 +145,8 @@
               - "  ✅ Auditoría de eventos"
               - "  ✅ Hardening de kernel"
       when: 
-        - ansible_os_family == "Debian" or ansible_os_family == "RedHat"
-        - inventory_hostname != "localhost"
+        - ansible_os_family is defined
+        - ansible_os_family in ['Debian', 'RedHat']
 
     # ============================================
     # SECCIÓN 5: ANÁLISIS DE TRÁFICO
@@ -188,8 +188,8 @@
             flat: yes 
           ignore_errors: yes
       when: 
-        - ansible_os_family == "Debian" or ansible_os_family == "RedHat"
-        - inventory_hostname != "localhost"
+        - ansible_os_family is defined
+        - ansible_os_family in ['Debian', 'RedHat']
 
     # ============================================
     # SECCIÓN 6: DOCUMENTACIÓN NIVEL 4
