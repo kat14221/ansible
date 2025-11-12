@@ -1,15 +1,34 @@
 ---
-- name: restart radvd
-  systemd: { name: radvd, state: restarted }
+# Handlers para el rol debian-ipv6-router
 
-- name: restart isc-dhcp-server6
-  systemd: { name: isc-dhcp-server, state: restarted }
-
-- name: restart nftables
-  systemd: { name: nftables, state: restarted }
+- name: apt sources changed
+  apt:
+    update_cache: yes
+  become: yes
+  listen: "apt sources changed"
 
 - name: reload networking (ifupdown2)
   command: ifreload -a
-  register: ifreload_result
-  changed_when: true
-  failed_when: false
+  become: yes
+  listen: "reload networking"
+  # ifupdown2 puede no estar instalado, ifdown/up es menos seguro
+  # en automatización, por lo que ignoramos errores si ifreload falla.
+  ignore_errors: yes
+
+- name: restart radvd
+  systemd:
+    name: radvd
+    state: restarted
+  become: yes
+
+- name: restart isc-dhcp-server6
+  systemd:
+    name: isc-dhcp-server
+    state: restarted
+  become: yes
+
+- name: restart nftables
+  systemd:
+    name: nftables
+    state: restarted
+  become: yes
