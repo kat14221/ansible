@@ -116,11 +116,11 @@ echo 'ansible ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/ansible
 #### 2️⃣ Configuración de red:
 **Interfaz**: enp0s17 (Red Fernandez)
 - Método: SLAAC (IPv6 automático desde Debian Router)
-- IP IPv6 esperada: 2025:db8:101::50/64
+- IP IPv6 esperada: 2025:db8:101:0:817c:729d:c0d5:d036/64
 
 #### 3️⃣ Copiar clave SSH:
 ```bash
-ssh-copy-id ansible@2025:db8:101::50
+ssh-copy-id ansible@2025:db8:101:0:817c:729d:c0d5:d036
 # Contraseña: ansible123
 ```
 
