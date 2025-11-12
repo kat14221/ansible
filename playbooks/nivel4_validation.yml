@@ -146,7 +146,7 @@
               - "  ✅ Hardening de kernel"
       when: 
         - ansible_os_family is defined
-        - ansible_os_family in ['Debian', 'RedHat']
+        - ansible_os_family in ['Debian', 'RedHat', 'Windows']
 
     # ============================================
     # SECCIÓN 5: ANÁLISIS DE TRÁFICO
@@ -189,7 +189,7 @@
           ignore_errors: yes
       when: 
         - ansible_os_family is defined
-        - ansible_os_family in ['Debian', 'RedHat']
+        - ansible_os_family in ['Debian', 'RedHat', 'Windows']
 
     # ============================================
     # SECCIÓN 6: DOCUMENTACIÓN NIVEL 4
@@ -216,11 +216,11 @@
              - Gateway para Red Fernandez
              - Servicios: RADVD, DHCPv6, DNS, Firewall
           
-          5. ubuntu-pc (VM Ubuntu) - DHCP
-             - IPv6: 2025:db8:101::10/64 (SLAAC)
+          5. ubuntu-pc (VM Ubuntu) - SLAAC/DHCP
+             - IPv6: 2025:db8:101::50/64
           
-          6. windows-pc (VM Windows) - DHCP
-             - IPv6: 2025:db8:101::11/64 (SLAAC)
+          6. windows-pc (VM Windows) - SLAAC/DHCP
+             - IPv6: 2025:db8:101::11/64
           
           ## Subredes IPv6
           - Red Laboratorio: 2025:db8:100::/64
@@ -300,9 +300,9 @@
           - "🌐 Red Laboratorio: 2025:db8:100::/64"
           - ""
           - "🔍 Comandos útiles:"
-          - "   ping6 2025:db8:101::10     # Test ubuntu-pc"
+          - "   ping6 2025:db8:101::50     # Test ubuntu-pc"
           - "   ssh ansible@2025:db8:101::1  # Acceso a router"
-          - "   mtr -6 2025:db8:101::10    # Análisis de ruta"
+          - "   mtr -6 2025:db8:101::50    # Análisis de ruta"
           - ""
           - "════════════════════════════════════════════════════════"
       run_once: yes
