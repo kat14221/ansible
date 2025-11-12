@@ -242,6 +242,7 @@
 - name: Install required packages (RA/DHCPv6/Firewall/Tools)
   apt:
     name:
+      - ifupdown2
       - radvd
       - isc-dhcp-server
       - nftables
