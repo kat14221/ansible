@@ -217,10 +217,10 @@
              - Servicios: RADVD, DHCPv6, DNS, Firewall
           
           5. ubuntu-pc (VM Ubuntu) - SLAAC/DHCP
-             - IPv6: 2025:db8:101::50/64
+             - IPv6: 2025:db8:101:0:817c:729d:c0d5:d036/64
           
           6. windows-pc (VM Windows) - SLAAC/DHCP
-             - IPv6: 2025:db8:101::11/64
+             - IPv6: 2025:db8:101:0:7a50:35f0:56b3:2743/64
           
           ## Subredes IPv6
           - Red Laboratorio: 2025:db8:100::/64
@@ -300,9 +300,9 @@
           - "🌐 Red Laboratorio: 2025:db8:100::/64"
           - ""
           - "🔍 Comandos útiles:"
-          - "   ping6 2025:db8:101::50     # Test ubuntu-pc"
+          - "   ping6 2025:db8:101:0:817c:729d:c0d5:d036     # Test ubuntu-pc"
           - "   ssh ansible@2025:db8:101::1  # Acceso a router"
-          - "   mtr -6 2025:db8:101::50    # Análisis de ruta"
+          - "   mtr -6 2025:db8:101:0:817c:729d:c0d5:d036    # Análisis de ruta"
           - ""
           - "════════════════════════════════════════════════════════"
       run_once: yes
