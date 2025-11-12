@@ -314,8 +314,10 @@
   command: ip -6 route add {{ item.network }} via {{ item.via }} dev {{ item.dev | default(lan_interface) }}
   loop: "{{ static_routes | default([]) }}"
   register: route_add_results
-  failed_when: false
-  changed_when: item.rc == 0
+  # No falla si la ruta ya existe, pero sí por otros errores.
+  failed_when: route_add_results.rc != 0 and 'File exists' not in route_add_results.stderr
+  # Se considera un cambio solo si el comando se ejecuta con éxito (rc=0).
+  changed_when: route_add_results.rc == 0
   become: yes
 
 # =========================
