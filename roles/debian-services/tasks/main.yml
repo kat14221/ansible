@@ -44,10 +44,9 @@
                   <h3>📋 Información del Sistema</h3>
                   <ul>
                       <li><strong>Host:</strong> {{ inventory_hostname }}</li>
-                      <li><strong>Dirección IPv6 LAN:</strong> <code>2025:db8:220::1/64</code></li>
-                      <li><strong>Dirección IPv6 Uplink:</strong> <code>2025:db8:101::a1/64</code></li>
-                      <li><strong>Backbone:</strong> <code>2025:db8:101::/64</code></li>
-                      <li><strong>Subred LAN:</strong> <code>2025:db8:220::/64</code></li>
+                      <li><strong>Dirección IPv6 LAN:</strong> <code>{{ lan_ipv6_address }}/{{ lan_ipv6_prefix }}</code></li>
+                      <li><strong>Interfaz WAN:</strong> <code>{{ wan_interface }}</code></li>
+                      <li><strong>Subred LAN (radvd):</strong> <code>{{ radvd_prefix }}</code></li>
                       <li><strong>Configuración:</strong> SLAAC/DHCPv6 con RADVD</li>
                   </ul>
               </div>
@@ -64,10 +63,8 @@
               
               <div class="info">
                   <h3>🌐 Conectividad</h3>
-                  <p>Acceso desde cualquier host en la LAN 2025:db8:220::/64:</p>
-                  <code>http://[2025:db8:220::1]</code>
-                  <p>Acceso desde el backbone:</p>
-                  <code>http://[2025:db8:101::a1]</code>
+                  <p>Acceso desde cualquier host en la LAN:</p>
+                  <code>http://[{{ lan_ipv6_address }}]</code>
               </div>
               
               <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666;">
@@ -178,15 +175,13 @@
       ================================================
       
       Información del Sistema:
-      - IPv6 LAN: 2025:db8:220::1/64
-      - IPv6 Uplink: 2025:db8:101::a1/64
-      - Backbone: 2025:db8:101::/64
+      - IPv6 LAN: {{ lan_ipv6_address }}/{{ lan_ipv6_prefix }}
+      - Subred LAN (radvd): {{ radvd_prefix }}
       
       Acceso FTP:
       - Usuario: ftpuser
       - Password: ftppass123
-      - Desde LAN: ftp://[2025:db8:220::1]
-      - Desde backbone: ftp://[2025:db8:101::a1]
+      - Desde LAN: ftp://[{{ lan_ipv6_address }}]
       
       Configurado con Ansible - {{ ansible_date_time.iso8601 }}
     dest: /home/ftpuser/public/README.txt
@@ -229,8 +224,7 @@
       - Modo Pasivo: Puertos 10000-10100
       
       Acceso:
-      - Desde LAN: ftp://[2025:db8:220::1]
-      - Desde backbone: ftp://[2025:db8:101::a1]
+      - Desde LAN: ftp://[{{ lan_ipv6_address }}]
     dest: "evidence/services/{{ inventory_hostname }}_ftp_service.txt"
   delegate_to: localhost
 
@@ -240,10 +234,6 @@
       - "=== Servicios Desplegados ==="
       - "HTTP Estado: {{ 'Running' if apache_status.rc == 0 else 'Failed' }}"
       - "FTP Estado: {{ 'Running' if vsftpd_status.rc == 0 else 'Failed' }}"
-      - "HTTP Acceso: http://{{ ansible_host }}"
-      - "HTTP Desde LAN: http://[2025:db8:220::1]"
-      - "HTTP Desde backbone: http://[2025:db8:101::a1]"
-      - "FTP Acceso: ftp://{{ ansible_host }}"
-      - "FTP Desde LAN: ftp://[2025:db8:220::1]"
-      - "FTP Desde backbone: ftp://[2025:db8:101::a1]"
+      - "HTTP Acceso (LAN): http://[{{ lan_ipv6_address }}]"
+      - "FTP Acceso (LAN): ftp://[{{ lan_ipv6_address }}]"
       - "FTP Usuario: ftpuser / ftppass123"

@@ -1,13 +1,10 @@
 ---
 # Variables específicas para dispositivos de red
 # Estas variables se cargan automáticamente para el grupo network_devices
-
-# Credenciales Cisco IOS (temporalmente directas)
-ansible_user: "ansible"
-ansible_password: "Ansible123!"
-cisco_enable_secret: "Ansible123!"
+# Las credenciales se heredan de group_vars/all y se gestionan con Vault.
 
 # Configuración de conexión network_cli
+# (ansible_user y ansible_password se heredan de group_vars/all)
 ansible_connection: network_cli
 ansible_network_os: ios
 ansible_become: yes
