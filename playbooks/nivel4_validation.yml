@@ -185,7 +185,7 @@
           fetch:
             src: "/tmp/net_stats_{{ inventory_hostname }}.txt"
             dest: "{{ evidence_dir }}/{{ inventory_hostname }}_network_stats.txt"
-            flat: yes
+            flat: yes 
           ignore_errors: yes
       when: 
         - ansible_os_family == "Debian" or ansible_os_family == "RedHat"
