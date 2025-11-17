@@ -82,6 +82,7 @@ case "${1:-help}" in
     if [ ! -f ~/.ssh/id_rsa_ansible ]; then
       echo -e "${YELLOW}🔑 Generando clave SSH...${NC}"
       ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_ansible -N "" -C "ansible@control"
+      echo -e "${GREEN}✅ Clave SSH generada en ~/.ssh/id_rsa_ansible${NC}"
     fi
     
     SSH_PUBLIC_KEY=$(cat ~/.ssh/id_rsa_ansible.pub)

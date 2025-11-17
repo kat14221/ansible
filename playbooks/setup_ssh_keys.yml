@@ -1,0 +1,23 @@
+---
+# Playbook: Configurar Claves SSH en Clientes
+# Descripción: Se conecta usando contraseña para instalar la clave SSH pública
+#              y permitir futuras conexiones sin contraseña.
+#
+# USO: ansible-playbook playbooks/setup_ssh_keys.yml --ask-pass
+
+- name: Instalar Clave SSH en Cliente Ubuntu
+  hosts: ubuntu-pc
+  gather_facts: no
+  become: yes
+
+  tasks:
+    - name: Asegurar que el usuario ansible existe
+      user:
+        name: ansible
+        state: present
+
+    - name: Instalar la clave SSH pública para el usuario ansible
+      ansible.posix.authorized_key:
+        user: ansible
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa_ansible.pub') }}"
