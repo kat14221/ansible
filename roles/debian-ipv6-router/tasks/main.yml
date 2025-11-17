@@ -181,7 +181,6 @@
       - net-tools
       - iproute2
       - curl
-      - apache2
       - vsftpd
       - bind9-dnsutils
       - resolvconf
@@ -301,16 +300,6 @@
   tags:
     - ssh
 
-- name: Force restart apache2 to ensure it binds correctly
-  systemd:
-    name: apache2
-    state: restarted
-    daemon_reload: yes
-  become: yes
-  # Esta tarea es crucial para recuperarse si apt falló al iniciar apache2
-  # la primera vez, antes de que la red estuviera completamente configurada.
-  ignore_errors: yes # Ignoramos errores si el servicio no existía o ya estaba parado.
-
 - name: Ensure services enabled and started
   systemd:
     name: "{{ item }}"
@@ -320,7 +309,6 @@
     - radvd
     - isc-dhcp-server
     - nftables
-    - apache2
   become: yes
 
 # =========================
