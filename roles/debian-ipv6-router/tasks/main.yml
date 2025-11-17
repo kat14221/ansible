@@ -226,6 +226,14 @@
   notify: reload networking (ifupdown2)
   become: yes
 
+- name: Forzar activación de la interfaz LAN para asegurar la ruta
+  command: ifup {{ lan_interface }}
+  register: ifup_lan_result
+  # No fallar si la interfaz ya está configurada
+  failed_when: "ifup_lan_result.rc != 0 and 'already configured' not in ifup_lan_result.stderr"
+  changed_when: ifup_lan_result.rc == 0
+  become: yes
+
 - name: Ensure IPv6 assigned on {{ lan_interface }} (runtime)
   shell: |
     ip -6 addr show {{ lan_interface }} | grep -qw '{{ lan_ipv6_address }}' || ip -6 addr add {{ lan_ipv6_address }}/{{ lan_ipv6_prefix }} dev {{ lan_interface }}
