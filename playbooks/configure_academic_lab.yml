@@ -2,14 +2,14 @@
 # Playbook: Configuración Completa del Laboratorio Académico
 # Descripción: Configura DHCPv6 con IPs cortas, usuarios académicos y red P2P.
 
-- name: Configurar Gateway con DHCPv6 (IPs Cortas)
+- name: Configurar Debian Router como Gateway IPv6
   hosts: debian_router
   become: yes
   gather_facts: yes
   tasks:
-    - name: Aplicar configuración de gateway con IPs cortas
+    - name: Aplicar rol de configuración del router
       include_role:
-        name: debian-ipv6-gateway
+        name: debian-ipv6-router
       tags: gateway
 
 - name: Crear Usuarios Académicos
