@@ -22,8 +22,8 @@
       apt:
         name: openssh-server
         state: present
-        update_cache: yes
       become: yes
+      notify: start and enable ssh
       tags: users, client
 
     - name: Crear usuarios académicos en cliente (primero para asegurar conectividad)
@@ -68,6 +68,13 @@
   handlers:
     - name: apply netplan
       command: netplan apply
+      become: yes
+
+    - name: start and enable ssh
+      systemd:
+        name: ssh
+        state: started
+        enabled: yes
       become: yes
 
 - name: Resumen de Configuración
