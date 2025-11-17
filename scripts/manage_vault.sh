@@ -100,10 +100,12 @@ vault_ansible_ssh_public_key: |\\
   $SSH_PUBLIC_KEY" "$VAULT_FILE"
     
     echo -e "${YELLOW}🔒 Cifrando vault...${NC}"
-    echo "$vault_pass" | ansible-vault encrypt "$VAULT_FILE" --vault-password-file=/dev/stdin
-    
+    # Crear primero el archivo de contraseña para que ansible.cfg lo encuentre
     echo "$vault_pass" > .vault_pass
     chmod 600 .vault_pass
+    
+    # Ahora cifrar. Ansible usará .vault_pass automáticamente.
+    ansible-vault encrypt "$VAULT_FILE"
     
     echo ""
     echo -e "${GREEN}✅ Vault creado y cifrado exitosamente${NC}"
