@@ -32,69 +32,13 @@ case "${1:-help}" in
       rm -f "$VAULT_FILE" .vault_pass
     fi
     
-    if [ ! -f "$VAULT_TEMPLATE" ]; then
-      echo -e "${RED}❌ Error: No se encuentra la plantilla $VAULT_TEMPLATE.${NC}"
-      exit 1
-    fi
-    
-    # Copiar template
     cp "$VAULT_TEMPLATE" "$VAULT_FILE"
     
     echo ""
-    echo -e "${BLUE}📝 Por favor, introduce las credenciales:${NC}"
-    echo ""
-    
-    # Solicitar credenciales
-    read -p "Introduce la IP de tu ESXi/vCenter [172.17.25.1]: " vcenter_ip
-    vcenter_ip=${vcenter_ip:-172.17.25.1}
-    
-    read -p "Introduce el usuario de vCenter [root]: " vcenter_user
-    vcenter_user=${vcenter_user:-root}
-    
-    read -s -p "Introduce la contraseña de vCenter: " vcenter_pass
-    echo ""
-    
-    read -p "Introduce el usuario para dispositivos Cisco IOS [ansible]: " cisco_user
-    cisco_user=${cisco_user:-ansible}
-    
-    read -s -p "Introduce la contraseña para dispositivos Cisco IOS: " cisco_pass
-    echo ""
-    
-    read -s -p "Crea una contraseña para el Vault (mínimo 8 caracteres): " vault_pass
-    echo ""
-    
-    read -s -p "Confirma la contraseña del Vault: " vault_pass_confirm
-    echo ""
-    
-    if [ "$vault_pass" != "$vault_pass_confirm" ]; then
-      echo -e "${RED}❌ Error: Las contraseñas no coinciden.${NC}"
-      rm -f "$VAULT_FILE"
-      exit 1
-    fi
-    
-    if [ ${#vault_pass} -lt 8 ]; then
-      echo -e "${RED}❌ Error: La contraseña debe tener al menos 8 caracteres.${NC}"
-      rm -f "$VAULT_FILE"
-      exit 1
-    fi
-    
-    # Generar clave SSH si no existe
-    if [ ! -f ~/.ssh/id_rsa_ansible ]; then
-      echo -e "${YELLOW}🔑 No se encontró una clave SSH. Generando una nueva...${NC}"
-      ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_ansible -N "" -C "ansible@control"
-      echo -e "${GREEN}✅ Clave SSH generada exitosamente en ~/.ssh/id_rsa_ansible${NC}"
-    fi
-    
-    SSH_PUBLIC_KEY=$(cat ~/.ssh/id_rsa_ansible.pub)
-    
-    # Actualizar vault con credenciales reales (usando | como delimitador para evitar conflictos con /)
-    sed -i "s|vault_vcenter_hostname: \".*\"|vault_vcenter_hostname: \"$vcenter_ip\"|g" "$VAULT_FILE"
-    sed -i "s|vault_vcenter_username: \".*\"|vault_vcenter_username: \"$vcenter_user\"|g" "$VAULT_FILE"
-    sed -i "s|vault_vcenter_password: \".*\"|vault_vcenter_password: \"$vcenter_pass\"|g" "$VAULT_FILE"
-    sed -i "s|vault_cisco_user: \".*\"|vault_cisco_user: \"$cisco_user\"|g" "$VAULT_FILE"
-    sed -i "s|vault_cisco_password: \".*\"|vault_cisco_password: \"$cisco_pass\"|g" "$VAULT_FILE"
-    sed -i "s|vault_cisco_enable_secret: \".*\"|vault_cisco_enable_secret: \"$cisco_pass\"|g" "$VAULT_FILE"
-    sed -i "/^vault_ansible_ssh_public_key:/,/REEMPLAZAR/c\vault_ansible_ssh_public_key: |\n  $SSH_PUBLIC_KEY" "$VAULT_FILE"
+    echo -e "${YELLOW}📝 Se ha copiado la plantilla. Por favor, revisa y edita el archivo con tus credenciales.${NC}"
+    echo "El editor de texto se abrirá ahora..."
+    sleep 2
+    ${EDITOR:-nano} "$VAULT_FILE"
     
     echo -e "${YELLOW}🔒 Cifrando el archivo vault...${NC}"
     # Crear primero el archivo de contraseña para que ansible.cfg lo encuentre
