@@ -113,14 +113,14 @@
     state: started
   become: yes
 
-- name: "📡 Network Monitor - Crear entrada firewall"
-  firewalld:
-    port: 5000/tcp
-    permanent: yes
-    state: enabled
-    zone: internal
+- name: "📡 Network Monitor - Permitir puerto 5000 en nftables"
+  lineinfile:
+    path: /etc/nftables.conf
+    regexp: '^\s*# MONITOR-APP-ANCHOR'
+    line: '		tcp dport 5000 accept # Permitir acceso al Network Monitor'
+    insertafter: '^\s*# MONITOR-APP-ANCHOR'
   become: yes
-  when: ansible_facts.packages | selectattr('name', 'match', 'firewalld') | list | length > 0
+  notify: reload nftables
 
 - name: "📡 Network Monitor - Verificar que la aplicación está corriendo"
   uri:
