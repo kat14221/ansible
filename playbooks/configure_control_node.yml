@@ -10,22 +10,17 @@
   connection: local
   become: yes
 
+  vars:
+    # Definimos aquí las IPs finales para que sea fácil de mantener
+    debian_router_ip: "2025:db8:101::1"
+    ubuntu_pc_ip: "2025:db8:101::10"
+
   tasks:
-    - name: Asegurar que systemd-resolved está configurado para usar el DNS del laboratorio
-      lineinfile:
-        path: /etc/systemd/resolved.conf
-        regexp: '^DNS='
-        line: "DNS=172.17.25.122" # IP de gestión del debian-router
-        create: yes
-        mode: '0644'
-
-    - name: Añadir dominio de búsqueda del laboratorio
-      lineinfile:
-        path: /etc/systemd/resolved.conf
-        regexp: '^Domains='
-        line: "Domains=~lab.local"
-
-    - name: Reiniciar systemd-resolved para aplicar los cambios
-      systemd:
-        name: systemd-resolved
-        state: restarted
+    - name: Añadir hosts del laboratorio al archivo /etc/hosts
+      blockinfile:
+        path: /etc/hosts
+        block: |
+          # --- Laboratorio Académico Ansible ---
+          {{ debian_router_ip }} debian-router
+          {{ ubuntu_pc_ip }}   ubuntu-pc
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - LAB"
