@@ -45,6 +45,12 @@
       notify: apply netplan
       tags: client
 
+    - name: Reiniciar interfaz de red para aplicar configuración DHCP
+      command: ifdown ens192 && ifup ens192
+      register: if_restart_result
+      failed_when: "if_restart_result.rc != 0 and 'already configured' not in if_restart_result.stderr"
+      changed_when: if_restart_result.rc == 0
+
     - name: Crear usuarios académicos en cliente
       include_role:
         name: academic-users
