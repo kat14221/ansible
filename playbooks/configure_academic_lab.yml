@@ -6,13 +6,11 @@
   hosts: debian_router
   become: yes
   gather_facts: yes
-  
   tasks:
     - name: Aplicar rol de configuración del router
       include_role:
         name: debian-ipv6-router
       tags: gateway
-
     - name: Incluir rol para crear usuarios académicos
       include_role:
         name: academic-users
