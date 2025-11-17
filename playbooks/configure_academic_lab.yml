@@ -11,10 +11,6 @@
       include_role:
         name: debian-ipv6-router
       tags: gateway
-    - name: Incluir rol para crear usuarios académicos
-      include_role:
-        name: academic-users
-      tags: users
 
 - name: Configurar Cliente Ubuntu
   hosts: ubuntu-pc
