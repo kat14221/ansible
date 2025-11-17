@@ -290,6 +290,17 @@
   notify: reload nftables
   become: yes
 
+- name: Permitir TCP Forwarding para conexiones Jump Host
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?AllowTcpForwarding'
+    line: 'AllowTcpForwarding yes'
+    state: present
+  notify: restart sshd
+  become: yes
+  tags:
+    - ssh
+
 - name: Ensure services enabled and started
   systemd:
     name: "{{ item }}"
