@@ -15,6 +15,10 @@
 # Compatible con ESXi 8.0 U2, sin deprecation warnings
 pyvmomi==8.0.3.0.1
 
+# WinRM for Windows Management
+# Permite a Ansible comunicarse con hosts Windows
+pywinrm>=0.4.1
+
 # Ansible SSH Performance (opcional pero recomendado)
 # Mejora significativamente el rendimiento de conexiones SSH
 ansible-pylibssh>=1.1.0
