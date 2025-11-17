@@ -1,19 +1,12 @@
 ---
-# Handlers para el rol debian-ipv6-router
-
-- name: apt sources changed
-  apt:
-    update_cache: yes
-  become: yes
-  listen: "apt sources changed"
+# Handlers for debian-ipv6-router
 
 - name: reload networking (ifupdown2)
   command: ifreload -a
+  register: ifreload_result
+  failed_when: "ifreload_result.rc != 0 and 'no changes' not in ifreload_result.stderr"
+  changed_when: ifreload_result.rc == 0
   become: yes
-  listen: "reload networking"
-  # ifupdown2 puede no estar instalado, ifdown/up es menos seguro
-  # en automatización, por lo que ignoramos errores si ifreload falla.
-  ignore_errors: yes
 
 - name: restart radvd
   systemd:
@@ -21,14 +14,8 @@
     state: restarted
   become: yes
 
-- name: restart isc-dhcp-server6
+- name: restart isc-dhcp-server
   systemd:
     name: isc-dhcp-server
-    state: restarted
-  become: yes
-
-- name: restart nftables
-  systemd:
-    name: nftables
     state: restarted
   become: yes

@@ -250,13 +250,6 @@
   # Se considera un cambio solo si el comando se ejecuta con éxito (rc=0).
   changed_when: route_add_results.rc == 0
   become: yes
-  
-- name: Aplicar configuración de red inmediatamente
-  command: ifup -a
-  register: ifup_result
-  failed_when: "ifup_result.rc != 0 and 'already configured' not in ifup_result.stderr"
-  changed_when: ifup_result.rc == 0
-  become: yes
 
 # =========================
 # radvd + isc-dhcp-server6
