@@ -125,10 +125,10 @@ if check_python_package "pyVmomi"; then
   fi
 else
   echo "  ⬇️  Instalando pyvmomi $PYVMOMI_VERSION_REQUIRED..."
-  if pip3 install --break-system-packages "pyvmomi==$PYVMOMI_VERSION_REQUIRED" 2>/dev/null; then
+  if sudo pip3 install --break-system-packages "pyvmomi==$PYVMOMI_VERSION_REQUIRED"; then
     echo "  ✅ pyvmomi instalado con --break-system-packages"
-  elif pip3 install --user "pyvmomi==$PYVMOMI_VERSION_REQUIRED" 2>/dev/null; then
-    echo "  ✅ pyvmomi instalado con --user"
+  elif pip3 install --user "pyvmomi==$PYVMOMI_VERSION_REQUIRED"; then
+    echo "  ✅ pyvmomi instalado para el usuario actual (--user)"
   else
     echo "  ⚠️  Error al instalar pyvmomi, intentando método alternativo..."
     python3 -m pip install --break-system-packages "pyvmomi==$PYVMOMI_VERSION_REQUIRED" || \
@@ -141,10 +141,10 @@ if check_python_package "ansible_pylibssh"; then
   echo "  ✅ ansible-pylibssh ya instalado"
 else
   echo "  ⬇️  Instalando ansible-pylibssh..."
-  if pip3 install --break-system-packages ansible-pylibssh 2>/dev/null; then
+  if sudo pip3 install --break-system-packages ansible-pylibssh; then
     echo "  ✅ ansible-pylibssh instalado con --break-system-packages"
-  elif pip3 install --user ansible-pylibssh 2>/dev/null; then
-    echo "  ✅ ansible-pylibssh instalado con --user"
+  elif pip3 install --user ansible-pylibssh; then
+    echo "  ✅ ansible-pylibssh instalado para el usuario actual (--user)"
   else
     echo "  ⚠️  No se pudo instalar ansible-pylibssh (opcional)"
   fi
@@ -157,8 +157,10 @@ echo "Verificando dependencias Python (vía apt):"
 for dep in "${PYTHON_DEPS[@]}"; do
   if check_python_package "$dep"; then
     echo "  ✅ $dep"
+  elif check_apt_package "python3-$dep"; then
+    echo -e "  ✅ python3-$dep (instalado vía apt)"
   else
-    echo "  ⚠️  $dep no encontrado (debería estar instalado vía apt)"
+    echo "  ⚠️  $dep no encontrado. Asegúrate de que 'python3-$dep' está en la lista de paquetes a instalar."
   fi
 done
 
