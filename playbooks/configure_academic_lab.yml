@@ -6,8 +6,6 @@
   hosts: debian_router
   become: yes
   gather_facts: yes
-  # Ejecutar siempre primero para asegurar que los servicios de red están listos.
-  order: 1
   tasks:
     - name: Aplicar configuración de gateway con IPs cortas
       include_role:
@@ -18,8 +16,6 @@
   hosts: debian_router
   become: yes
   gather_facts: yes
-  # Ejecutar después del gateway.
-  order: 2
   tasks:
     - name: Incluir rol para crear usuarios académicos
       include_role:
@@ -30,8 +26,6 @@
   hosts: ubuntu-pc
   become: yes
   gather_facts: yes
-  # Ejecutar al final, depende de los servicios del router.
-  order: 3
   tasks:
     - name: Deshabilitar SLAAC en Ubuntu
       sysctl:
