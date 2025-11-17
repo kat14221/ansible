@@ -60,6 +60,16 @@
   become: yes
   notify: restart isc-dhcp-server
 
+- name: Especificar interfaz de escucha para DHCPv6
+  lineinfile:
+    path: /etc/default/isc-dhcp-server
+    regexp: '^INTERFACESv6='
+    line: 'INTERFACESv6="{{ lan_interface }}"'
+    create: yes
+    mode: '0644'
+  become: yes
+  notify: restart isc-dhcp-server
+
 - name: Crear dnsmasq config
   template:
     src: dnsmasq.conf.j2
