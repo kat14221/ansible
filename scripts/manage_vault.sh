@@ -36,11 +36,31 @@ case "${1:-help}" in
     
     echo ""
     echo -e "${YELLOW}📝 Se ha copiado la plantilla. Por favor, revisa y edita el archivo con tus credenciales.${NC}"
-    echo "El editor de texto se abrirá ahora..."
+    echo "El editor de texto se abrirá a continuación..."
     sleep 2
     ${EDITOR:-nano} "$VAULT_FILE"
     
+    echo ""
+    read -s -p "Crea una contraseña para el Vault (mínimo 8 caracteres): " vault_pass
+    echo ""
+    
+    read -s -p "Confirma la contraseña del Vault: " vault_pass_confirm
+    echo ""
+    
+    if [ "$vault_pass" != "$vault_pass_confirm" ]; then
+      echo -e "${RED}❌ Error: Las contraseñas no coinciden.${NC}"
+      rm -f "$VAULT_FILE"
+      exit 1
+    fi
+    
+    if [ ${#vault_pass} -lt 8 ]; then
+      echo -e "${RED}❌ La contraseña debe tener al menos 8 caracteres.${NC}"
+      rm -f "$VAULT_FILE"
+      exit 1
+    fi
+    
     echo -e "${YELLOW}🔒 Cifrando el archivo vault...${NC}"
+
     # Crear primero el archivo de contraseña para que ansible.cfg lo encuentre
     echo "$vault_pass" > .vault_pass
     chmod 600 .vault_pass
