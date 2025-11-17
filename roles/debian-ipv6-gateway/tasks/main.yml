@@ -12,7 +12,7 @@
   package:
     name:
       - radvd
-      - isc-dhcp-server6
+      - isc-dhcp-server
       - dnsmasq
       - firewalld
       - traceroute
