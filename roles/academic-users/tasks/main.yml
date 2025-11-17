@@ -2,19 +2,22 @@
 # tasks file for academic-users
 # Crea los grupos y usuarios para el laboratorio académico.
 
-- name: Crear grupo para alumnos
+# Tareas para sistemas Linux/Unix
+- name: Crear grupo para alumnos (Linux)
   group:
     name: alumnos
     state: present
   become: yes
+  when: ansible_os_family != "Windows"
 
-- name: Crear grupo para profesores
+- name: Crear grupo para profesores (Linux)
   group:
     name: profesores
     state: present
   become: yes
+  when: ansible_os_family != "Windows"
 
-- name: Crear usuarios alumnos
+- name: Crear usuarios alumnos (Linux)
   user:
     name: "{{ item }}"
     password: "{{ 'alumno123' | password_hash('sha512') }}"
@@ -26,8 +29,9 @@
     - alumno2
     - alumno3
   become: yes
+  when: ansible_os_family != "Windows"
 
-- name: Crear usuarios profesores
+- name: Crear usuarios profesores (Linux)
   user:
     name: "{{ item }}"
     password: "{{ 'profesor123' | password_hash('sha512') }}"
@@ -35,11 +39,12 @@
     shell: /bin/bash
     state: present
   loop:
-    - profesor1
+    - profesor1  
     - profesor2
   become: yes
+  when: ansible_os_family != "Windows"
 
-- name: Crear usuario admin con privilegios sudo
+- name: Crear usuario admin con privilegios sudo (Linux)
   user:
     name: admin
     password: "{{ 'admin123' | password_hash('sha512') }}"
@@ -47,3 +52,39 @@
     shell: /bin/bash
     state: present
   become: yes
+  when: ansible_os_family != "Windows"
+
+# Tareas para sistemas Windows
+- name: Crear usuarios alumnos (Windows)
+  win_user:
+    name: "{{ item }}"
+    password: "alumno123"
+    groups:
+      - Users
+    state: present
+  loop:
+    - alumno1
+    - alumno2
+    - alumno3
+  when: ansible_os_family == "Windows"
+
+- name: Crear usuarios profesores (Windows)
+  win_user:
+    name: "{{ item }}"
+    password: "profesor123"
+    groups:
+      - Users
+    state: present
+  loop:
+    - profesor1
+    - profesor2
+  when: ansible_os_family == "Windows"
+
+- name: Crear usuario admin (Windows)
+  win_user:
+    name: admin
+    password: "admin123"
+    groups:
+      - Administrators
+    state: present
+  when: ansible_os_family == "Windows"
