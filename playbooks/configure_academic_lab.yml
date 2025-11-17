@@ -16,7 +16,21 @@
   hosts: ubuntu-pc
   become: yes
   gather_facts: yes
+  
   tasks:
+    - name: Asegurar que el servidor SSH está instalado y corriendo
+      apt:
+        name: openssh-server
+        state: present
+        update_cache: yes
+      become: yes
+      tags: users, client
+
+    - name: Crear usuarios académicos en cliente (primero para asegurar conectividad)
+      include_role:
+        name: academic-users
+      tags: users
+
     - name: Deshabilitar SLAAC en Ubuntu
       sysctl:
         name: "{{ item }}"
@@ -50,11 +64,6 @@
       register: if_restart_result
       failed_when: "if_restart_result.rc != 0 and 'already configured' not in if_restart_result.stderr"
       changed_when: if_restart_result.rc == 0
-
-    - name: Crear usuarios académicos en cliente
-      include_role:
-        name: academic-users
-      tags: users
 
   handlers:
     - name: apply netplan
