@@ -42,7 +42,7 @@ vault_debian_ansible_password: "ansible_secure_2024!"
 vault_windows_admin_user: "Administrator"
 vault_windows_admin_password: "Windows@2024!"
 vault_windows_ansible_user: "ansible"
-vault_windows_ansible_password: "ansible_win_2024!"
+vault_windows_ansible_password: "Ansible123!"
 
 # === Servicios de Aplicación ===
 vault_ftp_user: "ftpuser"
