@@ -19,3 +19,9 @@
     name: isc-dhcp-server
     state: restarted
   become: yes
+
+- name: reload nftables
+  systemd:
+    name: nftables
+    state: reloaded
+  become: yes
