@@ -1,0 +1,49 @@
+---
+# tasks file for academic-users
+# Crea los grupos y usuarios para el laboratorio académico.
+
+- name: Crear grupo para alumnos
+  group:
+    name: alumnos
+    state: present
+  become: yes
+
+- name: Crear grupo para profesores
+  group:
+    name: profesores
+    state: present
+  become: yes
+
+- name: Crear usuarios alumnos
+  user:
+    name: "{{ item }}"
+    password: "{{ 'alumno123' | password_hash('sha512') }}"
+    groups: alumnos
+    shell: /bin/bash
+    state: present
+  loop:
+    - alumno1
+    - alumno2
+    - alumno3
+  become: yes
+
+- name: Crear usuarios profesores
+  user:
+    name: "{{ item }}"
+    password: "{{ 'profesor123' | password_hash('sha512') }}"
+    groups: profesores
+    shell: /bin/bash
+    state: present
+  loop:
+    - profesor1
+    - profesor2
+  become: yes
+
+- name: Crear usuario admin con privilegios sudo
+  user:
+    name: admin
+    password: "{{ 'admin123' | password_hash('sha512') }}"
+    groups: sudo
+    shell: /bin/bash
+    state: present
+  become: yes
