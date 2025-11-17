@@ -20,8 +20,10 @@
   gather_facts: yes
   # Ejecutar después del gateway.
   order: 2
-  roles:
-    - academic-users
+  tasks:
+    - name: Incluir rol para crear usuarios académicos
+      include_role:
+        name: academic-users
   tags: users
 
 - name: Configurar Cliente Ubuntu
