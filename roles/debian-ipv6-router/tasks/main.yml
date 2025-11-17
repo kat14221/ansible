@@ -265,7 +265,7 @@
     src: dhcpd6.conf.j2
     dest: /etc/dhcp/dhcpd6.conf
     mode: '0644'
-  notify: restart isc-dhcp-server6
+  notify: restart isc-dhcp-server
   become: yes
 
 - name: Bind DHCPv6 to LAN interface
@@ -274,7 +274,7 @@
     regexp: '^INTERFACESv6='
     line: 'INTERFACESv6="{{ lan_interface }}"'
     create: yes
-  notify: restart isc-dhcp-server6
+  notify: restart isc-dhcp-server
   become: yes
 
 # =========================

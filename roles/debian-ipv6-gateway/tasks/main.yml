@@ -58,7 +58,7 @@
     group: root
     mode: '0644'
   become: yes
-  notify: restart isc-dhcp-server6
+  notify: restart isc-dhcp-server
 
 - name: Crear dnsmasq config
   template:
@@ -77,7 +77,7 @@
     state: started
   loop:
     - radvd
-    - isc-dhcp-server6
+    - isc-dhcp-server
     - dnsmasq
     - firewalld
   become: yes
