@@ -87,18 +87,14 @@ case "${1:-help}" in
     
     SSH_PUBLIC_KEY=$(cat ~/.ssh/id_rsa_ansible.pub)
     
-    # Actualizar vault con credenciales reales
+    # Actualizar vault con credenciales reales (usando | como delimitador para evitar conflictos con /)
     sed -i "s|vault_vcenter_hostname: \".*\"|vault_vcenter_hostname: \"$vcenter_ip\"|g" "$VAULT_FILE"
     sed -i "s|vault_vcenter_username: \".*\"|vault_vcenter_username: \"$vcenter_user\"|g" "$VAULT_FILE"
     sed -i "s|vault_vcenter_password: \".*\"|vault_vcenter_password: \"$vcenter_pass\"|g" "$VAULT_FILE"
     sed -i "s|vault_cisco_user: \".*\"|vault_cisco_user: \"$cisco_user\"|g" "$VAULT_FILE"
     sed -i "s|vault_cisco_password: \".*\"|vault_cisco_password: \"$cisco_pass\"|g" "$VAULT_FILE"
     sed -i "s|vault_cisco_enable_secret: \".*\"|vault_cisco_enable_secret: \"$cisco_pass\"|g" "$VAULT_FILE"
-    
-    # Actualizar clave SSH
-    sed -i "/vault_ansible_ssh_public_key:/,/# REEMPLAZAR/c\\
-vault_ansible_ssh_public_key: |\\
-  $SSH_PUBLIC_KEY" "$VAULT_FILE"
+    sed -i "s|vault_ansible_ssh_public_key:.*|vault_ansible_ssh_public_key: \"$SSH_PUBLIC_KEY\"|g" "$VAULT_FILE"
     
     echo -e "${YELLOW}🔒 Cifrando vault...${NC}"
     # Crear primero el archivo de contraseña para que ansible.cfg lo encuentre
