@@ -310,6 +310,7 @@
     - radvd
     - isc-dhcp-server
     - nftables
+    - apache2
   become: yes
 
 # =========================
