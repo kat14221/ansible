@@ -1,0 +1,44 @@
+---
+# tasks file for windows-academic-users
+# Crea los grupos y usuarios para el laboratorio académico en Windows.
+
+- name: Crear grupo para Alumnos
+  win_group:
+    name: Alumnos
+    state: present
+
+- name: Crear grupo para Profesores
+  win_group:
+    name: Profesores
+    state: present
+
+- name: Crear usuarios alumnos
+  win_user:
+    name: "{{ item.name }}"
+    password: "{{ item.pass }}"
+    groups:
+      - Alumnos
+    state: present
+  loop:
+    - { name: 'alumno1', pass: 'Alumno.123!' }
+    - { name: 'alumno2', pass: 'Alumno.123!' }
+    - { name: 'alumno3', pass: 'Alumno.123!' }
+
+- name: Crear usuarios profesores
+  win_user:
+    name: "{{ item.name }}"
+    password: "{{ item.pass }}"
+    groups:
+      - Profesores
+    state: present
+  loop:
+    - { name: 'profesor1', pass: 'Profesor.123!' }
+    - { name: 'profesor2', pass: 'Profesor.123!' }
+
+- name: Crear usuario admin y añadirlo a Administradores
+  win_user:
+    name: admin
+    password: "Admin.123!"
+    groups:
+      - Administrators
+    state: present
