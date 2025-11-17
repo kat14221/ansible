@@ -14,10 +14,6 @@ vcenter_password: "{{ vault_vcenter_password }}"
 vcenter_port: "{{ vault_vcenter_port | default(443) }}"
 vcenter_validate_certs: "{{ vault_vcenter_validate_certs | default('no') }}"
 
-# === Usuario Ansible ===
-ansible_user: "{{ vault_ansible_user }}"
-ansible_ssh_public_key: "{{ vault_ansible_ssh_public_key }}"
-
 # === Servicios ===
 ftp_user: "{{ vault_ftp_user }}"
 ftp_password: "{{ vault_ftp_password }}"
