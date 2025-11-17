@@ -1,0 +1,109 @@
+---
+# Playbook: Configuración Completa del Laboratorio Académico
+# Descripción: Configura DHCPv6 con IPs cortas, usuarios académicos y red P2P.
+
+- name: Configurar Gateway con DHCPv6 (IPs Cortas)
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  # Ejecutar siempre primero para asegurar que los servicios de red están listos.
+  order: 1
+  tasks:
+    - name: Aplicar configuración de gateway con IPs cortas
+      include_role:
+        name: debian-ipv6-gateway
+      tags: gateway
+
+- name: Crear Usuarios Académicos
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  # Ejecutar después del gateway.
+  order: 2
+  roles:
+    - academic-users
+  tags: users
+
+- name: Configurar Cliente Ubuntu
+  hosts: ubuntu-pc
+  become: yes
+  gather_facts: yes
+  # Ejecutar al final, depende de los servicios del router.
+  order: 3
+  tasks:
+    - name: Deshabilitar SLAAC en Ubuntu
+      sysctl:
+        name: "{{ item }}"
+        value: '0'
+        state: present
+        reload: yes
+      loop:
+        - net.ipv6.conf.all.autoconf
+        - net.ipv6.conf.default.autoconf
+      tags: client
+
+    - name: Configurar netplan para DHCPv6 puro
+      copy:
+        dest: /etc/netplan/01-netcfg.yaml
+        content: |
+          network: 
+            version: 2
+            renderer: networkd
+            ethernets:
+              ens192:
+                dhcp6: yes
+                ipv6-privacy: no
+                accept-ra: yes
+        mode: '0644'
+      notify: apply netplan
+      tags: client
+
+    - name: Crear usuarios académicos en cliente
+      include_role:
+        name: academic-users
+      tags: users
+
+  handlers:
+    - name: apply netplan
+      command: netplan apply
+      become: yes
+
+- name: Resumen de Configuración
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Mostrar resumen completo
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ LABORATORIO ACADÉMICO CONFIGURADO"
+          - "=========================================="
+          - ""
+          - "🌐 RED:"
+          - "   Red Fernandez: 2025:db8:101::/64"
+          - "   Gateway: 2025:db8:101::1 (debian-router)"
+          - ""
+          - "📍 DHCPv6 - IPs Cortas:"
+          - "   Rango: ::10 a ::99"
+          - "   ubuntu-pc: 2025:db8:101::10"
+          - "   windows-pc: 2025:db8:101::11"
+          - ""
+          - "👥 USUARIOS ACADÉMICOS:"
+          - "   Alumnos: alumno1, alumno2, alumno3 (pass: alumno123)"
+          - "   Profesores: profesor1, profesor2 (pass: profesor123)"
+          - "   Admin: admin (pass: admin123)"
+          - ""
+          - "🎮 JUEGOS P2P:"
+          - "   Cualquier alumno puede crear una partida local."
+          - "   Otros pueden unirse usando la IP del anfitrión."
+          - ""
+          - "📊 ACCESOS:"
+          - "   SSH debian-router: ssh admin@2025:db8:101::1"
+          - "   SSH ubuntu-pc: ssh alumno1@2025:db8:101::10"
+          - "   Network Monitor: http://[2025:db8:101::1]:5000"
+          - ""
+          - "🔒 SEGURIDAD:"
+          - "   ✅ Firewall P2P entre redes de laboratorio"
+          - "   ✅ Usuarios con permisos limitados"
+          - "   ✅ SLAAC deshabilitado (solo DHCPv6)"
+          - "=========================================="

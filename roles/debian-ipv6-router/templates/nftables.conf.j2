@@ -43,19 +43,38 @@ table ip6 filter {
     }
 
     chain forward {
-        type filter hook forward priority 0; policy accept;
+        type filter hook forward priority 0; policy drop;
         ct state {established, related} accept
         # Permitir ICMPv6 de reenvío explícitamente
         icmpv6 type { 128, 129, 133, 134, 135, 136 } accept
 
-        # Aceptar tráfico entre WAN y LAN interfaces (explicitar para evitar bloqueos accidentales)
+        # Permitir que la red LAN (Fernandez) salga a la WAN (hacia internet/lab)
         {% if wan_interface is defined and lan_interface is defined %}
         iifname "{{ lan_interface }}" oifname "{{ wan_interface }}" accept
-        iifname "{{ wan_interface }}" oifname "{{ lan_interface }}" accept
+
+        # Permitir que la red WAN (Laboratorio) entre a la LAN (Fernandez) para juegos P2P
+        iifname "{{ wan_interface }}" oifname "{{ lan_interface }}" ip6 saddr 2025:db8:100::/64 ip6 daddr 2025:db8:101::/64 accept
         {% endif %}
+
+        log prefix "FORWARD-DROP: " drop
     }
 
     chain output {
         type filter hook output priority 0; policy accept;
+    }
+}
+
+# =================================================
+# Tabla NAT para dar internet a la red interna
+# =================================================
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority 100; policy accept;
+
+        # "Disfrazar" todo el tráfico que sale por la interfaz WAN
+        # para que parezca que viene del propio router.
+        {% if wan_interface is defined %}
+        oifname "{{ wan_interface }}" masquerade
+        {% endif %}
     }
 }

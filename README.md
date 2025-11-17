@@ -1,16 +1,140 @@
-# 🌐 VMWARE-101001: Infraestructura de Red Académica IPv6
+# 🎓 Proyecto: Laboratorio Académico Automatizado con Ansible
 
-## 📖 Descripción General
+## 🎯 Objetivo del Proyecto
 
-Proyecto de **automatización e infraestructura de red** usando Ansible para implementar una red académica IPv6 completa en VMware ESXi. El proyecto alcanza **NIVEL 4 (SOBRESALIENTE)** en todas las unidades del currículo.
+Implementar y gestionar una infraestructura de red IPv6 para un laboratorio académico utilizando Ansible. La automatización cubre desde la configuración de la red y los servicios base hasta la gestión de usuarios y la visibilidad de los dispositivos conectados.
 
-### 🎯 Objetivos
+---
 
-- ✅ Implementar red IPv6 nativa (2025:db8:101::/64)
-- ✅ Configurar gateway inteligente con RADVD + DHCPv6
-- ✅ Aplicar firewall asimétrico para seguridad de capas
-- ✅ Automatizar todo con Ansible (IaC)
-- ✅ Documentar a nivel profesional (Nivel 4)
+## 🏗️ Arquitectura de la Solución
+
+La red se divide en dos subredes principales, `Red Laboratorio` (física) y `Red Fernandez` (virtual), interconectadas por un `debian-router` que actúa como gateway y firewall.
+
+```
+Red Laboratorio (2025:db8:100::/64)
+        │
+┌───────▼─────────┐
+│  physical-router  │
+└───────┬─────────┘
+        │
+┌───────▼─────────┐
+│      ESXi         │
+└───────┬─────────┘
+        │
+┌───────▼───────────────┐
+│ Red Fernandez (Virtual) │
+│   2025:db8:101::/64     │
+└───────┬──────────┬────┘
+        │          │
+┌───────▼──────┐ ┌─▼──────────┐
+│ debian-router│ │ ubuntu-pc  │
+│  (::1)       │ │  (::10)    │
+└──────────────┘ └────────────┘
+```
+
+---
+
+## ✨ Características Implementadas
+
+1.  **🌐 Red IPv6 con IPs Cortas y Legibles:**
+    *   Se eliminó SLAAC para usar DHCPv6 puro, asignando IPs predecibles como `2025:db8:101::10`.
+    *   **Roles implicados:** `debian-ipv6-router`.
+
+2.  **👥 Gestión de Usuarios Académicos Unificados:**
+    *   Creación de perfiles `alumno`, `profesor` y `admin` con permisos diferenciados.
+    *   Los usuarios se crean tanto en **Linux** (`ubuntu-pc`) como en **Windows** (`windows-pc`).
+    *   **Roles implicados:** `academic-users`, `windows-academic-users`.
+
+3.  **🎮 Soporte para Juegos Peer-to-Peer (P2P):**
+    *   Se ajustó el firewall para permitir que los alumnos creen partidas locales y jueguen entre sí, incluso entre diferentes subredes (`100::/64` y `101::/64`).
+    *   No se depende de un servidor de juegos centralizado.
+    *   **Roles implicados:** `debian-ipv6-router`.
+
+4.  **📡 Portal de Descubrimiento de Red:**
+    *   Una aplicación web en `http://[2025:db8:101::1]:5000` que escanea la red y muestra todos los dispositivos conectados, su IP, MAC y sistema operativo.
+    *   **Roles implicados:** `network-discovery-portal`.
+
+---
+
+## 📚 Documentación del Proyecto
+
+Toda la documentación ha sido organizada en la carpeta `docs/` para mantener el directorio raíz limpio.
+
+| Archivo                               | Descripción                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| **`docs/1_Guia_Laboratorio.md`**      | **(COMENZAR AQUÍ)** Guía paso a paso para desplegar y verificar todo.      |
+| **`docs/2_Solucion_Tecnica.md`**      | Resumen técnico detallado de cada solución implementada.                 |
+| **`docs/3_Topologia_Red.md`**         | Diagramas y explicación de la arquitectura de red física y virtual.      |
+| **`docs/4_Configuracion_VMs.md`**     | Guía para la configuración inicial de las máquinas virtuales en ESXi.    |
+| **`docs/5_Entregable_Sistemas_Operativos.md`** | **(NUEVO)** Guía para estructurar el informe del curso de SO. |
+| **`docs/6_Entregable_Redes.md`** | **(NUEVO)** Guía para estructurar el informe del curso de Redes. |
+| **`docs/legacy/`**                    | Contiene archivos de versiones anteriores y documentos de apoyo.         |
+
+---
+
+## 🚀 Cómo Empezar
+
+### Requisitos
+- Ansible instalado en la máquina de control.
+- Acceso SSH a las VMs y hosts.
+- Inventario (`inventory/hosts.yml`) configurado con las IPs correctas.
+
+### 1. Clonar el Repositorio
+```bash
+git clone https://github.com/tu-usuario/ansible.git
+cd ansible
+```
+
+### 2. Ejecutar el Playbook Principal
+Este playbook aplica toda la configuración en el orden correcto.
+
+```bash
+ansible-playbook playbooks/configure_academic_lab.yml -i inventory/hosts.yml
+```
+
+### 3. Ejecutar por Partes (Opcional)
+Puedes aplicar configuraciones específicas usando tags:
+
+```bash
+# Configurar red (DHCPv6, Firewall P2P)
+ansible-playbook playbooks/configure_academic_lab.yml --tags gateway
+
+# Crear usuarios en Linux y Windows
+ansible-playbook playbooks/configure_academic_lab.yml --tags users
+
+# Instalar el portal de descubrimiento de red
+ansible-playbook playbooks/configure_academic_lab.yml --tags discovery_portal
+```
+
+### 4. Verificar la Instalación
+Sigue los pasos de verificación en **`docs/1_Guia_Laboratorio.md`** para confirmar que:
+- Los clientes obtienen IPs cortas.
+- Los usuarios pueden iniciar sesión en Linux y Windows.
+- El ping funciona entre las redes `100::/64` y `101::/64`.
+- El portal de descubrimiento en `http://[2025:db8:101::1]:5000` está activo.
+
+---
+
+## 📁 Estructura de Archivos
+
+```
+ansible/
+├── README.md                      # <-- Este archivo
+├── docs/                          # Carpeta con toda la documentación
+├── inventory/
+│   └── hosts.yml
+├── playbooks/
+│   └── configure_academic_lab.yml
+└── roles/
+    ├── academic-users/
+    ├── debian-ipv6-router/
+    ├── network-discovery-portal/
+    └── windows-academic-users/
+```
+
+---
+
+**Estado del Proyecto:** ✅ Completamente funcional y documentado.
 
 ---
 

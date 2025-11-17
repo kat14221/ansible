@@ -1,0 +1,8 @@
+---
+# Playbook: Auditoría y Reporte de Desviaciones
+# Descripción: Ejecuta la configuración completa en modo 'check' y 'diff'
+#              para detectar cualquier cambio manual o desviación del estado deseado.
+#
+# USO: ansible-playbook playbooks/audit_and_report.yml --check --diff
+
+- import_playbook: configure_academic_lab.yml

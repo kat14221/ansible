@@ -3,7 +3,7 @@
 # Script de Corrección Rápida de PyVmomi
 # ============================================================================
 # Propósito: Desinstalar versión problemática e instalar la correcta
-# Uso: ./fix_pyvmomi.sh
+# Uso: ./scripts/fix_pyvmomi.sh
 # ============================================================================
 
 set -euo pipefail

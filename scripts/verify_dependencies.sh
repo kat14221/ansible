@@ -5,7 +5,7 @@
 # Propósito: Verificar que todas las dependencias estén instaladas y con
 #            las versiones correctas
 #
-# Uso: ./verify_dependencies.sh
+# Uso: ./scripts/verify_dependencies.sh
 #
 # Códigos de salida:
 #   0 - Todas las dependencias OK
@@ -213,13 +213,13 @@ elif [ $ERRORS -eq 0 ]; then
   echo -e "${YELLOW}⚠️  ADVERTENCIAS: $WARNINGS${NC}"
   echo ""
   echo "El sistema funcionará, pero hay algunas recomendaciones:"
-  echo "   ./bootstrap_control_vm.sh"
+  echo "   ./scripts/bootstrap_control_vm.sh"
   exit 0
 else
   echo -e "${RED}❌ ERRORES: $ERRORS${NC}"
   echo -e "${YELLOW}⚠️  ADVERTENCIAS: $WARNINGS${NC}"
   echo ""
   echo "Debes instalar las dependencias faltantes:"
-  echo "   ./bootstrap_control_vm.sh"
+  echo "   ./scripts/bootstrap_control_vm.sh"
   exit 1
 fi

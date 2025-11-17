@@ -11,7 +11,7 @@
 #   - FEEDBACK: Muestra claramente qué se instala y qué ya existe
 #   - ROBUSTO: Maneja errores y ofrece alternativas
 #
-# Uso: ./bootstrap_control_vm.sh
+# Uso: ./scripts/bootstrap_control_vm.sh
 #
 # Requisitos previos:
 #   - Ubuntu 24.04 LTS o Debian 12 (Bookworm)
