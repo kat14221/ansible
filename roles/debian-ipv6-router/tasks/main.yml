@@ -143,7 +143,9 @@
     path: /etc/network/interfaces.d
     state: directory
     mode: "0755"
+  become: yes
 
+- name: Update apt cache
   apt:
     update_cache: yes
     cache_valid_time: 3600
