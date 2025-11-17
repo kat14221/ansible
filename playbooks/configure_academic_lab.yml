@@ -37,9 +37,10 @@
             renderer: networkd
             ethernets:
               ens192:
-                dhcp6: yes
-                ipv6-privacy: no
-                accept-ra: yes
+                # Deshabilitar SLAAC y forzar DHCPv6
+                accept-ra: no
+                dhcp4: no
+                dhcp6: true
         mode: '0644'
       notify: apply netplan
       tags: client
