@@ -94,7 +94,7 @@ case "${1:-help}" in
     sed -i "s|vault_cisco_user: \".*\"|vault_cisco_user: \"$cisco_user\"|g" "$VAULT_FILE"
     sed -i "s|vault_cisco_password: \".*\"|vault_cisco_password: \"$cisco_pass\"|g" "$VAULT_FILE"
     sed -i "s|vault_cisco_enable_secret: \".*\"|vault_cisco_enable_secret: \"$cisco_pass\"|g" "$VAULT_FILE"
-    sed -i "s|vault_ansible_ssh_public_key:.*|vault_ansible_ssh_public_key: \"$SSH_PUBLIC_KEY\"|g" "$VAULT_FILE"
+    sed -i "/^vault_ansible_ssh_public_key:/,/REEMPLAZAR/c\vault_ansible_ssh_public_key: |\n  $SSH_PUBLIC_KEY" "$VAULT_FILE"
     
     echo -e "${YELLOW}🔒 Cifrando vault...${NC}"
     # Crear primero el archivo de contraseña para que ansible.cfg lo encuentre
