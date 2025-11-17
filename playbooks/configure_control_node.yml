@@ -1,0 +1,31 @@
+---
+# Playbook: Configurar Nodo de Control
+# Descripción: Configura el DNS en la máquina de control para que pueda
+#              resolver los hostnames del laboratorio a través del debian-router.
+#
+# USO: ansible-playbook playbooks/configure_control_node.yml
+
+- name: Configurar DNS en el Nodo de Control
+  hosts: localhost
+  connection: local
+  become: yes
+
+  tasks:
+    - name: Asegurar que systemd-resolved está configurado para usar el DNS del laboratorio
+      lineinfile:
+        path: /etc/systemd/resolved.conf
+        regexp: '^DNS='
+        line: "DNS=172.17.25.122" # IP de gestión del debian-router
+        create: yes
+        mode: '0644'
+
+    - name: Añadir dominio de búsqueda del laboratorio
+      lineinfile:
+        path: /etc/systemd/resolved.conf
+        regexp: '^Domains='
+        line: "Domains=~lab.local"
+
+    - name: Reiniciar systemd-resolved para aplicar los cambios
+      systemd:
+        name: systemd-resolved
+        state: restarted
