@@ -48,13 +48,16 @@
         content: |
           network: 
             version: 2
-            renderer: networkd
             ethernets:
               ens192:
-                # Deshabilitar SLAAC y forzar DHCPv6
+                # Forzar DHCPv6 y deshabilitar completamente SLAAC
                 accept-ra: no
                 dhcp4: no
-                dhcp6: true
+                dhcp6: yes
+                # Usar un DUID estable basado en la MAC para obtener siempre la misma IP
+                dhcp-identifier: duid
+                # Opcional: definir explícitamente el DUID si es necesario
+                # duid: 00:01:00:01:2d:3a:bc:de:00:0c:29:ff:fe:12:34:56
         mode: '0644'
       notify: apply netplan
       tags: client

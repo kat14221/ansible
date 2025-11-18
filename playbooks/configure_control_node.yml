@@ -14,6 +14,7 @@
     # Definimos aquí las IPs finales para que sea fácil de mantener
     debian_router_ip: "2025:db8:101::1"
     ubuntu_pc_ip: "2025:db8:101::10"
+    windows_pc_ip: "2025:db8:101::11"
 
   tasks:
     - name: Añadir hosts del laboratorio al archivo /etc/hosts
@@ -23,4 +24,5 @@
           # --- Laboratorio Académico Ansible ---
           {{ debian_router_ip }} debian-router
           {{ ubuntu_pc_ip }}   ubuntu-pc
+          {{ windows_pc_ip }}  windows-pc
         marker: "# {mark} ANSIBLE MANAGED BLOCK - LAB"
