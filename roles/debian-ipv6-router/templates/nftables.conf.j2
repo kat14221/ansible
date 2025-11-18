@@ -8,7 +8,7 @@ flush ruleset
 # Esto permite que el nodo de control (en la red de gestión) se comunique
 # con los hosts de la red del laboratorio (p.ej. para WinRM).
 # ==============================================================================
-table ip nat {
+table inet nat {
     chain postrouting {
         type nat hook postrouting priority 100; policy accept;
         # Enmascara el tráfico que sale por la interfaz LAN
