@@ -9,6 +9,8 @@
 - name: reload networking (ifupdown2)
   command: ifreload -a
   become: yes
+  # Ignoramos errores si ifreload no está disponible en una primera ejecución
+  ignore_errors: yes
 
 - name: restart radvd
   systemd:
