@@ -301,6 +301,16 @@
   tags:
     - ssh
 
+- name: Asegurar que SSH escucha en todas las interfaces (IPv4 e IPv6)
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    block: |
+      ListenAddress 0.0.0.0
+      ListenAddress ::
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - LISTEN ADDRESS"
+  notify: restart sshd
+  become: yes
+
 - name: Ensure services enabled and started
   systemd:
     name: "{{ item }}"
