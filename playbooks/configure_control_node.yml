@@ -26,3 +26,12 @@
           {{ ubuntu_pc_ip }}   ubuntu-pc
           {{ windows_pc_ip }}  windows-pc
         marker: "# {mark} ANSIBLE MANAGED BLOCK - LAB"
+
+    - name: Añadir ruta estática para la red del laboratorio a través del debian-router
+      command: ip -6 route add 2025:db8:101::/64 via 172.17.25.122
+      register: route_add_result
+      # No falla si la ruta ya existe, pero sí por otros errores.
+      failed_when: route_add_result.rc != 0 and 'File exists' not in route_add_result.stderr
+      # Se considera un cambio solo si el comando se ejecuta con éxito (rc=0).
+      changed_when: route_add_result.rc == 0
+      become: yes
