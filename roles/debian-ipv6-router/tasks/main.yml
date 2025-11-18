@@ -182,6 +182,7 @@
       - iproute2
       - curl
       - vsftpd
+      - htop # Herramienta de monitoreo de procesos
       - bind9-dnsutils
       - resolvconf
     state: present
