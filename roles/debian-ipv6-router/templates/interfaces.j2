@@ -1,50 +1,31 @@
-# Configuración de Red - Debian Router
-# Generado por Ansible - NO editar manualmente
+# Ansible managed file
 
 source /etc/network/interfaces.d/*
 
-# ============================================
-# Loopback
-# ============================================
+# The loopback network interface
 auto lo
 iface lo inet loopback
 
-# ============================================
-# Interfaz WAN (e.g., ens224)
-# Conectada a la red externa para salida a Internet.
-# - IPv4 por DHCP para obtener IP automáticamente
-# - IPv6 por DHCP para conectividad
-# ============================================
+# =================================================
+# Interfaz WAN / Gestión ({{ wan_interface }})
+# =================================================
 auto {{ wan_interface }}
-iface {{ wan_interface }} inet dhcp
-iface {{ wan_interface }} inet6 dhcp
+iface {{ wan_interface }} inet static
+    address 172.17.25.122/24
+    gateway 172.17.25.253
+    # DNS se gestiona con systemd-resolved o /etc/resolv.conf
 
-# ============================================
-# Interfaz LAN (e.g., ens192)
-# Conectada a la red del laboratorio.
-# - IPv6 estática para ser el gateway.
-# - Aquí operan radvd y dhcpv6.
-# ============================================
+# =================================================
+# Interfaz LAN ({{ lan_interface }})
+# =================================================
 auto {{ lan_interface }}
 iface {{ lan_interface }} inet6 static
     address {{ lan_ipv6_address }}/{{ lan_ipv6_prefix }}
     # No hay gateway en la LAN, este es el gateway.
 
-    # Deshabilitamos la aceptación de Router Advertisements.
-    # Este equipo es el router, no un cliente.
-    pre-up echo 0 > /proc/sys/net/ipv6/conf/{{ lan_interface }}/accept_ra
-
-    # Habilitamos el forwarding en esta interfaz.
-    pre-up echo 1 > /proc/sys/net/ipv6/conf/{{ lan_interface }}/forwarding
-
-    # Rutas estáticas adicionales (opcional)
-    # Definir en inventario: static_routes:
-    # - network: "2025:db8:100::/64"
-    #   via: "2025:db8:101::1"
-    #   dev: "{{ lan_interface }}"  # opcional, por defecto lan_interface
-    {% if static_routes is defined %}
-    {% for r in static_routes %}
-    post-up /sbin/ip -6 route add {{ r.network }} via {{ r.via }} dev {{ r.dev | default(lan_interface) }}
-    pre-down /sbin/ip -6 route del {{ r.network }} via {{ r.via }} dev {{ r.dev | default(lan_interface) }}
-    {% endfor %}
-    {% endif %}
+# --- Rutas estáticas persistentes ---
+{% for route in static_routes | default([]) %}
+    # Ruta a {{ route.network }} via {{ route.via }}
+    up ip -6 route add {{ route.network }} via {{ route.via }} dev {{ route.dev | default(lan_interface) }} || true
+    down ip -6 route del {{ route.network }} via {{ route.via }} dev {{ route.dev | default(lan_interface) }} || true
+{% endfor %}
