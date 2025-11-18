@@ -78,6 +78,15 @@
   hosts: windows-pc
   gather_facts: yes
   tasks:
+    - name: Permitir Ping (ICMPv6) en el Firewall de Windows
+      win_firewall_rule:
+        name: "ICMPv6 Allow Ping In"
+        group: "Servicios de red básicos"
+        localport: any
+        action: allow
+        direction: in
+        protocol: icmpv6
+
     - name: Crear usuarios académicos en cliente Windows
       include_role:
         name: academic-users
