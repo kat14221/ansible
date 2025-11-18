@@ -1,80 +1,72 @@
-#!/usr/sbin/nftables -f
-# Firewall básico para Debian Router IPv6
-# Red: 2025:DB8:101::/64
+#!/usr/sbin/nft -f
 
+# flush ruleset
 flush ruleset
 
-table ip6 filter {
+# ==============================================================================
+# Tabla NAT para enmascarar tráfico desde la red de gestión hacia la red LAN.
+# Esto permite que el nodo de control (en la red de gestión) se comunique
+# con los hosts de la red del laboratorio (p.ej. para WinRM).
+# ==============================================================================
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority 100; policy accept;
+        # Enmascara el tráfico que sale por la interfaz LAN
+        oifname "{{ lan_interface }}" masquerade
+    }
+}
+
+# ==============================================================================
+# Tabla principal de filtrado (Firewall)
+# ==============================================================================
+table inet ansible {
+    # --- CADENAS (Chains) ---
+    # INPUT: Tráfico destinado al propio router.
+    # FORWARD: Tráfico que atraviesa el router (de una red a otra).
+    # OUTPUT: Tráfico originado por el propio router.
+
     chain input {
         type filter hook input priority 0; policy drop;
 
-        # Aceptar loopback
-        iif lo accept
-
-        # Aceptar conexiones establecidas
+        # --- Reglas de Aceptación (INPUT) ---
+        # 1. Permitir tráfico de conexiones ya establecidas o relacionadas.
         ct state {established, related} accept
 
-        # ICMPv6 (necesario para IPv6)
-        # Permitir tipos esenciales (destination-unreachable, packet-too-big, time-exceeded, parameter-problem)
-        # eco request/reply y Neighbor Discovery / Router Advertisement (133-136)
-        icmpv6 type { 1, 2, 3, 4, 128, 129, 133, 134, 135, 136 } accept
+        # 2. Permitir tráfico de la interfaz loopback (localhost).
+        iifname "lo" accept
 
-        # Aceptar paquetes destinados a multicast (necesario para ND/RA)
-        ip6 daddr ff00::/8 accept
+        # 3. Permitir ICMPv6 (necesario para el funcionamiento de IPv6, como NDP).
+        ip6 nexthdr icmpv6 accept
 
-        # SSH
+        # 4. Permitir SSH (puerto 22) para administración.
         tcp dport 22 accept
 
-        # HTTP
-        tcp dport 80 accept
+        # 5. Permitir DHCPv6 (el router es cliente y servidor).
+        udp dport {546, 547} accept
 
-        # FTP
-        tcp dport {20, 21} accept
+        # 6. Permitir FTP (puerto 21) y HTTP (puerto 80) para servicios del laboratorio.
+        tcp dport {21, 80} accept
 
-        # DHCPv6
-        udp dport 547 accept
-
-        # DNS
-        udp dport 53 accept
-        tcp dport 53 accept
-
-        # Log dropped packets
-        log prefix "INPUT-DROP: " drop
+        # 7. Ancla para que otros roles (como network-monitor) puedan añadir reglas aquí.
+        # MONITOR-APP-ANCHOR
     }
 
     chain forward {
         type filter hook forward priority 0; policy drop;
-        ct state {established, related} accept
-        # Permitir ICMPv6 de reenvío explícitamente
-        icmpv6 type { 128, 129, 133, 134, 135, 136 } accept
 
-        # Permitir que la red LAN (Fernandez) salga a la WAN (hacia internet/lab)
-        {% if wan_interface is defined and lan_interface is defined %}
+        # --- Reglas de Aceptación (FORWARD) ---
+        # 1. Permitir tráfico de conexiones ya establecidas o relacionadas.
+        ct state {established, related} accept
+
+        # 2. Permitir el reenvío de tráfico desde la LAN hacia la WAN (salida a internet).
         iifname "{{ lan_interface }}" oifname "{{ wan_interface }}" accept
 
-        # Permitir que la red WAN (Laboratorio) entre a la LAN (Fernandez) para juegos P2P
-        iifname "{{ wan_interface }}" oifname "{{ lan_interface }}" ip6 saddr 2025:db8:100::/64 ip6 daddr 2025:db8:101::/64 accept
-        {% endif %}
-
-        log prefix "FORWARD-DROP: " drop
+        # 3. Permitir ICMPv6 entre redes.
+        ip6 nexthdr icmpv6 accept
     }
 
     chain output {
         type filter hook output priority 0; policy accept;
-    }
-}
-
-# =================================================
-# Tabla NAT para dar internet a la red interna
-# =================================================
-table ip nat {
-    chain postrouting {
-        type nat hook postrouting priority 100; policy accept;
-
-        # "Disfrazar" todo el tráfico que sale por la interfaz WAN
-        # para que parezca que viene del propio router.
-        {% if wan_interface is defined %}
-        oifname "{{ wan_interface }}" masquerade
-        {% endif %}
+        # Por defecto, se permite todo el tráfico saliente originado por el router.
     }
 }
