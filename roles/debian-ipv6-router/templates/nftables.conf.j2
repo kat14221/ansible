@@ -61,6 +61,9 @@ table inet ansible {
         # 2. Permitir el reenvío de tráfico desde la LAN hacia la WAN (salida a internet).
         iifname "{{ lan_interface }}" oifname "{{ wan_interface }}" accept
 
+        # 3. Permitir el reenvío desde la WAN a la LAN (para WinRM, etc.).
+        iifname "{{ wan_interface }}" oifname "{{ lan_interface }}" accept
+
         # 3. Permitir ICMPv6 entre redes.
         ip6 nexthdr icmpv6 accept
     }
