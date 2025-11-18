@@ -310,6 +310,7 @@
     - radvd
     - isc-dhcp-server
     - nftables
+    - sshd
   become: yes
 
 # =========================
