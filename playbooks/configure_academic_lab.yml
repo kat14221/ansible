@@ -74,12 +74,6 @@
 - name: Configurar Cliente Windows
   hosts: windows-pc
   gather_facts: yes
-  vars:
-    ansible_user: "{{ vault_windows_ansible_user }}"
-    ansible_password: "{{ vault_windows_ansible_password }}"
-    ansible_connection: winrm
-    ansible_winrm_transport: basic
-    ansible_winrm_server_cert_validation: ignore
   tasks:
     - name: Crear usuarios académicos en cliente Windows
       include_role:
