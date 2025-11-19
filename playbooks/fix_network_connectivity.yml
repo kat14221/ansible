@@ -97,14 +97,34 @@
   become: yes
   gather_facts: yes
   tasks:
-    - name: Liberar IP actual
-      command: dhclient -6 -r {{ ansible_default_ipv6.interface | default('ens192') }}
-      ignore_errors: yes
-      changed_when: false
+    - name: Verificar si existe dhclient (Ubuntu antiguo)
+      stat:
+        path: /sbin/dhclient
+      register: dhclient_exists
 
-    - name: Renovar IP vía DHCPv6
-      command: dhclient -6 {{ ansible_default_ipv6.interface | default('ens192') }}
-      changed_when: true
+    - name: Renovar IP con dhclient (si existe)
+      block:
+        - name: Liberar IP con dhclient
+          command: dhclient -6 -r {{ ansible_default_ipv6.interface | default('ens192') }}
+          ignore_errors: yes
+          changed_when: false
+
+        - name: Renovar IP con dhclient
+          command: dhclient -6 {{ ansible_default_ipv6.interface | default('ens192') }}
+          changed_when: true
+      when: dhclient_exists.stat.exists
+
+    - name: Renovar IP con netplan (Ubuntu 24.04)
+      block:
+        - name: Aplicar netplan
+          command: netplan apply
+          changed_when: true
+
+        - name: Reiniciar networkd para forzar renovación DHCPv6
+          systemd:
+            name: systemd-networkd
+            state: restarted
+      when: not dhclient_exists.stat.exists
 
     - name: Esperar 5 segundos para que se aplique
       pause:
