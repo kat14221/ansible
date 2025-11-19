@@ -1,0 +1,176 @@
+---
+# Playbook: Diagnóstico de Conectividad a Internet
+# Verifica por qué Ubuntu no tiene internet
+
+- name: Diagnosticar conectividad en debian-router
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Verificar forwarding IPv4
+      command: sysctl net.ipv4.ip_forward
+      register: ipv4_forward
+      changed_when: false
+
+    - name: Verificar forwarding IPv6
+      command: sysctl net.ipv6.conf.all.forwarding
+      register: ipv6_forward
+      changed_when: false
+
+    - name: Verificar rutas IPv4
+      command: ip route show
+      register: routes_ipv4
+      changed_when: false
+
+    - name: Verificar rutas IPv6
+      command: ip -6 route show
+      register: routes_ipv6
+      changed_when: false
+
+    - name: Verificar NAT en nftables
+      command: nft list table inet nat
+      register: nat_rules
+      changed_when: false
+
+    - name: Verificar reglas de forward
+      command: nft list chain inet ansible forward
+      register: forward_rules
+      changed_when: false
+
+    - name: Probar internet desde debian-router (IPv4)
+      command: ping -c 3 8.8.8.8
+      register: ping_internet_ipv4
+      changed_when: false
+      failed_when: false
+
+    - name: Probar internet desde debian-router (IPv6)
+      command: ping6 -c 3 2001:4860:4860::8888
+      register: ping_internet_ipv6
+      changed_when: false
+      failed_when: false
+
+    - name: Resumen debian-router
+      debug:
+        msg:
+          - "=========================================="
+          - "🔍 DIAGNÓSTICO debian-router"
+          - "=========================================="
+          - ""
+          - "IPv4 Forwarding: {{ ipv4_forward.stdout }}"
+          - "IPv6 Forwarding: {{ ipv6_forward.stdout }}"
+          - ""
+          - "Rutas IPv4:"
+          - "{{ routes_ipv4.stdout_lines }}"
+          - ""
+          - "Rutas IPv6:"
+          - "{{ routes_ipv6.stdout_lines }}"
+          - ""
+          - "NAT Rules:"
+          - "{{ nat_rules.stdout_lines }}"
+          - ""
+          - "Internet IPv4: {{ 'OK' if ping_internet_ipv4.rc == 0 else 'FALLÓ' }}"
+          - "Internet IPv6: {{ 'OK' if ping_internet_ipv6.rc == 0 else 'FALLÓ' }}"
+          - "=========================================="
+
+- name: Diagnosticar conectividad en ubuntu-pc
+  hosts: ubuntu-pc
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Verificar IPs asignadas
+      command: ip addr show
+      register: ip_addr
+      changed_when: false
+
+    - name: Verificar rutas IPv4
+      command: ip route show
+      register: ubuntu_routes_ipv4
+      changed_when: false
+
+    - name: Verificar rutas IPv6
+      command: ip -6 route show
+      register: ubuntu_routes_ipv6
+      changed_when: false
+
+    - name: Verificar DNS
+      command: cat /etc/resolv.conf
+      register: resolv_conf
+      changed_when: false
+
+    - name: Probar ping a gateway IPv6
+      command: ping6 -c 3 2025:db8:101::1
+      register: ping_gateway
+      changed_when: false
+      failed_when: false
+
+    - name: Probar ping a internet IPv4
+      command: ping -c 3 8.8.8.8
+      register: ping_internet_ipv4
+      changed_when: false
+      failed_when: false
+
+    - name: Probar ping a internet IPv6
+      command: ping6 -c 3 2001:4860:4860::8888
+      register: ping_internet_ipv6
+      changed_when: false
+      failed_when: false
+
+    - name: Probar resolución DNS
+      command: nslookup google.com
+      register: dns_test
+      changed_when: false
+      failed_when: false
+
+    - name: Resumen ubuntu-pc
+      debug:
+        msg:
+          - "=========================================="
+          - "🔍 DIAGNÓSTICO ubuntu-pc"
+          - "=========================================="
+          - ""
+          - "IPs asignadas:"
+          - "{{ ip_addr.stdout_lines | select('search', 'inet') | list }}"
+          - ""
+          - "Rutas IPv4:"
+          - "{{ ubuntu_routes_ipv4.stdout_lines }}"
+          - ""
+          - "Rutas IPv6:"
+          - "{{ ubuntu_routes_ipv6.stdout_lines }}"
+          - ""
+          - "DNS:"
+          - "{{ resolv_conf.stdout_lines }}"
+          - ""
+          - "Ping Gateway: {{ 'OK' if ping_gateway.rc == 0 else 'FALLÓ' }}"
+          - "Ping Internet IPv4: {{ 'OK' if ping_internet_ipv4.rc == 0 else 'FALLÓ' }}"
+          - "Ping Internet IPv6: {{ 'OK' if ping_internet_ipv6.rc == 0 else 'FALLÓ' }}"
+          - "DNS Resolution: {{ 'OK' if dns_test.rc == 0 else 'FALLÓ' }}"
+          - "=========================================="
+
+- name: Resumen y recomendaciones
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Mostrar recomendaciones
+      debug:
+        msg:
+          - "=========================================="
+          - "📋 ANÁLISIS Y RECOMENDACIONES"
+          - "=========================================="
+          - ""
+          - "Si ubuntu-pc NO tiene internet:"
+          - ""
+          - "1. Verificar que debian-router tenga gateway IPv4:"
+          - "   - Debe tener: 'default via 172.17.25.253 dev ens192'"
+          - ""
+          - "2. Ubuntu necesita IPv4 además de IPv6:"
+          - "   - Agregar DHCP IPv4 en netplan"
+          - "   - O configurar IP estática IPv4"
+          - ""
+          - "3. Verificar NAT masquerade en debian-router:"
+          - "   - Debe existir: 'oifname ens192 masquerade'"
+          - ""
+          - "4. Ubuntu debe tener ruta por defecto:"
+          - "   - IPv4: via debian-router"
+          - "   - IPv6: via 2025:db8:101::1"
+          - ""
+          - "=========================================="

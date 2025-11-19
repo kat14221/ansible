@@ -1,0 +1,154 @@
+---
+# Playbook: Configurar WinRM en Windows manualmente
+# NOTA: Este playbook NO se ejecuta automáticamente.
+# Es una GUÍA de los comandos que debes ejecutar MANUALMENTE en Windows.
+
+# ============================================================================
+# INSTRUCCIONES: Ejecuta estos comandos en PowerShell (como Administrador)
+# en la VM Windows ANTES de ejecutar playbooks de Ansible contra ella.
+# ============================================================================
+
+- name: Guía de configuración manual de WinRM en Windows
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Mostrar instrucciones para configurar WinRM
+      debug:
+        msg:
+          - "=========================================="
+          - "📋 CONFIGURACIÓN MANUAL DE WINRM EN WINDOWS"
+          - "=========================================="
+          - ""
+          - "Ejecuta estos comandos en PowerShell como Administrador en la VM Windows:"
+          - ""
+          - "# 1. Habilitar WinRM"
+          - "Enable-PSRemoting -Force"
+          - ""
+          - "# 2. Configurar autenticación básica"
+          - "Set-Item WSMan:\\localhost\\Service\\Auth\\Basic $true"
+          - "Set-Item WSMan:\\localhost\\Service\\AllowUnencrypted $true"
+          - ""
+          - "# 3. Crear listener HTTP (puerto 5985)"
+          - "winrm create winrm/config/Listener?Address=*+Transport=HTTP"
+          - ""
+          - "# 4. Crear certificado auto-firmado para HTTPS"
+          - "$cert = New-SelfSignedCertificate -DnsName 'windows-pc' -CertStoreLocation Cert:\\LocalMachine\\My"
+          - ""
+          - "# 5. Crear listener HTTPS (puerto 5986)"
+          - "New-Item -Path WSMan:\\localhost\\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force"
+          - ""
+          - "# 6. Abrir firewall para WinRM"
+          - "New-NetFirewallRule -DisplayName 'WinRM HTTP' -Direction Inbound -LocalPort 5985 -Protocol TCP -Action Allow"
+          - "New-NetFirewallRule -DisplayName 'WinRM HTTPS' -Direction Inbound -LocalPort 5986 -Protocol TCP -Action Allow"
+          - ""
+          - "# 7. Crear usuario ansible"
+          - "$password = ConvertTo-SecureString 'Ansible123!' -AsPlainText -Force"
+          - "New-LocalUser -Name 'ansible' -Password $password -FullName 'Ansible User' -Description 'Usuario para Ansible'"
+          - "Add-LocalGroupMember -Group 'Administrators' -Member 'ansible'"
+          - ""
+          - "# 8. Verificar configuración"
+          - "winrm get winrm/config"
+          - "Test-WSMan -ComputerName localhost"
+          - ""
+          - "# 9. Probar desde VM Control (Linux):"
+          - "ansible -i inventory/hosts.yml windows-pc -m win_ping"
+          - ""
+          - "=========================================="
+          - "✅ Después de ejecutar estos comandos, Windows estará listo para Ansible"
+          - "=========================================="
+
+# ============================================================================
+# ALTERNATIVA: Script automatizado para copiar y pegar
+# ============================================================================
+- name: Generar script de configuración
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Crear script PowerShell para Windows
+      copy:
+        dest: ./setup_winrm_windows.ps1
+        content: |
+          # Script de configuración automática de WinRM para Ansible
+          # Ejecutar como Administrador en Windows
+          
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Configurando WinRM para Ansible" -ForegroundColor Cyan
+          Write-Host "========================================" -ForegroundColor Cyan
+          
+          # 1. Habilitar WinRM
+          Write-Host "`n[1/9] Habilitando WinRM..." -ForegroundColor Yellow
+          Enable-PSRemoting -Force
+          
+          # 2. Configurar autenticación básica
+          Write-Host "[2/9] Configurando autenticación básica..." -ForegroundColor Yellow
+          Set-Item WSMan:\localhost\Service\Auth\Basic $true
+          Set-Item WSMan:\localhost\Service\AllowUnencrypted $true
+          
+          # 3. Crear listener HTTP
+          Write-Host "[3/9] Creando listener HTTP..." -ForegroundColor Yellow
+          try {
+              winrm create winrm/config/Listener?Address=*+Transport=HTTP 2>$null
+          } catch {
+              Write-Host "Listener HTTP ya existe" -ForegroundColor Gray
+          }
+          
+          # 4. Crear certificado auto-firmado
+          Write-Host "[4/9] Creando certificado auto-firmado..." -ForegroundColor Yellow
+          $cert = New-SelfSignedCertificate -DnsName "windows-pc" -CertStoreLocation Cert:\LocalMachine\My
+          
+          # 5. Crear listener HTTPS
+          Write-Host "[5/9] Creando listener HTTPS..." -ForegroundColor Yellow
+          try {
+              New-Item -Path WSMan:\localhost\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force
+          } catch {
+              Write-Host "Listener HTTPS ya existe" -ForegroundColor Gray
+          }
+          
+          # 6. Abrir firewall
+          Write-Host "[6/9] Configurando firewall..." -ForegroundColor Yellow
+          New-NetFirewallRule -DisplayName "WinRM HTTP" -Direction Inbound -LocalPort 5985 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue
+          New-NetFirewallRule -DisplayName "WinRM HTTPS" -Direction Inbound -LocalPort 5986 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue
+          
+          # 7. Crear usuario ansible
+          Write-Host "[7/9] Creando usuario ansible..." -ForegroundColor Yellow
+          $password = ConvertTo-SecureString "Ansible123!" -AsPlainText -Force
+          try {
+              New-LocalUser -Name "ansible" -Password $password -FullName "Ansible User" -Description "Usuario para Ansible" -ErrorAction Stop
+              Add-LocalGroupMember -Group "Administrators" -Member "ansible"
+              Write-Host "Usuario ansible creado correctamente" -ForegroundColor Green
+          } catch {
+              Write-Host "Usuario ansible ya existe" -ForegroundColor Gray
+          }
+          
+          # 8. Verificar configuración
+          Write-Host "[8/9] Verificando configuración..." -ForegroundColor Yellow
+          winrm get winrm/config/service
+          
+          # 9. Mostrar IPs
+          Write-Host "`n[9/9] Información de red:" -ForegroundColor Yellow
+          Get-NetIPAddress -AddressFamily IPv6 | Where-Object {$_.IPAddress -like "2025:*"} | Format-Table IPAddress, InterfaceAlias
+          
+          Write-Host "`n========================================" -ForegroundColor Green
+          Write-Host "✅ WinRM configurado exitosamente" -ForegroundColor Green
+          Write-Host "========================================" -ForegroundColor Green
+          Write-Host "`nPrueba desde Linux:" -ForegroundColor Cyan
+          Write-Host "ansible -i inventory/hosts.yml windows-pc -m win_ping" -ForegroundColor Yellow
+        mode: '0644'
+      
+    - name: Instrucciones finales
+      debug:
+        msg:
+          - ""
+          - "=========================================="
+          - "📄 Script generado: setup_winrm_windows.ps1"
+          - "=========================================="
+          - ""
+          - "Copia este archivo a Windows y ejecútalo como Administrador:"
+          - ""
+          - "1. Copiar archivo a Windows (desde VM Control):"
+          - "   scp setup_winrm_windows.ps1 usuario@windows-ip:C:\\Users\\usuario\\"
+          - ""
+          - "2. En Windows, ejecutar:"
+          - "   PowerShell -ExecutionPolicy Bypass -File setup_winrm_windows.ps1"
+          - ""
+          - "=========================================="
