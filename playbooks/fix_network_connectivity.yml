@@ -168,27 +168,43 @@
   hosts: windows-pc
   gather_facts: yes
   tasks:
-    - name: Deshabilitar SLAAC en Windows (forzar DHCPv6 puro)
-      win_shell: |
-        # Deshabilitar autoconfiguración IPv6 (SLAAC)
-        netsh interface ipv6 set interface "Ethernet0" routerdiscovery=disabled
-        netsh interface ipv6 set interface "Ethernet0" managedaddress=enabled
-        netsh interface ipv6 set interface "Ethernet0" otherstateful=enabled
-        
-        # Liberar y renovar IPv6
-        ipconfig /release6
-        Start-Sleep -Seconds 2
-        ipconfig /renew6
-      register: ipv6_config_result
-
-    - name: Esperar 10 segundos para que se aplique DHCPv6
-      pause:
-        seconds: 10
-
-    - name: Verificar nueva configuración de red
-      win_shell: ipconfig /all
-      register: windows_ipconfig
+    - name: Mostrar IP actual de Windows
+      win_shell: ipconfig | Select-String "2025"
+      register: windows_current_ip
       changed_when: false
+
+    - name: Mostrar mensaje informativo
+      debug:
+        msg:
+          - "=========================================="
+          - "📍 Windows PC - IP Actual"
+          - "{{ windows_current_ip.stdout_lines }}"
+          - ""
+          - "⚠️  NOTA: Para obtener IP corta (::11), ejecuta MANUALMENTE en Windows:"
+          - ""
+          - "PowerShell (como Administrador):"
+          - "netsh interface ipv6 set interface 'Ethernet0' routerdiscovery=disabled"
+          - "netsh interface ipv6 set interface 'Ethernet0' managedaddress=enabled"
+          - "ipconfig /release6"
+          - "ipconfig /renew6"
+          - ""
+          - "Esto no se ejecuta automáticamente porque interrumpe la conexión WinRM"
+          - "=========================================="
+
+    - name: Habilitar servicio DHCPv6 Client en Windows
+      win_service:
+        name: Dhcp
+        state: started
+        start_mode: auto
+
+    - name: Permitir Ping (ICMPv6) en el Firewall de Windows
+      win_firewall_rule:
+        name: "ICMPv6 Allow Ping In"
+        group: "Servicios de red básicos"
+        localport: any
+        action: allow
+        direction: in
+        protocol: icmpv6
 
     - name: Test de conectividad a gateway desde Windows
       win_shell: ping -6 -n 3 2025:db8:101::1
@@ -197,7 +213,7 @@
       failed_when: false
 
     - name: Test de conectividad a internet desde Windows
-      win_shell: ping -6 -n 3 2001:4860:4860::8888
+      win_shell: ping -n 3 8.8.8.8
       register: windows_ping_internet
       changed_when: false
       failed_when: false
@@ -208,11 +224,13 @@
           - "=========================================="
           - "📍 Windows PC - Estado de Red"
           - ""
-          - "Configuración de red:"
-          - "{{ windows_ipconfig.stdout_lines }}"
+          - "IP Actual:"
+          - "{{ windows_current_ip.stdout_lines }}"
           - ""
-          - "Ping a Gateway: {{ 'OK' if windows_ping_gateway.rc == 0 else 'FALLÓ' }}"
-          - "Ping a Internet: {{ 'OK' if windows_ping_internet.rc == 0 else 'FALLÓ' }}"
+          - "Ping a Gateway IPv6: {{ 'OK' if windows_ping_gateway.rc == 0 else 'FALLÓ' }}"
+          - "Ping a Internet IPv4: {{ 'OK' if windows_ping_internet.rc == 0 else 'FALLÓ' }}"
+          - ""
+          - "💡 Para obtener IP corta, ejecuta comandos mostrados arriba MANUALMENTE"
           - "=========================================="
 
 - name: Resumen Final

@@ -1,0 +1,116 @@
+---
+# Playbook: Configurar IPv6 corta en Windows (MANUAL)
+# ADVERTENCIA: Este playbook interrumpe la conexión de red temporalmente
+# Ejecutar solo si tienes acceso físico o consola a Windows
+
+- name: Configurar Windows para DHCPv6 puro (IP corta)
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Instrucciones para configurar Windows manualmente
+      debug:
+        msg:
+          - "=========================================="
+          - "⚠️  CONFIGURACIÓN MANUAL DE WINDOWS IPv6"
+          - "=========================================="
+          - ""
+          - "Estos comandos INTERRUMPEN la conexión de red temporalmente."
+          - "Debes ejecutarlos DIRECTAMENTE en Windows (consola física o RDP)"
+          - ""
+          - "Abre PowerShell como Administrador y ejecuta:"
+          - ""
+          - "# 1. Deshabilitar SLAAC"
+          - "netsh interface ipv6 set interface 'Ethernet0' routerdiscovery=disabled"
+          - "netsh interface ipv6 set interface 'Ethernet0' managedaddress=enabled"
+          - "netsh interface ipv6 set interface 'Ethernet0' otherstateful=enabled"
+          - ""
+          - "# 2. Liberar y renovar IPv6"
+          - "ipconfig /release6"
+          - "Start-Sleep -Seconds 2"
+          - "ipconfig /renew6"
+          - ""
+          - "# 3. Verificar nueva IP"
+          - "ipconfig | Select-String '2025'"
+          - ""
+          - "Deberías ver: 2025:db8:101::11 (IP CORTA)"
+          - ""
+          - "# 4. Probar conectividad"
+          - "ping -6 2025:db8:101::1        # Gateway"
+          - "ping google.com                 # Internet"
+          - ""
+          - "=========================================="
+          - ""
+          - "💡 ALTERNATIVA: Script completo para copiar/pegar"
+          - ""
+
+    - name: Crear script para Windows
+      copy:
+        dest: ./configure_windows_ipv6.ps1
+        content: |
+          # Script para configurar Windows con DHCPv6 puro (IP corta)
+          # Ejecutar como Administrador DIRECTAMENTE en Windows
+          
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "Configurando Windows para DHCPv6 puro" -ForegroundColor Cyan
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host ""
+          Write-Host "⚠️  ADVERTENCIA: Se perderá conexión de red temporalmente" -ForegroundColor Yellow
+          Write-Host ""
+          
+          $interfaceName = "Ethernet0"
+          
+          # Mostrar IP actual
+          Write-Host "[1/5] IP actual:" -ForegroundColor Yellow
+          Get-NetIPAddress -AddressFamily IPv6 | Where-Object {$_.IPAddress -like "2025:*"} | Format-Table IPAddress
+          
+          # Deshabilitar SLAAC
+          Write-Host "`n[2/5] Deshabilitando SLAAC..." -ForegroundColor Yellow
+          netsh interface ipv6 set interface $interfaceName routerdiscovery=disabled
+          netsh interface ipv6 set interface $interfaceName managedaddress=enabled
+          netsh interface ipv6 set interface $interfaceName otherstateful=enabled
+          
+          # Liberar IPv6
+          Write-Host "[3/5] Liberando IP actual..." -ForegroundColor Yellow
+          ipconfig /release6
+          
+          # Esperar
+          Write-Host "[4/5] Esperando 3 segundos..." -ForegroundColor Yellow
+          Start-Sleep -Seconds 3
+          
+          # Renovar IPv6
+          Write-Host "[5/5] Renovando IP vía DHCPv6..." -ForegroundColor Yellow
+          ipconfig /renew6
+          
+          Start-Sleep -Seconds 2
+          
+          # Mostrar nueva IP
+          Write-Host "`n========================================" -ForegroundColor Green
+          Write-Host "✅ Configuración completada" -ForegroundColor Green
+          Write-Host "========================================" -ForegroundColor Green
+          Write-Host ""
+          Write-Host "Nueva IP:" -ForegroundColor Cyan
+          Get-NetIPAddress -AddressFamily IPv6 | Where-Object {$_.IPAddress -like "2025:*"} | Format-Table IPAddress
+          
+          Write-Host "Si ves una IP como 2025:db8:101::11 (sin :0:xxxx), ¡éxito!" -ForegroundColor Green
+          Write-Host ""
+          Write-Host "Pruebas de conectividad:" -ForegroundColor Cyan
+          Write-Host "  ping -6 2025:db8:101::1        # Gateway" -ForegroundColor White
+          Write-Host "  ping google.com                 # Internet" -ForegroundColor White
+        mode: '0644'
+
+    - name: Instrucciones finales
+      debug:
+        msg:
+          - ""
+          - "=========================================="
+          - "📄 Script generado: configure_windows_ipv6.ps1"
+          - "=========================================="
+          - ""
+          - "Copia este archivo a Windows y ejecútalo:"
+          - ""
+          - "1. Desde Windows, descargar o copiar el archivo"
+          - "2. Click derecho > 'Ejecutar con PowerShell'"
+          - "   O en PowerShell Admin:"
+          - "   PowerShell -ExecutionPolicy Bypass -File configure_windows_ipv6.ps1"
+          - ""
+          - "=========================================="
