@@ -252,7 +252,7 @@
   become: yes
 
 # =========================
-# radvd + isc-dhcp-server6
+# radvd + isc-dhcp-server6 + isc-dhcp-server (IPv4)
 # =========================
 - name: Configure radvd (RA / SLAAC)
   template:
@@ -270,11 +270,35 @@
   notify: restart isc-dhcp-server
   become: yes
 
+- name: Configure DHCPv4 (ISC) para acceso a internet
+  template:
+    src: dhcpd.conf.j2
+    dest: /etc/dhcp/dhcpd.conf
+    mode: '0644'
+  notify: restart isc-dhcp-server
+  become: yes
+
+- name: Configurar IP IPv4 en LAN interface
+  shell: |
+    ip addr show {{ lan_interface }} | grep -qw '192.168.101.1' || ip addr add 192.168.101.1/24 dev {{ lan_interface }}
+    ip link set {{ lan_interface }} up
+  changed_when: false
+  become: yes
+
 - name: Bind DHCPv6 to LAN interface
   lineinfile:
     path: /etc/default/isc-dhcp-server
     regexp: '^INTERFACESv6='
     line: 'INTERFACESv6="{{ lan_interface }}"'
+    create: yes
+  notify: restart isc-dhcp-server
+  become: yes
+
+- name: Bind DHCPv4 to LAN interface
+  lineinfile:
+    path: /etc/default/isc-dhcp-server
+    regexp: '^INTERFACESv4='
+    line: 'INTERFACESv4="{{ lan_interface }}"'
     create: yes
   notify: restart isc-dhcp-server
   become: yes

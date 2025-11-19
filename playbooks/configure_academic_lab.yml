@@ -42,7 +42,7 @@
         - net.ipv6.conf.default.autoconf
       tags: client
 
-    - name: Configurar netplan para DHCPv6 puro
+    - name: Configurar netplan para DHCPv6 puro + IPv4
       copy:
         dest: /etc/netplan/01-netcfg.yaml
         content: |
@@ -50,14 +50,13 @@
             version: 2
             ethernets:
               ens192:
-                # Forzar DHCPv6 y deshabilitar completamente SLAAC
+                # IPv4 para acceso a internet (debian-router tiene internet por IPv4)
+                dhcp4: yes
+                # IPv6 forzar DHCPv6 y deshabilitar completamente SLAAC
                 accept-ra: no
-                dhcp4: no
                 dhcp6: yes
                 # Usar un DUID estable basado en la MAC para obtener siempre la misma IP
                 dhcp-identifier: duid
-                # Opcional: definir explícitamente el DUID si es necesario
-                # duid: 00:01:00:01:2d:3a:bc:de:00:0c:29:ff:fe:12:34:56
         mode: '0644'
       notify: apply netplan
       tags: client
