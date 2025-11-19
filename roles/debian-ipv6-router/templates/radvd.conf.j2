@@ -26,8 +26,8 @@ interface {{ lan_interface }}
                 # Prefijo on-link (en misma red)
                 AdvOnLink on;
                 
-                # Autoconfiguración autónoma (SLAAC)
-                AdvAutonomous on;
+                # Autoconfiguración autónoma (SLAAC) - DESHABILITADO para forzar DHCPv6
+                AdvAutonomous off;
                 
                 # No incluir dirección del router en prefijo
                 AdvRouterAddr off;

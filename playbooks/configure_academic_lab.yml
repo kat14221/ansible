@@ -78,6 +78,34 @@
   hosts: windows-pc
   gather_facts: yes
   tasks:
+    - name: Deshabilitar SLAAC en Windows (forzar DHCPv6 puro)
+      win_shell: |
+        # Deshabilitar autoconfiguración IPv6 (SLAAC)
+        netsh interface ipv6 set interface "Ethernet0" routerdiscovery=disabled
+        netsh interface ipv6 set interface "Ethernet0" managedaddress=enabled
+        netsh interface ipv6 set interface "Ethernet0" otherstateful=enabled
+        
+        # Liberar y renovar IPv6
+        ipconfig /release6
+        ipconfig /renew6
+      register: ipv6_config_result
+      changed_when: true
+
+    - name: Verificar configuración de red en Windows
+      win_shell: ipconfig /all
+      register: ipconfig_output
+      changed_when: false
+
+    - name: Mostrar configuración de red
+      debug:
+        var: ipconfig_output.stdout_lines
+
+    - name: Habilitar servicio DHCPv6 Client en Windows
+      win_service:
+        name: Dhcp
+        state: started
+        start_mode: auto
+
     - name: Permitir Ping (ICMPv6) en el Firewall de Windows
       win_firewall_rule:
         name: "ICMPv6 Allow Ping In"

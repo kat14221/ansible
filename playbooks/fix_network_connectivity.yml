@@ -1,0 +1,225 @@
+---
+# Playbook: Reparar Conectividad de Red (IPv6 + Internet)
+# Descripción: Soluciona problemas de DHCPv6, NAT y conectividad a internet
+
+- name: Reconfigurar debian-router para acceso a internet
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Verificar forwarding IPv4 está habilitado
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        reload: yes
+
+    - name: Verificar forwarding IPv6 está habilitado
+      sysctl:
+        name: net.ipv6.conf.all.forwarding
+        value: '1'
+        state: present
+        reload: yes
+
+    - name: Reconfigur radvd (deshabilitar SLAAC)
+      template:
+        src: ../roles/debian-ipv6-router/templates/radvd.conf.j2
+        dest: /etc/radvd.conf
+        mode: '0644'
+      notify: restart radvd
+
+    - name: Reconfigurar nftables (NAT + forwarding)
+      template:
+        src: ../roles/debian-ipv6-router/templates/nftables.conf.j2
+        dest: /etc/nftables.conf
+        mode: '0644'
+      notify: reload nftables
+
+    - name: Verificar estado de servicios
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - radvd
+        - isc-dhcp-server
+        - nftables
+
+    - name: Mostrar tabla de rutas IPv4
+      command: ip route show
+      register: routes_ipv4
+      changed_when: false
+
+    - name: Mostrar tabla de rutas IPv6
+      command: ip -6 route show
+      register: routes_ipv6
+      changed_when: false
+
+    - name: Mostrar reglas de nftables
+      command: nft list ruleset
+      register: nft_rules
+      changed_when: false
+
+    - name: Resumen de configuración
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ Forwarding IPv4: habilitado"
+          - "✅ Forwarding IPv6: habilitado"
+          - "✅ RADVD: configurado sin SLAAC"
+          - "✅ nftables: NAT + forward configurado"
+          - ""
+          - "📋 Rutas IPv4:"
+          - "{{ routes_ipv4.stdout_lines }}"
+          - ""
+          - "📋 Rutas IPv6:"
+          - "{{ routes_ipv6.stdout_lines }}"
+          - "=========================================="
+
+  handlers:
+    - name: restart radvd
+      systemd:
+        name: radvd
+        state: restarted
+
+    - name: reload nftables
+      systemd:
+        name: nftables
+        state: reloaded
+
+    - name: restart sshd
+      systemd:
+        name: sshd
+        state: restarted
+
+- name: Reconfigurar Cliente Ubuntu
+  hosts: ubuntu-pc
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Liberar IP actual
+      command: dhclient -6 -r {{ ansible_default_ipv6.interface | default('ens192') }}
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Renovar IP vía DHCPv6
+      command: dhclient -6 {{ ansible_default_ipv6.interface | default('ens192') }}
+      changed_when: true
+
+    - name: Esperar 5 segundos para que se aplique
+      pause:
+        seconds: 5
+
+    - name: Verificar nueva IP
+      command: ip -6 addr show
+      register: ubuntu_ipv6
+      changed_when: false
+
+    - name: Test de conectividad a gateway
+      command: ping6 -c 3 {{ lan_ipv6_address }}
+      register: ping_gateway
+      changed_when: false
+      failed_when: false
+
+    - name: Test de conectividad a internet (Google DNS)
+      command: ping6 -c 3 2001:4860:4860::8888
+      register: ping_internet
+      changed_when: false
+      failed_when: false
+
+    - name: Resumen Ubuntu
+      debug:
+        msg:
+          - "=========================================="
+          - "📍 Ubuntu PC - Estado de Red"
+          - ""
+          - "IPs IPv6:"
+          - "{{ ubuntu_ipv6.stdout_lines }}"
+          - ""
+          - "Ping a Gateway: {{ 'OK' if ping_gateway.rc == 0 else 'FALLÓ' }}"
+          - "Ping a Internet: {{ 'OK' if ping_internet.rc == 0 else 'FALLÓ' }}"
+          - "=========================================="
+
+- name: Reconfigurar Cliente Windows
+  hosts: windows-pc
+  gather_facts: yes
+  tasks:
+    - name: Deshabilitar SLAAC en Windows (forzar DHCPv6 puro)
+      win_shell: |
+        # Deshabilitar autoconfiguración IPv6 (SLAAC)
+        netsh interface ipv6 set interface "Ethernet0" routerdiscovery=disabled
+        netsh interface ipv6 set interface "Ethernet0" managedaddress=enabled
+        netsh interface ipv6 set interface "Ethernet0" otherstateful=enabled
+        
+        # Liberar y renovar IPv6
+        ipconfig /release6
+        Start-Sleep -Seconds 2
+        ipconfig /renew6
+      register: ipv6_config_result
+
+    - name: Esperar 10 segundos para que se aplique DHCPv6
+      pause:
+        seconds: 10
+
+    - name: Verificar nueva configuración de red
+      win_shell: ipconfig /all
+      register: windows_ipconfig
+      changed_when: false
+
+    - name: Test de conectividad a gateway desde Windows
+      win_shell: ping -6 -n 3 {{ lan_ipv6_address }}
+      register: windows_ping_gateway
+      changed_when: false
+      failed_when: false
+
+    - name: Test de conectividad a internet desde Windows
+      win_shell: ping -6 -n 3 2001:4860:4860::8888
+      register: windows_ping_internet
+      changed_when: false
+      failed_when: false
+
+    - name: Resumen Windows
+      debug:
+        msg:
+          - "=========================================="
+          - "📍 Windows PC - Estado de Red"
+          - ""
+          - "Configuración de red:"
+          - "{{ windows_ipconfig.stdout_lines }}"
+          - ""
+          - "Ping a Gateway: {{ 'OK' if windows_ping_gateway.rc == 0 else 'FALLÓ' }}"
+          - "Ping a Internet: {{ 'OK' if windows_ping_internet.rc == 0 else 'FALLÓ' }}"
+          - "=========================================="
+
+- name: Resumen Final
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Mostrar resumen de correcciones
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ CORRECCIONES APLICADAS"
+          - "=========================================="
+          - ""
+          - "1. ✅ debian-router:"
+          - "   - SLAAC deshabilitado (AdvAutonomous off)"
+          - "   - NAT configurado para acceso a internet"
+          - "   - Forwarding IPv4/IPv6 habilitado"
+          - "   - nftables con reglas de masquerade"
+          - ""
+          - "2. ✅ ubuntu-pc:"
+          - "   - IP renovada vía DHCPv6"
+          - "   - Debería tener IP corta (::10)"
+          - ""
+          - "3. ✅ windows-pc:"
+          - "   - SLAAC deshabilitado en adaptador"
+          - "   - DHCPv6 forzado"
+          - "   - Debería tener IP corta (::11)"
+          - ""
+          - "📋 PRÓXIMOS PASOS:"
+          - "   1. Verificar en Windows: ipconfig /all"
+          - "   2. Verificar IP corta sin ':0:' en el medio"
+          - "   3. Probar ping a internet: ping -6 google.com"
+          - "   4. Probar SSH: ssh usuario@2025:db8:101::11"
+          - "=========================================="

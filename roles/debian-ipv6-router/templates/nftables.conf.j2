@@ -4,15 +4,23 @@
 flush ruleset
 
 # ==============================================================================
-# Tabla NAT para enmascarar tráfico desde la red de gestión hacia la red LAN.
-# Esto permite que el nodo de control (en la red de gestión) se comunique
-# con los hosts de la red del laboratorio (p.ej. para WinRM).
+# Tabla NAT para enmascarar tráfico desde la red LAN hacia internet (WAN).
+# Esto permite que los clientes de la red interna (Red Fernandez) accedan
+# a internet a través del debian-router como gateway.
 # ==============================================================================
 table inet nat {
     chain postrouting {
         type nat hook postrouting priority 100; policy accept;
-        # Enmascara el tráfico que sale por la interfaz LAN
+        
+        # NAT para tráfico desde LAN hacia WAN (acceso a internet)
+        oifname "{{ wan_interface }}" masquerade
+        
+        # NAT para tráfico desde LAN hacia LAN (interno)
         oifname "{{ lan_interface }}" masquerade
+    }
+    
+    chain prerouting {
+        type nat hook prerouting priority -100; policy accept;
     }
 }
 
@@ -61,11 +69,14 @@ table inet ansible {
         # 2. Permitir el reenvío de tráfico desde la LAN hacia la WAN (salida a internet).
         iifname "{{ lan_interface }}" oifname "{{ wan_interface }}" accept
 
-        # 3. Permitir el reenvío desde la WAN a la LAN (para WinRM, etc.).
-        iifname "{{ wan_interface }}" oifname "{{ lan_interface }}" accept
+        # 3. Permitir el reenvío desde la WAN a la LAN (respuestas, etc.).
+        iifname "{{ wan_interface }}" oifname "{{ lan_interface }}" ct state {established, related} accept
 
-        # 3. Permitir ICMPv6 entre redes.
+        # 4. Permitir ICMPv6 entre redes (necesario para IPv6).
         ip6 nexthdr icmpv6 accept
+        
+        # 5. Permitir ICMPv4 (ping, etc.)
+        ip protocol icmp accept
     }
 
     chain output {
