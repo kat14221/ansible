@@ -64,8 +64,13 @@
 
   handlers:
     - name: apply netplan
-      command: netplan apply
+      shell: |
+        # Aplicar netplan de forma asíncrona para no colgar SSH
+        nohup sh -c 'netplan apply' > /dev/null 2>&1 &
+        sleep 2
       become: yes
+      async: 5
+      poll: 0
 
     - name: start and enable ssh
       systemd:

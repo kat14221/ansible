@@ -116,14 +116,18 @@
 
     - name: Renovar IP con netplan (Ubuntu 24.04)
       block:
-        - name: Aplicar netplan
-          command: netplan apply
-          changed_when: true
-
-        - name: Reiniciar networkd para forzar renovación DHCPv6
+        - name: Reiniciar systemd-networkd de forma segura
           systemd:
             name: systemd-networkd
             state: restarted
+          async: 10
+          poll: 0
+          changed_when: true
+
+        - name: Esperar a que la red se estabilice
+          wait_for:
+            timeout: 8
+          delegate_to: localhost
       when: not dhclient_exists.stat.exists
 
     - name: Esperar 5 segundos para que se aplique
