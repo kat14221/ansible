@@ -140,7 +140,7 @@
       changed_when: false
 
     - name: Test de conectividad a gateway
-      command: ping6 -c 3 {{ lan_ipv6_address }}
+      command: ping6 -c 3 2025:db8:101::1
       register: ping_gateway
       changed_when: false
       failed_when: false
@@ -191,7 +191,7 @@
       changed_when: false
 
     - name: Test de conectividad a gateway desde Windows
-      win_shell: ping -6 -n 3 {{ lan_ipv6_address }}
+      win_shell: ping -6 -n 3 2025:db8:101::1
       register: windows_ping_gateway
       changed_when: false
       failed_when: false
