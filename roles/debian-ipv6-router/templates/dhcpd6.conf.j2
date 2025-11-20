@@ -25,3 +25,19 @@ subnet6 {{ dhcpv6_subnet }}/{{ dhcpv6_prefix }} {
     # Rapid Commit (acelera la asignación)
     option dhcp6.rapid-commit;
 }
+
+# ============================================
+# Reservas de IP fijas por MAC (Host Declarations)
+# ============================================
+
+# Windows PC - IP fija ::11
+host windows-pc {
+    hardware ethernet 00:0c:29:87:97:38;
+    fixed-address6 2025:db8:101::11;
+}
+
+# Ubuntu PC - IP fija ::10
+host ubuntu-pc {
+    hardware ethernet 00:0c:29:35:41:60;
+    fixed-address6 2025:db8:101::10;
+}
