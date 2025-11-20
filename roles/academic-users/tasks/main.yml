@@ -59,8 +59,8 @@
   win_user:
     name: "{{ item }}"
     password: "alumno123"
-    groups:
-      - Users
+    groups_action: add
+    groups: Users
     state: present
   loop:
     - alumno1
@@ -72,8 +72,8 @@
   win_user:
     name: "{{ item }}"
     password: "profesor123"
-    groups:
-      - Users
+    groups_action: add
+    groups: Users
     state: present
   loop:
     - profesor1
@@ -84,7 +84,7 @@
   win_user:
     name: admin
     password: "admin123"
-    groups:
-      - Administrators
+    groups_action: add
+    groups: Administrators
     state: present
   when: ansible_connection == "winrm"
