@@ -76,7 +76,6 @@
       - alumno3
     state: present
   when: ansible_connection == "winrm"
-  ignore_errors: yes
 
 - name: Crear usuarios profesores (Windows)
   win_user:
@@ -97,7 +96,6 @@
       - profesor2
     state: present
   when: ansible_connection == "winrm"
-  ignore_errors: yes
 
 - name: Crear usuario admin (Windows)
   win_user:
@@ -114,4 +112,3 @@
       - admin
     state: present
   when: ansible_connection == "winrm"
-  ignore_errors: yes
