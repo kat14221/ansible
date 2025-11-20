@@ -59,32 +59,59 @@
   win_user:
     name: "{{ item }}"
     password: "alumno123"
-    groups_action: add
-    groups: Users
     state: present
+    password_never_expires: yes
   loop:
     - alumno1
     - alumno2
     - alumno3
   when: ansible_connection == "winrm"
 
+- name: Agregar alumnos al grupo Usuarios (Windows)
+  win_group_membership:
+    name: Usuarios
+    members:
+      - alumno1
+      - alumno2
+      - alumno3
+    state: present
+  when: ansible_connection == "winrm"
+  ignore_errors: yes
+
 - name: Crear usuarios profesores (Windows)
   win_user:
     name: "{{ item }}"
     password: "profesor123"
-    groups_action: add
-    groups: Users
     state: present
+    password_never_expires: yes
   loop:
     - profesor1
     - profesor2
   when: ansible_connection == "winrm"
 
+- name: Agregar profesores al grupo Usuarios (Windows)
+  win_group_membership:
+    name: Usuarios
+    members:
+      - profesor1
+      - profesor2
+    state: present
+  when: ansible_connection == "winrm"
+  ignore_errors: yes
+
 - name: Crear usuario admin (Windows)
   win_user:
     name: admin
     password: "admin123"
-    groups_action: add
-    groups: Administrators
+    state: present
+    password_never_expires: yes
+  when: ansible_connection == "winrm"
+
+- name: Agregar admin al grupo Administradores (Windows)
+  win_group_membership:
+    name: Administradores
+    members:
+      - admin
     state: present
   when: ansible_connection == "winrm"
+  ignore_errors: yes
