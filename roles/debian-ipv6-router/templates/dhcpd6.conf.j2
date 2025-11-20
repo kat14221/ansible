@@ -21,9 +21,6 @@ subnet6 {{ dhcpv6_subnet }}/{{ dhcpv6_prefix }} {
 
     # Domain search list
     option dhcp6.domain-search "local";
-
-    # Rapid Commit (acelera la asignación)
-    option dhcp6.rapid-commit;
 }
 
 # ============================================
