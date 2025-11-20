@@ -8,14 +8,14 @@
     name: alumnos
     state: present
   become: yes
-  when: ansible_os_family != "Windows"
+  when: ansible_connection != "winrm"
 
 - name: Crear grupo para profesores (Linux)
   group:
     name: profesores
     state: present
   become: yes
-  when: ansible_os_family != "Windows"
+  when: ansible_connection != "winrm"
 
 - name: Crear usuarios alumnos (Linux)
   user:
@@ -29,7 +29,7 @@
     - alumno2
     - alumno3
   become: yes
-  when: ansible_os_family != "Windows"
+  when: ansible_connection != "winrm"
 
 - name: Crear usuarios profesores (Linux)
   user:
@@ -42,7 +42,7 @@
     - profesor1  
     - profesor2
   become: yes
-  when: ansible_os_family != "Windows"
+  when: ansible_connection != "winrm"
 
 - name: Crear usuario admin con privilegios sudo (Linux)
   user:
@@ -52,7 +52,7 @@
     shell: /bin/bash
     state: present
   become: yes
-  when: ansible_os_family != "Windows"
+  when: ansible_connection != "winrm"
 
 # Tareas para sistemas Windows
 - name: Crear usuarios alumnos (Windows)
@@ -66,7 +66,7 @@
     - alumno1
     - alumno2
     - alumno3
-  when: ansible_os_family == "Windows"
+  when: ansible_connection == "winrm"
 
 - name: Crear usuarios profesores (Windows)
   win_user:
@@ -78,7 +78,7 @@
   loop:
     - profesor1
     - profesor2
-  when: ansible_os_family == "Windows"
+  when: ansible_connection == "winrm"
 
 - name: Crear usuario admin (Windows)
   win_user:
@@ -87,4 +87,4 @@
     groups:
       - Administrators
     state: present
-  when: ansible_os_family == "Windows"
+  when: ansible_connection == "winrm"
