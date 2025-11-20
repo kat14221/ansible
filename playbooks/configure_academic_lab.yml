@@ -82,17 +82,18 @@
   hosts: windows-pc
   gather_facts: yes
   tasks:
-    - name: Deshabilitar SLAAC en Windows (forzar DHCPv6 puro)
-      win_shell: |
-        # Deshabilitar autoconfiguración IPv6 (SLAAC)
-        netsh interface ipv6 set interface "Ethernet0" routerdiscovery=disabled
-        netsh interface ipv6 set interface "Ethernet0" managedaddress=enabled
-        netsh interface ipv6 set interface "Ethernet0" otherstateful=enabled
-        
-        # Liberar y renovar IPv6
-        ipconfig /release6
-        ipconfig /renew6
-      register: ipv6_config_result
+    # NOTA: Esta tarea se omite porque Windows ya está configurado con DHCPv6
+    # Si necesitas reconfigurar, ejecuta manualmente en Windows PowerShell:
+    # netsh interface ipv6 set interface "Ethernet0" managedaddress=enabled
+    # Restart-NetAdapter -Name "Ethernet0"
+    
+    - name: Verificar conectividad IPv6 en Windows
+      win_ping:
+      register: windows_ping_result
+    
+    - name: Mostrar resultado de conectividad
+      debug:
+        msg: "Windows está accesible vía IPv6: {{ ansible_host }}"
       changed_when: true
 
     - name: Verificar configuración de red en Windows
