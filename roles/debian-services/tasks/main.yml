@@ -14,6 +14,7 @@
   systemd:
     name: apache2
     state: stopped
+  ignore_errors: yes
 
 - name: Crear página de prueba
   template:
@@ -21,24 +22,46 @@
     dest: /var/www/html/index.html
     mode: '0644'
 
-- name: Configurar Apache para escuchar en IPv6
-  lineinfile:
-    path: /etc/apache2/ports.conf
-    regexp: '^Listen 80'
-    line: "Listen 80"
-    state: present
+- name: Verificar configuración actual de Apache
+  command: grep -E "^Listen" /etc/apache2/ports.conf
+  register: apache_ports_before
+  ignore_errors: yes
+  changed_when: false
 
-- name: Asegurar Apache escucha en IPv6
+- name: Limpiar configuración de puertos de Apache
   lineinfile:
     path: /etc/apache2/ports.conf
-    line: "Listen [::]:80"
-    insertafter: '^Listen 80'
-    state: present
+    regexp: '^Listen'
+    state: absent
+
+- name: Configurar Apache para escuchar en IPv4 e IPv6
+  blockinfile:
+    path: /etc/apache2/ports.conf
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - IPv6"
+    insertafter: EOF
+    block: |
+      Listen 80
+      <IfModule ssl_module>
+              Listen 443
+      </IfModule>
+      <IfModule mod_gnutls.c>
+              Listen 443
+      </IfModule>
+
+- name: Verificar sintaxis de Apache
+  command: apache2ctl configtest
+  register: apache_configtest
+  failed_when: false
+  changed_when: false
+
+- name: Mostrar resultado de verificación
+  debug:
+    msg: "Apache config test: {{ apache_configtest.stdout_lines }}"
 
 - name: Iniciar y habilitar Apache
   systemd:
     name: apache2
-    state: restarted
+    state: started
     enabled: yes
 
 - name: Verificar estado de Apache
