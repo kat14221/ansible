@@ -26,6 +26,15 @@
     group: root
   become: yes
 
+- name: "📡 Network Monitor - Crear directorio de logs"
+  file:
+    path: /var/log/network-monitor
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+
 - name: "📡 Network Monitor - Crear virtualenv"
   pip:
     name:
