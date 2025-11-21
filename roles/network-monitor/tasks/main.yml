@@ -113,18 +113,14 @@
     state: started
   become: yes
 
-- name: "📡 Network Monitor - Permitir puerto 5000 en nftables (nftables_rule)"
-  community.general.nftables_rule:
-    family: inet
-    table: ansible # La tabla por defecto creada por el rol del router
-    chain: input
-    rule: "tcp dport {{ monitor_port }} accept"
-    comment: "Permitir acceso al Network Monitor"
+- name: "📡 Network Monitor - Permitir puerto 5000 en nftables"
+  command: nft add rule inet filter input tcp dport {{ monitor_port }} accept comment "Network Monitor"
   become: yes
+  ignore_errors: yes  # Por si la regla ya existe
 
 - name: "📡 Network Monitor - Verificar que la aplicación está corriendo"
   uri:
-    url: "http://localhost:5000/"
+    url: "http://localhost:{{ monitor_port }}/"
     status_code: 200
   register: result
   until: result.status == 200
