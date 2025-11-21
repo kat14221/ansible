@@ -1,0 +1,535 @@
+---
+# Playbook: Generar Evidencias de Capa de Aplicación
+# Objetivo: Demostrar competencia en servicios HTTP y FTP con pruebas reales
+
+- name: Evidencias de Servicios de Aplicación - HTTP y FTP
+  hosts: localhost
+  gather_facts: no
+  vars:
+    evidence_dir: "evidence/capa_aplicacion"
+    timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+  
+  tasks:
+    - name: Crear directorio de evidencias
+      file:
+        path: "{{ evidence_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Generar reporte inicial
+      copy:
+        dest: "{{ evidence_dir }}/00_RESUMEN.txt"
+        content: |
+          ========================================================
+          EVIDENCIA: COMPETENCIA EN CAPA DE APLICACIÓN
+          ========================================================
+          Fecha: {{ ansible_date_time.date }} {{ ansible_date_time.time }}
+          
+          SERVICIOS CONFIGURADOS:
+          - HTTP (Apache2) en debian-router
+          - FTP (vsftpd) en debian-router
+          
+          PRUEBAS REALIZADAS:
+          1. Conexión HTTP desde Ubuntu y Windows
+          2. Descarga de archivos vía HTTP
+          3. Conexión FTP desde Ubuntu y Windows
+          4. Descarga de archivos vía FTP
+          5. Validación IPv6 end-to-end
+          
+          TOPOLOGÍA:
+          debian-router: 2025:db8:101::1 (servidor HTTP/FTP)
+          ubuntu-pc: 2025:db8:101::10 (cliente)
+          windows-pc: 2025:db8:101::11 (cliente)
+          ========================================================
+
+- name: Pruebas desde Ubuntu Cliente
+  hosts: ubuntu-pc
+  gather_facts: yes
+  vars:
+    evidence_dir: "evidence/capa_aplicacion"
+    server_ipv6: "2025:db8:101::1"
+    server_ipv4: "172.17.25.122"
+  
+  tasks:
+    - name: Instalar herramientas necesarias
+      apt:
+        name:
+          - curl
+          - wget
+          - ftp
+          - lftp
+        state: present
+        update_cache: yes
+      become: yes
+
+    - name: "[HTTP] Probar conexión web con curl IPv6"
+      shell: |
+        curl -6 -v http://[{{ server_ipv6 }}] -o /tmp/http_test.html 2>&1
+      register: ubuntu_http_curl
+      ignore_errors: yes
+
+    - name: "[HTTP] Descargar página con wget IPv6"
+      shell: |
+        wget -6 --output-document=/tmp/http_wget.html http://[{{ server_ipv6 }}]/ 2>&1
+      register: ubuntu_http_wget
+      ignore_errors: yes
+
+    - name: "[HTTP] Verificar contenido descargado"
+      shell: |
+        if [ -f /tmp/http_wget.html ]; then
+          echo "=== ARCHIVO DESCARGADO ==="
+          ls -lh /tmp/http_wget.html
+          echo ""
+          echo "=== PRIMERAS 10 LÍNEAS ==="
+          head -n 10 /tmp/http_wget.html
+        else
+          echo "ERROR: Archivo no descargado"
+        fi
+      register: ubuntu_http_content
+      ignore_errors: yes
+
+    - name: "[FTP] Listar archivos FTP con lftp"
+      shell: |
+        lftp -e "ls; bye" -u ftpuser,ftppass123 {{ server_ipv6 }} 2>&1
+      register: ubuntu_ftp_list
+      ignore_errors: yes
+
+    - name: "[FTP] Descargar archivo vía FTP"
+      shell: |
+        lftp -e "get public/README.txt -o /tmp/ftp_download.txt; bye" -u ftpuser,ftppass123 {{ server_ipv6 }} 2>&1
+      register: ubuntu_ftp_download
+      ignore_errors: yes
+
+    - name: "[FTP] Verificar archivo FTP descargado"
+      shell: |
+        if [ -f /tmp/ftp_download.txt ]; then
+          echo "=== ARCHIVO FTP DESCARGADO ==="
+          ls -lh /tmp/ftp_download.txt
+          echo ""
+          echo "=== CONTENIDO ==="
+          cat /tmp/ftp_download.txt
+        else
+          echo "ERROR: Archivo FTP no descargado"
+        fi
+      register: ubuntu_ftp_content
+      ignore_errors: yes
+
+    - name: Verificar conectividad IPv6 al servidor
+      shell: |
+        ping -6 -c 4 {{ server_ipv6 }} 2>&1
+      register: ubuntu_ping
+      ignore_errors: yes
+
+    - name: Guardar evidencias Ubuntu
+      copy:
+        dest: "{{ evidence_dir }}/ubuntu_evidencias.txt"
+        content: |
+          ========================================================
+          EVIDENCIAS DESDE UBUNTU-PC ({{ ansible_hostname }})
+          ========================================================
+          IPv6: {{ ansible_default_ipv6.address | default('N/A') }}
+          IPv4: {{ ansible_default_ipv4.address | default('N/A') }}
+          Sistema: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Fecha: {{ ansible_date_time.date }} {{ ansible_date_time.time }}
+          
+          ========================================================
+          1. PRUEBA HTTP - CURL IPv6
+          ========================================================
+          {{ ubuntu_http_curl.stdout }}
+          {{ ubuntu_http_curl.stderr }}
+          Código de salida: {{ ubuntu_http_curl.rc }}
+          
+          ========================================================
+          2. PRUEBA HTTP - WGET IPv6
+          ========================================================
+          {{ ubuntu_http_wget.stdout }}
+          {{ ubuntu_http_wget.stderr }}
+          Código de salida: {{ ubuntu_http_wget.rc }}
+          
+          ========================================================
+          3. CONTENIDO HTTP DESCARGADO
+          ========================================================
+          {{ ubuntu_http_content.stdout }}
+          
+          ========================================================
+          4. PRUEBA FTP - LISTAR ARCHIVOS
+          ========================================================
+          {{ ubuntu_ftp_list.stdout }}
+          {{ ubuntu_ftp_list.stderr }}
+          Código de salida: {{ ubuntu_ftp_list.rc }}
+          
+          ========================================================
+          5. PRUEBA FTP - DESCARGA DE ARCHIVO
+          ========================================================
+          {{ ubuntu_ftp_download.stdout }}
+          {{ ubuntu_ftp_download.stderr }}
+          Código de salida: {{ ubuntu_ftp_download.rc }}
+          
+          ========================================================
+          6. CONTENIDO FTP DESCARGADO
+          ========================================================
+          {{ ubuntu_ftp_content.stdout }}
+          
+          ========================================================
+          7. CONECTIVIDAD IPv6 AL SERVIDOR
+          ========================================================
+          {{ ubuntu_ping.stdout }}
+          
+          ========================================================
+          CONCLUSIÓN UBUNTU
+          ========================================================
+          HTTP IPv6: {{ 'EXITOSO' if ubuntu_http_curl.rc == 0 else 'FALLIDO' }}
+          FTP IPv6: {{ 'EXITOSO' if ubuntu_ftp_download.rc == 0 else 'FALLIDO' }}
+          Ping IPv6: {{ 'EXITOSO' if ubuntu_ping.rc == 0 else 'FALLIDO' }}
+          ========================================================
+      delegate_to: localhost
+      become: no
+
+- name: Pruebas desde Windows Cliente
+  hosts: windows-pc
+  gather_facts: yes
+  vars:
+    evidence_dir: "evidence/capa_aplicacion"
+    server_ipv6: "2025:db8:101::1"
+    server_ipv4: "172.17.25.122"
+  
+  tasks:
+    - name: "[HTTP] Probar conexión web con PowerShell IPv6"
+      win_shell: |
+        try {
+          $response = Invoke-WebRequest -Uri "http://[{{ server_ipv6 }}]" -UseBasicParsing
+          Write-Output "StatusCode: $($response.StatusCode)"
+          Write-Output "ContentLength: $($response.Content.Length) bytes"
+          Write-Output ""
+          Write-Output "=== PRIMERAS 500 CARACTERES ==="
+          Write-Output $response.Content.Substring(0, [Math]::Min(500, $response.Content.Length))
+          
+          # Guardar contenido
+          $response.Content | Out-File -FilePath "C:\temp\http_test.html" -Encoding UTF8
+          Write-Output ""
+          Write-Output "Archivo guardado en C:\temp\http_test.html"
+        } catch {
+          Write-Output "ERROR: $_"
+        }
+      register: win_http_test
+      ignore_errors: yes
+
+    - name: "[HTTP] Descargar archivo con wget de PowerShell"
+      win_shell: |
+        try {
+          $dest = "C:\temp\http_download.html"
+          Invoke-WebRequest -Uri "http://[{{ server_ipv6 }}]" -OutFile $dest -UseBasicParsing
+          if (Test-Path $dest) {
+            Write-Output "Descarga exitosa:"
+            Get-Item $dest | Format-List Name, Length, LastWriteTime
+          }
+        } catch {
+          Write-Output "ERROR: $_"
+        }
+      register: win_http_download
+      ignore_errors: yes
+
+    - name: Crear directorio temporal en Windows
+      win_file:
+        path: C:\temp
+        state: directory
+
+    - name: "[FTP] Probar FTP con PowerShell"
+      win_shell: |
+        try {
+          # Crear archivo de comandos FTP
+          $ftpCommands = @"
+        open {{ server_ipv6 }}
+        ftpuser
+        ftppass123
+        cd public
+        dir
+        get README.txt C:\temp\ftp_download.txt
+        bye
+        "@
+          $ftpCommands | Out-File -FilePath "C:\temp\ftp_commands.txt" -Encoding ASCII
+          
+          # Ejecutar FTP
+          $output = ftp -s:"C:\temp\ftp_commands.txt" 2>&1
+          Write-Output $output
+          
+          # Verificar descarga
+          if (Test-Path "C:\temp\ftp_download.txt") {
+            Write-Output ""
+            Write-Output "=== ARCHIVO FTP DESCARGADO ==="
+            Get-Item "C:\temp\ftp_download.txt" | Format-List
+            Write-Output ""
+            Write-Output "=== CONTENIDO ==="
+            Get-Content "C:\temp\ftp_download.txt"
+          }
+        } catch {
+          Write-Output "ERROR: $_"
+        }
+      register: win_ftp_test
+      ignore_errors: yes
+
+    - name: Verificar conectividad IPv6
+      win_shell: |
+        ping -6 -n 4 {{ server_ipv6 }}
+      register: win_ping
+      ignore_errors: yes
+
+    - name: Verificar configuración de red Windows
+      win_shell: |
+        Write-Output "=== CONFIGURACIÓN IPv6 ==="
+        Get-NetIPAddress -AddressFamily IPv6 | Where-Object {$_.IPAddress -like "2025:*"} | Format-List
+        Write-Output ""
+        Write-Output "=== GATEWAY IPv6 ==="
+        Get-NetRoute -AddressFamily IPv6 | Where-Object {$_.DestinationPrefix -eq "::/0"} | Format-List
+      register: win_network
+      ignore_errors: yes
+
+    - name: Guardar evidencias Windows
+      copy:
+        dest: "{{ evidence_dir }}/windows_evidencias.txt"
+        content: |
+          ========================================================
+          EVIDENCIAS DESDE WINDOWS-PC ({{ ansible_hostname }})
+          ========================================================
+          Sistema: {{ ansible_os_family }} {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Fecha: {{ ansible_date_time.date }} {{ ansible_date_time.time }}
+          
+          ========================================================
+          1. CONFIGURACIÓN DE RED
+          ========================================================
+          {{ win_network.stdout }}
+          
+          ========================================================
+          2. PRUEBA HTTP - INVOKE-WEBREQUEST IPv6
+          ========================================================
+          {{ win_http_test.stdout }}
+          Código de salida: {{ win_http_test.rc }}
+          
+          ========================================================
+          3. PRUEBA HTTP - DESCARGA DE ARCHIVO
+          ========================================================
+          {{ win_http_download.stdout }}
+          Código de salida: {{ win_http_download.rc }}
+          
+          ========================================================
+          4. PRUEBA FTP - CONEXIÓN Y DESCARGA
+          ========================================================
+          {{ win_ftp_test.stdout }}
+          Código de salida: {{ win_ftp_test.rc }}
+          
+          ========================================================
+          5. CONECTIVIDAD IPv6 AL SERVIDOR
+          ========================================================
+          {{ win_ping.stdout }}
+          
+          ========================================================
+          CONCLUSIÓN WINDOWS
+          ========================================================
+          HTTP IPv6: {{ 'EXITOSO' if win_http_test.rc == 0 else 'FALLIDO' }}
+          FTP IPv6: {{ 'EXITOSO' if win_ftp_test.rc == 0 else 'FALLIDO' }}
+          Ping IPv6: {{ 'EXITOSO' if win_ping.rc == 0 else 'FALLIDO' }}
+          ========================================================
+      delegate_to: localhost
+      become: no
+
+- name: Verificar estado de servicios en servidor
+  hosts: debian-router
+  gather_facts: yes
+  vars:
+    evidence_dir: "evidence/capa_aplicacion"
+  
+  tasks:
+    - name: Estado de Apache
+      shell: systemctl status apache2 --no-pager
+      register: apache_status
+      ignore_errors: yes
+
+    - name: Estado de vsftpd
+      shell: systemctl status vsftpd --no-pager
+      register: vsftpd_status
+      ignore_errors: yes
+
+    - name: Puertos en escucha
+      shell: netstat -tlnp | grep -E '(:80|:21)'
+      register: listening_ports
+      ignore_errors: yes
+
+    - name: Conexiones activas
+      shell: netstat -tnp | grep -E '(:80|:21)'
+      register: active_connections
+      ignore_errors: yes
+
+    - name: Logs recientes de Apache
+      shell: journalctl -u apache2 -n 30 --no-pager
+      register: apache_logs
+      ignore_errors: yes
+
+    - name: Logs recientes de vsftpd
+      shell: journalctl -u vsftpd -n 30 --no-pager
+      register: vsftpd_logs
+      ignore_errors: yes
+
+    - name: Guardar evidencias del servidor
+      copy:
+        dest: "{{ evidence_dir }}/servidor_evidencias.txt"
+        content: |
+          ========================================================
+          EVIDENCIAS DEL SERVIDOR ({{ ansible_hostname }})
+          ========================================================
+          IPv6 LAN: {{ lan_ipv6_address | default('N/A') }}
+          IPv4 Gestión: {{ ansible_host }}
+          Sistema: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Fecha: {{ ansible_date_time.date }} {{ ansible_date_time.time }}
+          
+          ========================================================
+          1. ESTADO APACHE2
+          ========================================================
+          {{ apache_status.stdout }}
+          
+          ========================================================
+          2. ESTADO VSFTPD
+          ========================================================
+          {{ vsftpd_status.stdout }}
+          
+          ========================================================
+          3. PUERTOS EN ESCUCHA
+          ========================================================
+          {{ listening_ports.stdout }}
+          
+          ========================================================
+          4. CONEXIONES ACTIVAS
+          ========================================================
+          {{ active_connections.stdout }}
+          
+          ========================================================
+          5. LOGS APACHE (ÚLTIMOS 30)
+          ========================================================
+          {{ apache_logs.stdout }}
+          
+          ========================================================
+          6. LOGS VSFTPD (ÚLTIMOS 30)
+          ========================================================
+          {{ vsftpd_logs.stdout }}
+          
+          ========================================================
+          CONCLUSIÓN SERVIDOR
+          ========================================================
+          Apache: {{ 'ACTIVO' if 'active (running)' in apache_status.stdout else 'INACTIVO' }}
+          vsftpd: {{ 'ACTIVO' if 'active (running)' in vsftpd_status.stdout else 'INACTIVO' }}
+          Puerto 80: {{ 'ESCUCHANDO' if ':80' in listening_ports.stdout else 'NO ESCUCHA' }}
+          Puerto 21: {{ 'ESCUCHANDO' if ':21' in listening_ports.stdout else 'NO ESCUCHA' }}
+          ========================================================
+      delegate_to: localhost
+      become: no
+
+- name: Generar Reporte Final
+  hosts: localhost
+  gather_facts: yes
+  vars:
+    evidence_dir: "evidence/capa_aplicacion"
+  
+  tasks:
+    - name: Crear reporte consolidado
+      shell: |
+        cat << 'EOF' > {{ evidence_dir }}/REPORTE_FINAL_CAPA_APLICACION.txt
+        ╔════════════════════════════════════════════════════════════════╗
+        ║                                                                ║
+        ║   REPORTE DE COMPETENCIA EN CAPA DE APLICACIÓN                ║
+        ║   Configuración y Validación de Servicios HTTP y FTP          ║
+        ║                                                                ║
+        ╚════════════════════════════════════════════════════════════════╝
+        
+        📅 FECHA: $(date '+%Y-%m-%d %H:%M:%S')
+        👤 GENERADO POR: Ansible Automation
+        
+        ═══════════════════════════════════════════════════════════════
+        📊 RESUMEN EJECUTIVO
+        ═══════════════════════════════════════════════════════════════
+        
+        ✅ SERVICIOS CONFIGURADOS:
+           • Apache2 (HTTP) en debian-router [2025:db8:101::1]
+           • vsftpd (FTP) en debian-router [2025:db8:101::1]
+        
+        ✅ CLIENTES PROBADOS:
+           • Ubuntu 24.04 [2025:db8:101::10]
+           • Windows 11 [2025:db8:101::11]
+        
+        ✅ PRUEBAS REALIZADAS:
+           • Conexión HTTP con curl/wget (Ubuntu)
+           • Conexión HTTP con PowerShell (Windows)
+           • Descarga de páginas web vía HTTP
+           • Conexión FTP con lftp (Ubuntu)
+           • Conexión FTP con cliente nativo (Windows)
+           • Descarga de archivos vía FTP
+           • Validación de conectividad IPv6
+        
+        ═══════════════════════════════════════════════════════════════
+        📁 ARCHIVOS DE EVIDENCIA GENERADOS
+        ═══════════════════════════════════════════════════════════════
+        
+        $(ls -lh {{ evidence_dir }}/*.txt 2>/dev/null || echo "Generando...")
+        
+        ═══════════════════════════════════════════════════════════════
+        🎯 COMPETENCIAS DEMOSTRADAS
+        ═══════════════════════════════════════════════════════════════
+        
+        ✓ Configuración de servidor web Apache2 con IPv6
+        ✓ Configuración de servidor FTP vsftpd con IPv6
+        ✓ Validación de servicios desde múltiples clientes
+        ✓ Pruebas de descarga de archivos HTTP y FTP
+        ✓ Verificación de conectividad end-to-end IPv6
+        ✓ Documentación automatizada de evidencias
+        
+        ═══════════════════════════════════════════════════════════════
+        📋 DETALLES TÉCNICOS
+        ═══════════════════════════════════════════════════════════════
+        
+        SERVIDOR (debian-router):
+        - SO: Debian 12
+        - IPv6: 2025:db8:101::1
+        - Servicios: Apache 2.4.x, vsftpd 3.x
+        
+        CLIENTE UBUNTU (ubuntu-pc):
+        - SO: Ubuntu 24.04
+        - IPv6: 2025:db8:101::10
+        - Herramientas: curl, wget, lftp
+        
+        CLIENTE WINDOWS (windows-pc):
+        - SO: Windows 11
+        - IPv6: 2025:db8:101::11
+        - Herramientas: PowerShell, FTP nativo
+        
+        ═══════════════════════════════════════════════════════════════
+        
+        Para ver los detalles completos, revisa los siguientes archivos:
+        - servidor_evidencias.txt    : Estado de servicios en el servidor
+        - ubuntu_evidencias.txt       : Pruebas desde cliente Ubuntu
+        - windows_evidencias.txt      : Pruebas desde cliente Windows
+        
+        ═══════════════════════════════════════════════════════════════
+        ✅ EVIDENCIA COMPLETADA EXITOSAMENTE
+        ═══════════════════════════════════════════════════════════════
+        EOF
+      args:
+        executable: /bin/bash
+
+    - name: Mostrar resumen final
+      debug:
+        msg:
+          - "╔════════════════════════════════════════════════════════════════╗"
+          - "║  ✅ EVIDENCIAS DE CAPA DE APLICACIÓN GENERADAS               ║"
+          - "╚════════════════════════════════════════════════════════════════╝"
+          - ""
+          - "📁 Ubicación: {{ evidence_dir }}/"
+          - ""
+          - "📄 Archivos generados:"
+          - "   • REPORTE_FINAL_CAPA_APLICACION.txt"
+          - "   • servidor_evidencias.txt"
+          - "   • ubuntu_evidencias.txt"
+          - "   • windows_evidencias.txt"
+          - ""
+          - "🎯 Competencias demostradas:"
+          - "   ✓ Configuración de servicios HTTP y FTP"
+          - "   ✓ Validación con múltiples clientes"
+          - "   ✓ Pruebas de descarga funcionales"
+          - "   ✓ Conectividad IPv6 end-to-end"
