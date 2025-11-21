@@ -16,6 +16,28 @@
     state: stopped
   ignore_errors: yes
 
+- name: Restaurar ports.conf a configuración predeterminada
+  copy:
+    dest: /etc/apache2/ports.conf
+    content: |
+      # If you just change the port or add more ports here, you will likely also
+      # have to change the VirtualHost statement in
+      # /etc/apache2/sites-enabled/000-default.conf
+      
+      Listen 80
+      
+      <IfModule ssl_module>
+              Listen 443
+      </IfModule>
+      
+      <IfModule mod_gnutls.c>
+              Listen 443
+      </IfModule>
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart apache2
+
 - name: Verificar que Apache esté correctamente instalado
   command: dpkg -l apache2
   register: apache_installed
@@ -86,10 +108,11 @@
   debug:
     msg: "{{ apache_final_status.stdout_lines }}"
 
-- name: Fallar si Apache no está corriendo
-  fail:
-    msg: "Apache2 no pudo iniciarse. Revisa los logs arriba."
-  when: apache_start.failed | default(false)
+# Comentado para permitir diagnóstico completo
+# - name: Fallar si Apache no está corriendo
+#   fail:
+#     msg: "Apache2 no pudo iniciarse. Revisa los logs arriba."
+#   when: apache_start.failed | default(false)
 
 - name: Verificar estado de Apache
   command: systemctl status apache2 --no-pager

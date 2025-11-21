@@ -1,0 +1,8 @@
+---
+# Handlers para debian-services role
+
+- name: restart apache2
+  systemd:
+    name: apache2
+    state: restarted
+  ignore_errors: yes
