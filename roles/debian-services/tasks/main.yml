@@ -16,79 +16,29 @@
     state: stopped
 
 - name: Crear página de prueba
-  copy:
-    content: |
-      <!DOCTYPE html>
-      <html>
-      <head>
-          <title>VMWARE-101001 - IPv6 Test Page</title>
-          <style>
-              body { font-family: Arial, sans-serif; margin: 40px; background: #f0f0f0; }
-              .container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-              h1 { color: #0066cc; }
-              .info { background: #e8f4fd; padding: 15px; border-left: 4px solid #0066cc; margin: 20px 0; }
-              .success { background: #d4edda; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0; }
-              code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; }
-          </style>
-      </head>
-      <body>
-          <div class="container">
-              <h1>🌐 Red Académica IPv6 - VMWARE-101001</h1>
-              
-              <div class="success">
-                  <h2>✅ Servidor HTTP Funcionando con IPv6</h2>
-                  <p>Esta página se sirve desde el router Debian configurado con Ansible.</p>
-              </div>
-              
-              <div class="info">
-                  <h3>📋 Información del Sistema</h3>
-                  <ul>
-                      <li><strong>Host:</strong> {{ inventory_hostname }}</li>
-                      <li><strong>Dirección IPv6 LAN:</strong> <code>{{ lan_ipv6_address }}/{{ lan_ipv6_prefix }}</code></li>
-                      <li><strong>Interfaz WAN:</strong> <code>{{ wan_interface }}</code></li>
-                      <li><strong>Subred LAN (radvd):</strong> <code>{{ radvd_prefix }}</code></li>
-                      <li><strong>Configuración:</strong> SLAAC/DHCPv6 con RADVD</li>
-                  </ul>
-              </div>
-              
-              <div class="info">
-                  <h3>🔧 Servicios Activos</h3>
-                  <ul>
-                      <li>Apache HTTP Server (IPv6)</li>
-                      <li>RADVD (Router Advertisement)</li>
-                      <li>DNSmasq (DHCPv6 + DNS)</li>
-                      <li>IP Forwarding IPv6</li>
-                  </ul>
-              </div>
-              
-              <div class="info">
-                  <h3>🌐 Conectividad</h3>
-                  <p>Acceso desde cualquier host en la LAN:</p>
-                  <code>http://[{{ lan_ipv6_address }}]</code>
-              </div>
-              
-              <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666;">
-                  <p><small>Configurado automáticamente con Ansible - {{ ansible_date_time.iso8601 }}</small></p>
-              </div>
-          </div>
-      </body>
-      </html>
+  template:
+    src: index.html.j2
     dest: /var/www/html/index.html
+    mode: '0644'
 
 - name: Configurar Apache para escuchar en IPv6
   lineinfile:
     path: /etc/apache2/ports.conf
-    line: "Listen [::]:80"
+    regexp: '^Listen 80'
+    line: "Listen 80"
     state: present
 
-- name: Habilitar módulos necesarios de Apache
-  command: a2enmod ssl rewrite
-  ignore_errors: yes
+- name: Asegurar Apache escucha en IPv6
+  lineinfile:
+    path: /etc/apache2/ports.conf
+    line: "Listen [::]:80"
+    insertafter: '^Listen 80'
+    state: present
 
 - name: Iniciar y habilitar Apache
   systemd:
     name: apache2
-    state: started
+    state: restarted
     enabled: yes
 
 - name: Verificar estado de Apache
