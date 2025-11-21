@@ -37,12 +37,20 @@
     virtualenv_command: python3 -m venv
   become: yes
 
+- name: "📡 Network Monitor - Copiar requirements.txt"
+  copy:
+    src: requirements.txt
+    dest: /opt/network-monitor/requirements.txt
+    mode: '0644'
+    owner: root
+    group: root
+  become: yes
+
 - name: "📡 Network Monitor - Instalar paquetes Python"
   pip:
     requirements: /opt/network-monitor/requirements.txt
     virtualenv: /opt/network-monitor/venv
   become: yes
-  when: lookup('file', '/opt/network-monitor/requirements.txt', errors='ignore')
 
 - name: "📡 Network Monitor - Copiar aplicación Flask"
   copy:
@@ -114,11 +122,9 @@
   become: yes
 
 - name: "📡 Network Monitor - Permitir puerto 5000 en nftables"
-  shell: nft add rule inet filter input tcp dport {{ monitor_port }} accept comment \"Network Monitor\"
+  shell: nft add rule inet ansible input tcp dport {{ monitor_port }} accept comment \"Network Monitor\"
   become: yes
   ignore_errors: yes  # Por si la regla ya existe
-  register: nft_result
-  changed_when: nft_result.rc == 0
   register: nft_result
   changed_when: nft_result.rc == 0
 
