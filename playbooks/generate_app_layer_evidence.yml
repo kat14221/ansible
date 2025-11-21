@@ -4,9 +4,9 @@
 
 - name: Evidencias de Servicios de Aplicación - HTTP y FTP
   hosts: localhost
-  gather_facts: no
+  gather_facts: yes
   vars:
-    evidence_dir: "evidence/capa_aplicacion"
+    evidence_dir: "{{ playbook_dir }}/../evidence/capa_aplicacion"
     timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
   
   tasks:
@@ -46,7 +46,7 @@
   hosts: ubuntu-pc
   gather_facts: yes
   vars:
-    evidence_dir: "evidence/capa_aplicacion"
+    evidence_dir: "{{ playbook_dir }}/../evidence/capa_aplicacion"
     server_ipv6: "2025:db8:101::1"
     server_ipv4: "172.17.25.122"
   
@@ -189,7 +189,7 @@
   hosts: windows-pc
   gather_facts: yes
   vars:
-    evidence_dir: "evidence/capa_aplicacion"
+    evidence_dir: "{{ playbook_dir }}/../evidence/capa_aplicacion"
     server_ipv6: "2025:db8:101::1"
     server_ipv4: "172.17.25.122"
   
@@ -336,7 +336,7 @@
   hosts: debian-router
   gather_facts: yes
   vars:
-    evidence_dir: "evidence/capa_aplicacion"
+    evidence_dir: "{{ playbook_dir }}/../evidence/capa_aplicacion"
   
   tasks:
     - name: Estado de Apache
@@ -426,7 +426,7 @@
   hosts: localhost
   gather_facts: yes
   vars:
-    evidence_dir: "evidence/capa_aplicacion"
+    evidence_dir: "{{ playbook_dir }}/../evidence/capa_aplicacion"
   
   tasks:
     - name: Crear reporte consolidado
