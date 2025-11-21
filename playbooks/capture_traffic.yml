@@ -1,41 +1,40 @@
 ﻿---
 # Playbook: Captura de Tráfico IPv6
-# Descripción: tcpdump + SPAN en switch
-# Evidencias: evidence/pcaps/
+# Descripción: tcpdump para análisis de red
+# Evidencias: /tmp/*.pcap
 
 - name: Captura de Tráfico IPv6
-  hosts: vm_router
+  hosts: debian-router
   become: yes
   gather_facts: yes
   tasks:
-    - name: Incluir role traffic-capture
-      include_role:
-        name: traffic-capture
+    - name: Instalar tcpdump
+      apt:
+        name: tcpdump
+        state: present
+        update_cache: yes
 
-    - name: Mostrar resumen de captura
+    - name: Capturar tráfico IPv6 en interfaz LAN
+      shell: |
+        timeout 30 tcpdump -i ens34 -w /tmp/captura_ipv6_$(date +%Y%m%d_%H%M%S).pcap ip6 &
+      async: 35
+      poll: 0
+      register: capture_job
+
+    - name: Mostrar información de captura
       debug:
         msg:
           - "================================================"
-          - "  Captura de Tráfico Completada"
+          - "  Captura de Tráfico Iniciada"
           - "================================================"
+          - "Interfaz: ens34 (LAN)"
+          - "Filtro: IPv6"
+          - "Duración: 30 segundos"
+          - "Archivo: /tmp/captura_ipv6_*.pcap"
           - ""
-          - "Método: tcpdump en interfaz ens160"
-          - "Filtro: IPv6 (ip6)"
-          - "Duración: 20 segundos"
+          - "Para descargar:"
+          - "  scp ansible@172.17.25.122:/tmp/captura_ipv6_*.pcap ~/"
           - ""
-          - "Tráfico capturado:"
-          - "  - Router Advertisements (RA)"
-          - "  - DHCPv6 Solicits"
-          - "  - ICMPv6 Echo Request/Reply"
-          - "  - Neighbor Discovery"
-          - ""
-          - "SPAN configurado en switch:"
-          - "  - Source: GigabitEthernet1/0/2"
-          - "  - Destination: GigabitEthernet1/0/3"
-          - ""
-          - "Archivos generados:"
-          - "  - evidence/pcaps/debian-router_capture_*.pcap"
-          - "  - evidence/pcaps/debian-router_capture_summary.txt"
-          - ""
-          - "Analizar con: wireshark evidence/pcaps/*.pcap"
+          - "Para analizar con Wireshark:"
+          - "  wireshark ~/captura_ipv6_*.pcap"
           - "================================================"
