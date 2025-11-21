@@ -108,6 +108,15 @@
   register: http_test
   ignore_errors: yes
 
+- name: Crear directorio de evidencias local
+  file:
+    path: evidence/services
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  become: no
+  run_once: true
+
 - name: Guardar información del servicio HTTP
   copy:
     content: |
@@ -223,10 +232,11 @@
       - IPv6: Habilitado
       - Modo Pasivo: Puertos 10000-10100
       
-      Acceso:
+      - Acceso:
       - Desde LAN: ftp://[{{ lan_ipv6_address }}]
     dest: "evidence/services/{{ inventory_hostname }}_ftp_service.txt"
   delegate_to: localhost
+  become: no
 
 - name: Mostrar resumen del servicio
   debug:
