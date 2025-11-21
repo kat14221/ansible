@@ -16,53 +16,64 @@
     state: stopped
   ignore_errors: yes
 
+- name: Verificar que Apache esté correctamente instalado
+  command: dpkg -l apache2
+  register: apache_installed
+  failed_when: false
+  changed_when: false
+
+- name: Reinstalar Apache si es necesario
+  apt:
+    name: apache2
+    state: present
+    force: yes
+  when: apache_installed.rc != 0
+
 - name: Crear página de prueba
   template:
     src: index.html.j2
     dest: /var/www/html/index.html
     mode: '0644'
 
-- name: Verificar configuración actual de Apache
-  command: grep -E "^Listen" /etc/apache2/ports.conf
-  register: apache_ports_before
-  ignore_errors: yes
-  changed_when: false
-
-- name: Limpiar configuración de puertos de Apache
-  lineinfile:
-    path: /etc/apache2/ports.conf
-    regexp: '^Listen'
-    state: absent
-
-- name: Configurar Apache para escuchar en IPv4 e IPv6
-  blockinfile:
-    path: /etc/apache2/ports.conf
-    marker: "# {mark} ANSIBLE MANAGED BLOCK - IPv6"
-    insertafter: EOF
-    block: |
-      Listen 80
-      <IfModule ssl_module>
-              Listen 443
-      </IfModule>
-      <IfModule mod_gnutls.c>
-              Listen 443
-      </IfModule>
-
-- name: Verificar sintaxis de Apache
+- name: Verificar sintaxis de Apache antes de iniciar
   command: apache2ctl configtest
   register: apache_configtest
   failed_when: false
   changed_when: false
 
-- name: Mostrar resultado de verificación
+- name: Mostrar resultado de verificación de configuración
   debug:
-    msg: "Apache config test: {{ apache_configtest.stdout_lines }}"
+    msg: "{{ apache_configtest.stderr_lines }}"
+  when: apache_configtest.rc != 0
 
-- name: Iniciar y habilitar Apache
+- name: Obtener logs de Apache si hay error
+  shell: journalctl -u apache2 -n 50 --no-pager
+  register: apache_logs
+  failed_when: false
+  changed_when: false
+  when: apache_configtest.rc != 0
+
+- name: Mostrar logs de Apache
+  debug:
+    msg: "{{ apache_logs.stdout_lines }}"
+  when: apache_configtest.rc != 0 and apache_logs is defined
+
+- name: Iniciar Apache
   systemd:
     name: apache2
     state: started
     enabled: yes
+  register: apache_start
+
+- name: Verificar estado final de Apache
+  command: systemctl status apache2 --no-pager
+  register: apache_final_status
+  failed_when: false
+  changed_when: false
+
+- name: Mostrar estado final
+  debug:
+    msg: "{{ apache_final_status.stdout_lines }}"
 
 - name: Verificar estado de Apache
   command: systemctl status apache2 --no-pager
