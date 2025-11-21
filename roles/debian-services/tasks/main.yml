@@ -46,24 +46,35 @@
     msg: "{{ apache_configtest.stderr_lines }}"
   when: apache_configtest.rc != 0
 
-- name: Obtener logs de Apache si hay error
+- name: Obtener logs de Apache antes de intentar iniciar
   shell: journalctl -u apache2 -n 50 --no-pager
-  register: apache_logs
+  register: apache_logs_before
   failed_when: false
   changed_when: false
-  when: apache_configtest.rc != 0
 
-- name: Mostrar logs de Apache
+- name: Mostrar logs previos de Apache
   debug:
-    msg: "{{ apache_logs.stdout_lines }}"
-  when: apache_configtest.rc != 0 and apache_logs is defined
+    msg: "{{ apache_logs_before.stdout_lines[-20:] }}"
 
-- name: Iniciar Apache
+- name: Intentar iniciar Apache
   systemd:
     name: apache2
     state: started
     enabled: yes
   register: apache_start
+  failed_when: false
+
+- name: Obtener logs de Apache después del intento
+  shell: journalctl -u apache2 -n 100 --no-pager
+  register: apache_logs_after
+  failed_when: false
+  changed_when: false
+  when: apache_start.failed | default(false)
+
+- name: Mostrar logs detallados si falló
+  debug:
+    msg: "{{ apache_logs_after.stdout_lines[-30:] }}"
+  when: apache_start.failed | default(false)
 
 - name: Verificar estado final de Apache
   command: systemctl status apache2 --no-pager
@@ -74,6 +85,11 @@
 - name: Mostrar estado final
   debug:
     msg: "{{ apache_final_status.stdout_lines }}"
+
+- name: Fallar si Apache no está corriendo
+  fail:
+    msg: "Apache2 no pudo iniciarse. Revisa los logs arriba."
+  when: apache_start.failed | default(false)
 
 - name: Verificar estado de Apache
   command: systemctl status apache2 --no-pager
