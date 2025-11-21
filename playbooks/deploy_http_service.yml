@@ -1,11 +1,9 @@
 ﻿---
 # Playbook: Desplegar Servicio HTTP y FTP
 # Descripción: Apache HTTP Server + vsftpd en IPv6
-# Acceso HTTP: http://[2025:db8:220::1]
-# Acceso FTP: ftp://[2025:db8:220::1]
 
 - name: Desplegar Servicios HTTP y FTP en Debian Router
-  hosts: vm_router
+  hosts: debian-router
   become: yes
   gather_facts: yes
   tasks:
@@ -27,17 +25,7 @@
           - "  Servicios HTTP y FTP Desplegados"
           - "================================================"
           - ""
-          - "HTTP:"
-          - "  - Desde LAN: http://[2025:db8:220::1]"
-          - "  - Desde backbone: http://[2025:db8:101::a1]"
-          - "  - Estado: {{ 'OK' if http_test.status | default(0) == 200 else 'Error' }}"
-          - ""
-          - "FTP:"
-          - "  - Desde LAN: ftp://[2025:db8:220::1]"
-          - "  - Desde backbone: ftp://[2025:db8:101::a1]"
-          - "  - Usuario: ftpuser / ftppass123"
-          - ""
-          - "Evidencias guardadas en:"
-          - "  evidence/services/{{ inventory_hostname }}_http_service.txt"
-          - "  evidence/services/{{ inventory_hostname }}_ftp_service.txt"
+          - "HTTP: http://[2025:db8:101::1]"
+          - "FTP: ftp://2025:db8:101::1"
+          - "Estado HTTP: {{ 'OK' if http_test.status | default(0) == 200 else 'Error' }}"
           - "================================================"
