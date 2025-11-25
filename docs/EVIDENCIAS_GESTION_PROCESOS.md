@@ -991,6 +991,108 @@ Resultado: No se detectaron errores críticos en las últimas 24 horas.
 
 ---
 
+### 📝 Sección 5: Gestión de Seguridad por Usuario
+
+```markdown
+## 5. Gestión de Seguridad por Usuario
+
+### Descripción
+
+Para alcanzar la competencia **"Gestión de seguridad por usuario: Define políticas seguras con restricciones claras"**, reforcé la administración de cuentas, permisos y políticas en el servidor `debian-router`. Mi objetivo fue garantizar que solo las personas autorizadas puedan operar los servicios críticos y que cada acción quede auditada.
+
+### Acciones Ejecutadas
+
+```bash
+# 1. Crear grupo administrativo restringido
+sudo groupadd lab-admins
+
+# 2. Incorporar cuentas con roles bien definidos
+sudo adduser academico
+sudo usermod -aG lab-admins academico
+
+# 3. Aplicar políticas de contraseñas y expiración
+sudo chage -M 45 -W 7 -I 10 academico
+sudo passwd -l root  # Mantengo acceso exclusivamente por claves SSH
+
+# 4. Definir reglas de sudo granular por política
+sudo tee /etc/sudoers.d/lab-admins <<'EOF'
+%lab-admins ALL=(ALL) /usr/bin/systemctl, /usr/bin/journalctl
+EOF
+sudo chmod 440 /etc/sudoers.d/lab-admins
+
+# 5. Endurecer permisos en carpetas sensibles
+sudo chown -R root:lab-admins /srv/evidence
+sudo chmod -R 750 /srv/evidence
+sudo setfacl -m g:lab-admins:rx /var/log
+
+# 6. Registrar auditoría sobre archivos críticos
+sudo auditctl -w /etc/sudoers.d/lab-admins -p wa -k sudo-policy
+sudo ausearch -k sudo-policy
+```
+
+### Evidencia y Captura Recomendada
+
+**Figura 12: Políticas de usuarios y sudo endurecidas**
+
+- Mostrar el contenido de `/etc/sudoers.d/lab-admins`
+- Listar miembros del grupo `lab-admins` (`getent group lab-admins`)
+- Enseñar la política de expiración (`chage -l academico`)
+- Evidenciar permisos de `/srv/evidence` (`ls -ld /srv/evidence`)
+- Incluir salida de `auditctl -l | grep sudo-policy`
+
+### Relato en Primera Persona
+
+```
+FIGURA 12: Gestión de seguridad por usuario con restricciones claras
+
+Implementé un esquema de seguridad por capas donde cada usuario tiene un
+rol y permisos específicos. Primero creé el grupo lab-admins para separar a
+los operadores del resto del alumnado. A las cuentas críticas les apliqué
+políticas de expiración de 45 días con aviso a los 7 días (comando chage),
+lo que obliga a renovar credenciales con frecuencia.
+
+Para administrar servicios sin exponer el sistema completo redacté un
+archivo sudoers dedicado. Solo permito systemctl y journalctl, de modo que
+los administradores puedan reiniciar servicios y revisar logs sin ejecutar
+comandos peligrosos. La política se guarda en /etc/sudoers.d/lab-admins con
+permisos 440 para evitar modificaciones accidentales.
+
+Las evidencias se almacenan en /srv/evidence. Cambié la propiedad a
+root:lab-admins y asigné permisos 750; así, únicamente el equipo operativo
+puede leer los reportes sensibles. Complementé la protección añadiendo ACLs
+de solo lectura sobre /var/log, lo que impide que usuarios no autorizados
+manipulen los registros.
+
+Finalmente activé reglas de auditd que monitorean cualquier cambio en la
+política sudo. Cada vez que alguien intenta editarla, el evento queda
+registrado con la etiqueta sudo-policy. De esta forma puedo rastrear quién
+hizo qué y cuándo.
+
+Gracias a esta combinación de controles demuestro que defino políticas
+seguras con restricciones claras, administro usuarios y permisos siguiendo
+mejores prácticas y mantengo trazabilidad completa de las acciones
+administrativas.
+```
+
+### Análisis
+
+- **Segregación de funciones:** el grupo `lab-admins` limita qué cuentas tienen capacidad operativa.
+- **Políticas de contraseña:** ciclos de expiración cortos y bloqueo del acceso directo de `root` obligan al uso de SSH con llaves y sudo auditado.
+- **Principio de menor privilegio:** el archivo sudoers permite únicamente los comandos necesarios para operar los servicios IPv6.
+- **Protección de evidencias:** permisos 750 + ACLs aseguran la confidencialidad de los reportes.
+- **Auditoría activa:** con `auditctl` garantizo trazabilidad ante cambios de políticas.
+
+### Competencias Demostradas
+
+✓ Administración de usuarios y grupos según roles académicos.
+✓ Definición de políticas de expiración y bloqueo de cuentas privilegiadas.
+✓ Configuración de sudo granular orientada a tareas.
+✓ Endurecimiento de permisos y ACLs en rutas críticas.
+✓ Implementación de auditoría continua sobre configuraciones sensibles.
+```
+
+---
+
 ### 📝 Conclusión del Documento
 
 ```markdown

@@ -1,11 +1,49 @@
 ---
 # Playbook unificado para crear todas las VMs en ESXi
-# Basado en los playbooks individuales existentes
 # Uso: ansible-playbook playbooks/create_vms.yml -vvv
 
-- name: Crear VM Debian Router
+- name: Definir y Crear VMs en ESXi
   hosts: localhost
   gather_facts: no
+  vars:
+    esxi_hostname: "172.17.25.1"
+    esxi_username: "root"
+    esxi_password: "qwe123$"
+    vms_to_create:
+      - name: "vm-debian-router"
+        guest_id: "otherLinux64Guest"
+        disk_gb: 20
+        disk_type: "thin"
+        memory_mb: 2048
+        num_cpus: 2
+        scsi: "paravirtual"
+        networks:
+          - { name: "VM Network", device_type: "vmxnet3" }
+          - { name: "Red Fernandez", device_type: "vmxnet3" }
+        iso_path: "[datastore1] debian/debian-13.1.0-amd64-netinst.iso"
+      - name: "vm-ubuntu-pc"
+        guest_id: "ubuntu64Guest"
+        disk_gb: 25
+        disk_type: "thin"
+        memory_mb: 4096
+        num_cpus: 2
+        scsi: "paravirtual"
+        networks:
+          - { name: "Red Fernandez", device_type: "vmxnet3" }
+        iso_path: "[datastore1] ubuntu/ubuntu-24.04.2-desktop-amd64.iso"
+      - name: "vm-windows-pc"
+        guest_id: "windows11_64Guest"
+        disk_gb: 40
+        disk_type: "thick"
+        memory_mb: 8192
+        num_cpus: 4
+        scsi: "lsilogicsas"
+        boot_firmware: "efi"
+        networks:
+          - { name: "VM Network", device_type: "e1000e" }
+          - { name: "Red Fernandez", device_type: "e1000e" }
+        iso_path: "[datastore1] W-11/Win11_25H2_Spanish_x64.iso"
+
   tasks:
     - name: Verificar conectividad con ESXi
       uri:
@@ -16,209 +54,52 @@
       register: esxi_check
       failed_when: false
 
-    - name: Verificar si VM Router ya existe (método alternativo)
+    - name: Obtener información de todas las VMs existentes
       community.vmware.vmware_vm_info:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
+        hostname: "{{ esxi_hostname }}"
+        username: "{{ esxi_username }}"
+        password: "{{ esxi_password }}"
         validate_certs: no
-        vm_name: "vm-debian-router"
-      register: router_vm_info
-      failed_when: false
-      ignore_errors: yes
+      register: existing_vms_info
 
-    - name: Crear VM Debian Router (si no existe)
+    - name: Crear VMs si no existen
       community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
+        hostname: "{{ esxi_hostname }}"
+        username: "{{ esxi_username }}"
+        password: "{{ esxi_password }}"
         validate_certs: no
         datacenter: ha-datacenter
         folder: /vm
-        name: vm-debian-router
+        name: "{{ item.name }}"
         state: poweredon
-        guest_id: otherLinux64Guest
+        guest_id: "{{ item.guest_id }}"
         disk:
-          - size_gb: 20
-            type: thin
+          - size_gb: "{{ item.disk_gb }}"
+            type: "{{ item.disk_type }}"
             datastore: datastore1
         hardware:
-          memory_mb: 2048
-          num_cpus: 2
-          scsi: paravirtual
-        networks:
-          - name: VM Network
-            device_type: vmxnet3
-          - name: Red Fernandez
-            device_type: vmxnet3
+          memory_mb: "{{ item.memory_mb }}"
+          num_cpus: "{{ item.num_cpus }}"
+          scsi: "{{ item.scsi }}"
+          boot_firmware: "{{ item.boot_firmware | default(omit) }}"
+        networks: "{{ item.networks }}"
         cdrom:
           - controller_number: 0
             unit_number: 0
             state: present
             type: iso
-            iso_path: "[datastore1] debian/debian-13.1.0-amd64-netinst.iso"
+            iso_path: "{{ item.iso_path }}"
         wait_for_ip_address: no
         force: no
-      when: router_vm_info.virtual_machines is not defined or router_vm_info.virtual_machines | length == 0
-      register: router_result
-
-
+      loop: "{{ vms_to_create }}"
+      when: "item.name not in existing_vms_info.virtual_machines"
+      register: vm_creation_results
 
     - name: Mostrar resultado VM Router
       debug:
-        msg:
-          - "=========================================="
-          - "✅ VM Debian Router: {{ 'CREADA' if router_result.changed | default(false) else 'YA EXISTÍA' }}"
-          - "Nombre: vm-debian-router"
-          - "Estado: Encendida (creada con state=poweredon)"
-          - "Memoria: 2048 MB"
-          - "CPUs: 2"
-          - "Disco: 20 GB"
-          - "Redes: VM Network, Red Fernandez"
-          - "ISO: debian-12.12.0-amd64-netinst.iso"
-          - "Verificación: {{ 'VM encontrada' if router_vm_info.virtual_machines is defined and router_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
-          - "=========================================="
-
-- name: Crear VM Ubuntu PC
-  hosts: localhost
-  gather_facts: no
-  tasks:
-    - name: Verificar si VM Ubuntu ya existe
-      community.vmware.vmware_vm_info:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        vm_name: "vm-ubuntu-pc"
-      register: ubuntu_vm_info
-      failed_when: false
-      ignore_errors: yes
-
-    - name: Crear VM Ubuntu PC (si no existe)
-      community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        datacenter: ha-datacenter
-        folder: /vm
-        name: vm-ubuntu-pc
-        state: poweredon
-        guest_id: ubuntu64Guest
-        disk:
-          - size_gb: 25
-            type: thin
-            datastore: datastore1
-        hardware:
-          memory_mb: 4096
-          num_cpus: 2
-          scsi: paravirtual
-        networks:
-          - name: Red Fernandez
-            device_type: vmxnet3
-        cdrom:
-          - controller_number: 0
-            unit_number: 0
-            state: present
-            type: iso
-            iso_path: "[datastore1] ubuntu/ubuntu-24.04.2-desktop-amd64.iso"
-        wait_for_ip_address: no
-        force: no
-      when: ubuntu_vm_info.virtual_machines is not defined or ubuntu_vm_info.virtual_machines | length == 0
-      register: ubuntu_result
-
-
-
-    - name: Mostrar resultado VM Ubuntu
-      debug:
-        msg:
-          - "=========================================="
-          - "✅ VM Ubuntu PC: {{ 'CREADA' if ubuntu_result.changed | default(false) else 'YA EXISTÍA' }}"
-          - "Nombre: vm-ubuntu-pc"
-          - "Estado: Encendida (creada con state=poweredon)"
-          - "Memoria: 4096 MB"
-          - "CPUs: 2"
-          - "Disco: 25 GB"
-          - "Red: Red Fernandez"
-          - "ISO: ubuntu-24.04.2-desktop-amd64.iso"
-          - "Verificación: {{ 'VM encontrada' if ubuntu_vm_info.virtual_machines is defined and ubuntu_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
-          - "=========================================="
-
-- name: Crear VM Windows PC
-  hosts: localhost
-  gather_facts: no
-  tasks:
-    - name: Verificar si VM Windows ya existe
-      community.vmware.vmware_vm_info:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        vm_name: "vm-windows-pc"
-      register: windows_vm_info
-      failed_when: false
-      ignore_errors: yes
-
-    - name: Crear VM Windows PC (si no existe)
-      community.vmware.vmware_guest:
-        hostname: "172.17.25.1"
-        username: "root"
-        password: "qwe123$"
-        validate_certs: no
-        datacenter: ha-datacenter
-        folder: /vm
-        name: vm-windows-pc
-        state: poweredon
-        guest_id: windows11_64Guest
-        disk:
-          - size_gb: 40
-            type: thick
-            datastore: datastore1
-        hardware:
-          memory_mb: 8192
-          num_cpus: 4
-          scsi: lsilogicsas
-          boot_firmware: efi
-          version: 20
-        networks:
-          - name: VM Network
-            device_type: e1000e
-          - name: Red Fernandez
-            device_type: e1000e
-        customization:
-          hostname: windows-pc
-        cdrom:
-          - controller_number: 0
-            unit_number: 0
-            state: present
-            type: iso
-            iso_path: "[datastore1] W-11/Win11_25H2_Spanish_x64.iso"
-        wait_for_ip_address: no
-        force: no
-      when: windows_vm_info.virtual_machines is not defined or windows_vm_info.virtual_machines | length == 0
-      register: windows_result
-
-
-
-    - name: Mostrar resultado VM Windows
-      debug:
-        msg:
-          - "=========================================="
-          - "✅ VM Windows PC: {{ 'CREADA' if windows_result.changed | default(false) else 'YA EXISTÍA' }}"
-          - "Nombre: vm-windows-pc"
-          - "Estado: Encendida"
-          - "Sistema: Microsoft Windows 11 (64 bits)"
-          - "Memoria: 8192 MB (8 GB)"
-          - "CPUs: 4"
-          - "Disco: 40 GB (thick provisioning)"
-          - "Controladora: LSI Logic SAS"
-          - "Redes: VM Network (E1000e), Red Fernandez (E1000e)"
-          - "ISO: Win11_25H2_Spanish_x64.iso"
-          - "Firmware: EFI"
-          - "USB: Configurar manualmente si es necesario"
-          - "Compatibilidad: ESXi 8.0 U2 (version 20)"
-          - "Verificación: {{ 'VM encontrada' if windows_vm_info.virtual_machines is defined and windows_vm_info.virtual_machines | length > 0 else 'VM nueva' }}"
-          - "=========================================="
+        msg: "✅ VM {{ item.item.name }}: {{ 'CREADA' if item.changed else 'YA EXISTÍA' }}"
+      loop: "{{ vm_creation_results.results }}"
+      when: item.skipped is not defined or not item.skipped
 
 - name: Resumen Final de Creación
   hosts: localhost
@@ -234,7 +115,7 @@
           - "✅ VMs creadas y encendidas:"
           - "   • vm-debian-router (Debian 12) - 2GB RAM, 20GB disk"
           - "   • vm-ubuntu-pc (Ubuntu 24.04) - 4GB RAM, 25GB disk"
-          - "   • vm-windows-pc (Windows 11) - 4GB RAM, 40GB disk"
+          - "   • vm-windows-pc (Windows 11) - 8GB RAM, 40GB disk"
           - ""
           - "🌐 Todas conectadas a 'Red Fernandez'"
           - "📀 ISOs montadas automáticamente"
