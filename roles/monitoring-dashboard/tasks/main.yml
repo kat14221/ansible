@@ -32,12 +32,17 @@
   become: yes
   changed_when: true
 
-- name: "NETDATA | Permitir puerto 19999 en nftables"
-  shell: |
-    nft list ruleset | grep -q 'tcp dport 19999 accept' || nft add rule inet ansible input tcp dport 19999 accept comment "Allow Netdata Dashboard"
-  become: yes
-  changed_when: true
+- name: "NETDATA | Verificar si existe regla para el puerto 19999"
+  shell: nft list ruleset | grep -q 'tcp dport 19999 accept'
+  register: netdata_rule_check
   failed_when: false
+  changed_when: false
+  become: yes
+
+- name: "NETDATA | Agregar regla nftables para el puerto 19999"
+  command: nft add rule inet ansible input tcp dport 19999 accept comment "Allow Netdata Dashboard"
+  become: yes
+  when: netdata_rule_check.rc != 0
 
 - name: "NETDATA | Mostrar URL de acceso"
   debug:
