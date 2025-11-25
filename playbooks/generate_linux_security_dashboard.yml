@@ -1,0 +1,16 @@
+---
+- name: Generar Dashboard de Seguridad - Solo Linux
+  hosts: debian_router
+  gather_facts: true
+  become: true
+  
+  roles:
+    - role: user-security-dashboard
+      vars:
+        dashboard_title: "Dashboard de Seguridad - Laboratorio Académico"
+        dashboard_subtitle: "Reporte de Seguridad del Sistema Debian Router"
+        generate_network_info: true
+        generate_firewall_rules: true
+        generate_user_analysis: true
+        generate_process_info: true
+        generate_system_hardening: true

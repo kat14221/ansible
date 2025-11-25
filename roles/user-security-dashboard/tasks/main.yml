@@ -22,6 +22,7 @@
   import_tasks: linux.yml
   when: ansible_os_family != 'Windows'
 
-- name: Include Windows workflow
-  import_tasks: windows.yml
-  when: ansible_os_family == 'Windows'
+# Windows deshabilitado temporalmente
+# - name: Include Windows workflow  
+#   import_tasks: windows.yml
+#   when: ansible_os_family == 'Windows'
