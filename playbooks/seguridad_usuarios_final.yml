@@ -7,10 +7,22 @@
   tasks:
     - name: "Limpiar procesos y puertos"
       shell: |
+        # Limpiar procesos de forma más segura
         pkill -f "gestion_seguridad" 2>/dev/null || true
-        pkill -f "port.*8085" 2>/dev/null || true
-        fuser -k 8085/tcp 2>/dev/null || true
-        sleep 3
+        pkill -f "python.*8085" 2>/dev/null || true
+        
+        # Verificar y terminar procesos en puerto 8085
+        if command -v fuser >/dev/null 2>&1; then
+          fuser -k 8085/tcp 2>/dev/null || true
+        fi
+        
+        # Método alternativo si fuser no está disponible
+        netstat_result=$(netstat -tlnp 2>/dev/null | grep :8085 || true)
+        if [ -n "$netstat_result" ]; then
+          echo "Puerto 8085 en uso, intentando liberar..."
+        fi
+        
+        sleep 2
       ignore_errors: yes
 
     - name: "Crear servidor web de gestión de seguridad"
