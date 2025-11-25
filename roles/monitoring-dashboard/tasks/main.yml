@@ -32,6 +32,32 @@
   become: yes
   changed_when: true
 
+- name: "NETDATA | Verificar tabla nftables 'inet ansible'"
+  command: nft list table inet ansible
+  register: netdata_nft_table
+  failed_when: false
+  changed_when: false
+  become: yes
+
+- name: "NETDATA | Crear tabla nftables 'inet ansible' si no existe"
+  command: nft add table inet ansible
+  when: netdata_nft_table.rc != 0
+  become: yes
+
+- name: "NETDATA | Verificar cadena 'input' en tabla 'inet ansible'"
+  command: nft list chain inet ansible input
+  register: netdata_nft_chain
+  failed_when: false
+  changed_when: false
+  become: yes
+
+- name: "NETDATA | Crear cadena 'input' con hook si no existe"
+  shell: nft add chain inet ansible input '{ type filter hook input priority 0; policy drop; }'
+  args:
+    warn: false
+  when: netdata_nft_chain.rc != 0
+  become: yes
+
 - name: "NETDATA | Verificar si existe regla para el puerto 19999"
   shell: nft list ruleset | grep -q 'tcp dport 19999 accept'
   register: netdata_rule_check
@@ -40,7 +66,7 @@
   become: yes
 
 - name: "NETDATA | Agregar regla nftables para el puerto 19999"
-  command: nft add rule inet ansible input tcp dport 19999 accept comment "Allow Netdata Dashboard"
+  shell: nft add rule inet ansible input tcp dport 19999 counter accept comment 'Allow Netdata Dashboard'
   become: yes
   when: netdata_rule_check.rc != 0
 
