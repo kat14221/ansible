@@ -9,7 +9,7 @@
   gather_facts: yes
 
   vars:
-    local_dir: "evidence/gestion_procesos"
+    local_dir: "/home/ansible/ansible/evidence/gestion_procesos"
 
   tasks:
     # ========================================
