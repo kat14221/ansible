@@ -1093,6 +1093,82 @@ administrativas.
 
 ---
 
+### 📝 Sección 6: Observabilidad en Tiempo Real con Netdata
+
+```markdown
+## 6. Observabilidad en Tiempo Real con Netdata
+
+### Descripción
+
+Para cerrar el ciclo de vida de la infraestructura como código incorporé un
+rol de Ansible (`monitoring-dashboard`) que despliega Netdata en el servidor
+`debian-router`. Con esta capa puedo validar en vivo el impacto de las
+políticas de procesos, detectar anomalías y documentar métricas históricas.
+
+### Ejecución Automatizada
+
+```bash
+cd ~/ansible
+ansible-playbook playbooks/deploy_observability.yml -i inventory/hosts.yml -l debian_router -vv
+```
+
+El rol realiza:
+- Instalación de dependencias (curl, git, toolchain)
+- Descarga y ejecución del instalador oficial (`kickstart.sh --dont-wait`)
+- Apertura del puerto 19999 en nftables
+- Mensaje final con la URL del dashboard
+
+### Captura Recomendada
+
+**Figura 13: Dashboard Netdata en operación**
+
+1. Abrir navegador desde la red de gestión:
+    - `http://172.17.25.126:19999` o `http://[2025:db8:101::1]:19999`
+2. Mostrar gráficos de CPU, memoria y servicios systemd.
+3. Incluir panel “Applications” para evidenciar procesos radvd, apache2,
+    vsftpd y ssh.
+
+### Relato en Primera Persona
+
+```
+FIGURA 13: Observabilidad continua con Netdata
+
+Automatizé la instalación de Netdata mediante un rol dedicado para garantizar
+que cada despliegue tenga visibilidad inmediata. El playbook crea todas las
+dependencias, ejecuta el instalador en modo no interactivo y habilita el
+puerto 19999 en nftables sin intervención manual.
+
+Con el dashboard puedo validar en segundos el estado de CPU, memoria, I/O y
+servicios systemd. También reviso las secciones de alarms y health checks
+para detectar desviaciones antes de que impacten al laboratorio. Esta vista
+histórica me permite correlacionar reinicios de servicios con picos de carga
+y sustentar decisiones de optimización.
+
+Gracias a Netdata cierro el ciclo DevOps: defino servicios con Ansible,
+aplico políticas de seguridad y observo en tiempo real los resultados desde
+una misma fuente de verdad.
+```
+
+### Métricas Clave a Documentar
+
+- **CPU Utilization:** confirma que radvd/isc-dhcp-server mantienen consumo
+   estable.
+- **Memory Footprint:** valida la eficiencia de Apache2 y vsftpd tras aplicar
+   límites de procesos.
+- **Network Traffic:** evidencia la actividad IPv6 hacia los prefijos
+   `2025:db8:100::/64` y `2025:db8:101::/64`.
+- **Health Checks:** muestra alarmas en verde luego del hardening.
+
+### Competencias Demostradas
+
+✓ Automatización E2E (despliegue + monitoreo) usando Ansible.
+✓ Implementación de observabilidad continua sin acciones manuales.
+✓ Diagnóstico visual de procesos y servicios en tiempo real.
+✓ Capacidad para detectar anomalías y justificar acciones correctivas.
+```
+
+---
+
 ### 📝 Conclusión del Documento
 
 ```markdown

@@ -1,0 +1,6 @@
+---
+- name: "Observabilidad: desplegar Netdata"
+  hosts: debian_router
+  become: yes
+  roles:
+    - monitoring-dashboard
