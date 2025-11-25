@@ -84,7 +84,7 @@
   become: yes
 
 - name: "NETDATA | Verificar si existe regla para el puerto 19999"
-  shell: nft list chain inet ansible input | grep -q 'tcp dport 19999 .*Allow Netdata Dashboard'
+  shell: nft list chain inet ansible input | grep -q 'tcp dport 19999'
   register: netdata_rule_check
   failed_when: false
   changed_when: false
@@ -104,8 +104,6 @@
       - "19999"
       - counter
       - accept
-      - comment
-      - "Allow Netdata Dashboard"
   become: yes
   when: netdata_rule_check.rc != 0
 
