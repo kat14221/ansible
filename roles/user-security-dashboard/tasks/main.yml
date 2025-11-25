@@ -109,19 +109,34 @@
     EOF
   become: yes
 
-- name: Ensure local evidence directory exists
+- name: Ensure local evidence base directory exists
   delegate_to: localhost
   file:
-    path: "{{ (playbook_dir | dirname) + '/evidence/gestion_seguridad' }}"
+    path: "{{ (playbook_dir | dirname) + '/evidence/gestion-seguridad' }}"
     state: directory
     mode: '0750'
   run_once: true
 
+- name: Ensure host evidence directory exists
+  delegate_to: localhost
+  file:
+    path: "{{ (playbook_dir | dirname) + '/evidence/gestion-seguridad/' + inventory_hostname }}"
+    state: directory
+    mode: '0750'
+
+- name: Enumerate dashboard artifacts
+  find:
+    paths: /tmp/user_security_dashboard
+    file_type: file
+  register: dashboard_artifacts
+  become: yes
+
 - name: Fetch dashboard artifacts
   fetch:
-    src: /tmp/user_security_dashboard/
-    dest: "{{ (playbook_dir | dirname) + '/evidence/gestion_seguridad/' + inventory_hostname }}"
-    flat: no
+    src: "{{ item.path }}"
+    dest: "{{ (playbook_dir | dirname) + '/evidence/gestion-seguridad/' + inventory_hostname + '/' }}"
+    flat: yes
+  loop: "{{ dashboard_artifacts.files }}"
   become: yes
 
 - name: Show summary
