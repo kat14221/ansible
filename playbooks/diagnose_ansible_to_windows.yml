@@ -1,0 +1,45 @@
+---
+- name: Diagnóstico de conectividad desde Ansible a Windows
+  hosts: debian_router
+  gather_facts: false
+  become: true
+  
+  tasks:
+    - name: Test ping IPv6 a Windows desde debian-router
+      shell: ping6 -c 5 2025:db8:101::11
+      register: ping_windows
+      ignore_errors: true
+      
+    - name: Test conectividad puerto WinRM desde debian-router
+      shell: |
+        timeout 10 nc -v 2025:db8:101::11 5985 < /dev/null
+      register: nc_winrm
+      ignore_errors: true
+      
+    - name: Test curl a WinRM desde debian-router
+      shell: |
+        timeout 15 curl -v --connect-timeout 10 \
+             --user "ansible:Ansible123!" \
+             --header "Content-Type: application/soap+xml;charset=UTF-8" \
+             "http://[2025:db8:101::11]:5985/wsman" 2>&1 || echo "CURL_FAILED"
+      register: curl_winrm
+      ignore_errors: true
+      
+    - name: Mostrar resultados de conectividad
+      debug:
+        msg:
+          - "=== DIAGNÓSTICO CONECTIVIDAD A WINDOWS ==="
+          - ""
+          - "🔍 Ping IPv6:"
+          - "{{ ping_windows.stdout_lines | default(['FAILED']) | join(' | ') }}"
+          - ""
+          - "🔍 Puerto 5985 (nc):"
+          - "{{ nc_winrm.stdout_lines | default(['FAILED']) | join(' | ') }}"  
+          - "{{ nc_winrm.stderr_lines | default(['']) | join(' | ') }}"
+          - ""
+          - "🔍 WinRM HTTP (curl):"
+          - "{{ curl_winrm.stdout_lines | default(['FAILED']) | join(' | ') }}"
+          - ""
+          - "💡 ANÁLISIS:"
+          - "{% if 'ttl=' in ping_windows.stdout %}✅ IPv6 funciona{% else %}❌ IPv6 no funciona{% endif %}"
+          - "{% if 'succeeded' in nc_winrm.stdout or 'Connected' in nc_winrm.stderr %}✅ Puerto accesible{% else %}❌ Puerto no accesible{% endif %}"
