@@ -16,12 +16,12 @@
         update_cache: yes
 
     - name: Crear aplicación Flask
-      copy:
-        content: |
-          #!/usr/bin/env python3
-          from flask import Flask, request, jsonify, redirect, session
-          import subprocess
-          import json
+      shell: |
+        cat > /home/ansible/security_app.py << 'EOF'
+        #!/usr/bin/env python3
+        from flask import Flask, request, jsonify, redirect, session
+        import subprocess
+        import json
           
           app = Flask(__name__)
           app.secret_key = 'ansible-security-2025'
@@ -362,9 +362,13 @@
                   'disk': disk
               })
           
-          if __name__ == '__main__':
-              app.run(host='0.0.0.0', port=8090, debug=True)
-        dest: /home/ansible/security_app.py
+        if __name__ == '__main__':
+            app.run(host='0.0.0.0', port=8090, debug=True)
+        EOF
+
+    - name: Hacer ejecutable la aplicación
+      file:
+        path: /home/ansible/security_app.py
         mode: '0755'
         owner: ansible
         group: ansible
