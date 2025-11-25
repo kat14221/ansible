@@ -1,0 +1,57 @@
+---
+- name: "VERIFICACIÓN SIMPLE - La app ya funciona"
+  hosts: debian-router
+  gather_facts: no
+  become: false
+  
+  tasks:
+    - name: "Verificar que todo esté funcionando"
+      shell: |
+        echo "=== VERIFICACIÓN RÁPIDA ==="
+        echo "📋 Proceso Flask:"
+        ps aux | grep flask_dashboard_final | grep -v grep || echo "❌ No encontrado"
+        
+        echo -e "\n🌐 Puerto 8090:"
+        netstat -tuln | grep 8090 || echo "❌ Puerto no activo"
+        
+        echo -e "\n🏥 Test directo:"
+        curl -s http://localhost:8090/ | head -5 || echo "❌ No responde"
+        
+        echo -e "\n✅ ACCESO AL DASHBOARD:"
+        echo "🌐 Abrir navegador en: http://172.17.25.122:8090"
+        echo "📱 La aplicación debería estar funcionando correctamente"
+      register: quick_check
+
+    - name: "Mostrar verificación"
+      debug:
+        var: quick_check.stdout_lines
+
+    - name: "Si no funciona - Reiniciar aplicación"
+      shell: |
+        echo "🔄 Reiniciando aplicación Flask..."
+        
+        # Matar proceso actual
+        pkill -f flask_dashboard_final || echo "No hay proceso previo"
+        sleep 2
+        
+        # Iniciar de nuevo
+        cd /home/ansible
+        nohup python3 flask_dashboard_final.py > dashboard_restart.log 2>&1 &
+        echo $! > dashboard_restart.pid
+        sleep 3
+        
+        # Verificar
+        if ps -p $(cat dashboard_restart.pid 2>/dev/null) > /dev/null 2>&1; then
+          echo "✅ Aplicación reiniciada correctamente"
+          echo "🌐 Acceder a: http://172.17.25.122:8090"
+        else
+          echo "❌ Error al reiniciar"
+          cat dashboard_restart.log
+        fi
+      when: quick_check.stdout.find('8090') == -1
+      register: restart_result
+
+    - name: "Resultado del reinicio"
+      debug:
+        var: restart_result.stdout_lines
+      when: restart_result is defined
