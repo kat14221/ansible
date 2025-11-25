@@ -1,0 +1,45 @@
+---
+- name: Simple Windows connectivity test
+  hosts: windows_hosts
+  gather_facts: false
+  
+  tasks:
+    - name: Test Windows ping
+      win_ping:
+      register: ping_result
+      ignore_errors: true
+      
+    - name: Show success message
+      debug:
+        msg: 
+          - "✅ Windows connection successful!"
+          - "Host: {{ ansible_host }}"
+          - "Transport: {{ ansible_winrm_transport }}"
+          - "Port: {{ ansible_port }}"
+      when: ping_result is succeeded
+      
+    - name: Show failure message
+      debug:
+        msg:
+          - "❌ Windows connection failed!"
+          - "Host: {{ ansible_host }}"
+          - "Error: {{ ping_result.msg | default('Connection timeout or unreachable') }}"
+          - ""
+          - "Troubleshooting checklist:"
+          - "□ Windows VM is powered on"
+          - "□ WinRM is enabled (run setup_winrm_windows.ps1)"
+          - "□ User 'ansible' exists with password 'Ansible123!'"
+          - "□ IPv6 connectivity: ping6 2025:db8:101::11"
+          - "□ Windows firewall allows port 5985"
+      when: ping_result is failed
+      
+    - name: Test basic Windows command (if ping worked)
+      win_shell: echo "Windows is reachable - $(Get-Date)"
+      register: shell_result
+      ignore_errors: true
+      when: ping_result is succeeded
+      
+    - name: Show shell result
+      debug:
+        msg: "{{ shell_result.stdout }}"
+      when: ping_result is succeeded and shell_result is defined and shell_result.stdout is defined
