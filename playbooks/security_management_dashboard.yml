@@ -17,16 +17,20 @@
         state: present
         update_cache: yes
 
-    - name: Instalar Flask con pip si no está disponible
-      pip:
-        name: flask
-        state: present
-        extra_args: "--break-system-packages"
+    - name: Instalar Flask en el entorno virtual existente
+      shell: |
+        if [ -f /home/ansible/ansible-venv/bin/activate ]; then
+          source /home/ansible/ansible-venv/bin/activate
+          pip install flask
+        else
+          python3 -m pip install flask --break-system-packages
+        fi
       ignore_errors: yes
+      become: false
 
     - name: Crear aplicación Flask de gestión
       shell: |
-        cat > /opt/security_app.py << 'SCRIPT_EOF'
+        cat > /home/ansible/security_app.py << 'SCRIPT_EOF'
         #!/usr/bin/env python3
         from flask import Flask, request, jsonify, redirect, session
         import subprocess
@@ -327,36 +331,54 @@
         
         if __name__ == '__main__':
             app.run(host='0.0.0.0', port=8090, debug=True)
-        SCRIPT_EOF          @app.route('/logout')
-          def logout():
-              session.pop('user', None)
-              return redirect(url_for('login'))
-          
-          @app.route('/api/users')
-          @require_auth
-          def get_users():
-              result = run_command("getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1,$3,$5,$6,$7}' OFS=':'")
-              users = []
-              
-              if result['success']:
-                  for line in result['stdout'].strip().split('\n'):
-                      if line:
-                          parts = line.split(':')
-                          if len(parts) >= 5:
-                              # Obtener grupos del usuario
-                              groups_result = run_command(f"groups {parts[0]}")
-                              groups = groups_result['stdout'].split(':')[1].strip() if groups_result['success'] else ""
-                              
-                              users.append({
-                                  'username': parts[0],
-                                  'uid': parts[1],
-                                  'gecos': parts[2],
-                                  'home': parts[3],
-                                  'shell': parts[4],
-                                  'groups': groups
-                              })
-              
-              return jsonify(users)
+        SCRIPT_EOF
+
+    - name: Hacer ejecutable la aplicación
+      file:
+        path: /home/ansible/security_app.py
+        mode: '0755'
+        owner: ansible
+        group: ansible
+
+    - name: Ejecutar aplicación Flask en background
+      shell: |
+        cd /home/ansible
+        if [ -f ansible-venv/bin/activate ]; then
+          source ansible-venv/bin/activate
+        fi
+        # Detener proceso anterior si existe
+        if [ -f security_app.pid ]; then
+          kill -9 $(cat security_app.pid) 2>/dev/null || true
+          rm -f security_app.pid
+        fi
+        # Iniciar nueva aplicación
+        nohup python3 security_app.py > security_app.log 2>&1 &
+        echo $! > security_app.pid
+        sleep 2
+      become: false
+      async: 10
+      poll: 0
+
+    - name: Verificar que la aplicación está ejecutándose
+      wait_for:
+        port: 8090
+        host: "{{ ansible_default_ipv4.address }}"
+        timeout: 30
+      ignore_errors: yes
+
+    - name: Mostrar información de despliegue
+      debug:
+        msg:
+          - "🛡️ SISTEMA DE GESTIÓN DE SEGURIDAD DESPLEGADO"
+          - "============================================="
+          - ""
+          - "🌐 Dashboard: http://{{ ansible_default_ipv4.address }}:8090"
+          - "👤 Login: admin/ansible (contraseña > 3 caracteres)"
+          - ""
+          - "✨ Funcionalidades:"
+          - "   👥 Gestión visual de usuarios"
+          - "   📊 Estado del sistema en tiempo real"
+          - "   🔧 API REST completa"
           
           @app.route('/api/groups')
           @require_auth
