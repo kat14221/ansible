@@ -1,0 +1,101 @@
+---
+- name: "Evidencia - Gestión Avanzada de Permisos por Usuario"
+  hosts: debian-router
+  gather_facts: no
+  become: true
+  
+  tasks:
+    - name: "Crear sistema de grupos y permisos académicos"
+      shell: |
+        echo "=== CREANDO GRUPOS ACADÉMICOS ==="
+        
+        # Crear grupos específicos
+        groupadd profesores 2>/dev/null || echo "Grupo profesores existe"
+        groupadd estudiantes 2>/dev/null || echo "Grupo estudiantes existe"  
+        groupadd administradores 2>/dev/null || echo "Grupo administradores existe"
+        groupadd laboratorio 2>/dev/null || echo "Grupo laboratorio existe"
+        
+        # Crear directorios con permisos específicos
+        mkdir -p /home/academico/{profesores,estudiantes,compartido,laboratorio}
+        
+        # Asignar permisos por grupo
+        chown root:profesores /home/academico/profesores
+        chmod 770 /home/academico/profesores
+        
+        chown root:estudiantes /home/academico/estudiantes  
+        chmod 750 /home/academico/estudiantes
+        
+        chown root:laboratorio /home/academico/laboratorio
+        chmod 755 /home/academico/laboratorio
+        
+        chown root:users /home/academico/compartido
+        chmod 755 /home/academico/compartido
+        
+        echo "✅ Sistema de permisos académicos configurado"
+
+    - name: "Asignar usuarios a grupos según rol"
+      shell: |
+        echo "=== ASIGNANDO USUARIOS A GRUPOS ==="
+        
+        # Profesores al grupo profesores
+        for user in profesor1 profesor2; do
+          if id "$user" &>/dev/null; then
+            usermod -a -G profesores,laboratorio "$user"
+            echo "✅ $user agregado a grupos: profesores, laboratorio"
+          fi
+        done
+        
+        # Estudiantes al grupo estudiantes
+        for user in alumno1 alumno2 alumno3; do
+          if id "$user" &>/dev/null; then
+            usermod -a -G estudiantes "$user"
+            echo "✅ $user agregado a grupo: estudiantes"
+          fi
+        done
+        
+        # Admin a todos los grupos
+        if id "admin" &>/dev/null; then
+          usermod -a -G profesores,estudiantes,administradores,laboratorio admin
+          echo "✅ admin agregado a todos los grupos"
+        fi
+
+    - name: "Crear políticas de acceso por horarios"
+      copy:
+        content: |
+          #!/bin/bash
+          # Script de control de acceso por horarios académicos
+          
+          HORA_ACTUAL=$(date +%H)
+          DIA_SEMANA=$(date +%u)  # 1=Lunes, 7=Domingo
+          USUARIO=$1
+          
+          # Horarios académicos
+          # Estudiantes: 8:00-18:00, Lunes a Viernes
+          # Profesores: 7:00-20:00, Lunes a Sábado  
+          # Admin: 24/7
+          
+          if groups "$USUARIO" | grep -q "administradores"; then
+            echo "✅ Acceso admin 24/7 - Permitido"
+            exit 0
+          elif groups "$USUARIO" | grep -q "profesores"; then
+            if [ $DIA_SEMANA -le 6 ] && [ $HORA_ACTUAL -ge 7 ] && [ $HORA_ACTUAL -lt 20 ]; then
+              echo "✅ Acceso profesor en horario académico - Permitido"
+              exit 0
+            else
+              echo "❌ Profesor fuera de horario académico - Denegado"
+              exit 1
+            fi
+          elif groups "$USUARIO" | grep -q "estudiantes"; then
+            if [ $DIA_SEMANA -le 5 ] && [ $HORA_ACTUAL -ge 8 ] && [ $HORA_ACTUAL -lt 18 ]; then
+              echo "✅ Acceso estudiante en horario de clases - Permitido"
+              exit 0
+            else
+              echo "❌ Estudiante fuera de horario de clases - Denegado"  
+              exit 1
+            fi
+          else
+            echo "❌ Usuario sin grupo académico - Denegado"
+            exit 1
+          fi
+        dest: /usr/local/bin/control_acceso_academico.sh
+        mode: '0755'

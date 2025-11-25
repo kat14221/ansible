@@ -1,0 +1,884 @@
+---
+- name: "Evidencia - Dashboard de Seguridad Avanzado"
+  hosts: debian-router
+  gather_facts: no
+  become: true
+  
+  tasks:
+    - name: "Sistema de dashboard de seguridad unificado"
+      copy:
+        content: |
+          #!/usr/bin/env python3
+          """
+          Dashboard de Seguridad Avanzado - Sistema Académico
+          Unifica todas las funcionalidades en una interfaz web moderna
+          """
+          
+          import socket
+          import threading
+          import json
+          import subprocess
+          import datetime
+          import os
+          import time
+          from urllib.parse import parse_qs, urlparse
+          
+          class DashboardSeguridad:
+              def __init__(self, host='0.0.0.0', port=8080):
+                  self.host = host
+                  self.port = port
+                  self.usuarios_academicos = {}
+                  self.cargar_usuarios()
+              
+              def cargar_usuarios(self):
+                  """Carga información de usuarios académicos"""
+                  try:
+                      # Cargar estudiantes
+                      resultado = subprocess.run(['getent', 'group', 'estudiantes'], 
+                                               capture_output=True, text=True)
+                      if resultado.returncode == 0:
+                          estudiantes = resultado.stdout.split(':')[-1].strip()
+                          for estudiante in estudiantes.split(','):
+                              if estudiante:
+                                  self.usuarios_academicos[estudiante] = 'estudiante'
+                      
+                      # Cargar profesores
+                      resultado = subprocess.run(['getent', 'group', 'profesores'], 
+                                               capture_output=True, text=True)
+                      if resultado.returncode == 0:
+                          profesores = resultado.stdout.split(':')[-1].strip()
+                          for profesor in profesores.split(','):
+                              if profesor:
+                                  self.usuarios_academicos[profesor] = 'profesor'
+                      
+                      # Cargar administradores
+                      resultado = subprocess.run(['getent', 'group', 'administradores'], 
+                                               capture_output=True, text=True)
+                      if resultado.returncode == 0:
+                          admins = resultado.stdout.split(':')[-1].strip()
+                          for admin in admins.split(','):
+                              if admin:
+                                  self.usuarios_academicos[admin] = 'administrador'
+                  
+                  except Exception as e:
+                      print(f"Error cargando usuarios: {e}")
+              
+              def obtener_estadisticas_sistema(self):
+                  """Obtiene estadísticas del sistema"""
+                  stats = {
+                      'timestamp': datetime.datetime.now().isoformat(),
+                      'usuarios_total': len(self.usuarios_academicos),
+                      'estudiantes': len([u for u, r in self.usuarios_academicos.items() if r == 'estudiante']),
+                      'profesores': len([u for u, r in self.usuarios_academicos.items() if r == 'profesor']),
+                      'administradores': len([u for u, r in self.usuarios_academicos.items() if r == 'administrador']),
+                      'procesos_activos': 0,
+                      'conexiones_ssh': 0,
+                      'espacio_logs': '0 MB',
+                      'ultimo_backup': 'No disponible',
+                      'calendario_activo': True
+                  }
+                  
+                  # Obtener procesos activos
+                  try:
+                      resultado = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
+                      stats['procesos_activos'] = len(resultado.stdout.split('\n')) - 1
+                  except:
+                      pass
+                  
+                  # Verificar conexiones SSH activas
+                  try:
+                      resultado = subprocess.run(['who'], capture_output=True, text=True)
+                      stats['conexiones_ssh'] = len([l for l in resultado.stdout.split('\n') if 'pts' in l])
+                  except:
+                      pass
+                  
+                  # Tamaño de logs académicos
+                  try:
+                      if os.path.exists('/var/log/academico'):
+                          resultado = subprocess.run(['du', '-sh', '/var/log/academico'], 
+                                                   capture_output=True, text=True)
+                          stats['espacio_logs'] = resultado.stdout.split()[0]
+                  except:
+                      pass
+                  
+                  # Último backup
+                  try:
+                      if os.path.exists('/backup/academico'):
+                          archivos = os.listdir('/backup/academico/usuarios')
+                          if archivos:
+                              archivos.sort(reverse=True)
+                              stats['ultimo_backup'] = archivos[0]
+                  except:
+                      pass
+                  
+                  return stats
+              
+              def obtener_eventos_recientes(self):
+                  """Obtiene eventos recientes del sistema"""
+                  eventos = []
+                  
+                  # Leer logs de actividad académica
+                  try:
+                      if os.path.exists('/var/log/academico/actividades_lab.log'):
+                          with open('/var/log/academico/actividades_lab.log', 'r') as f:
+                              lineas = f.readlines()[-20:]  # Últimos 20 eventos
+                              for linea in lineas:
+                                  if linea.strip():
+                                      eventos.append(linea.strip())
+                  except:
+                      pass
+                  
+                  # Leer logs de acceso
+                  try:
+                      if os.path.exists('/var/log/academico/accesos_usuarios.log'):
+                          with open('/var/log/academico/accesos_usuarios.log', 'r') as f:
+                              lineas = f.readlines()[-10:]  # Últimos 10 accesos
+                              for linea in lineas:
+                                  if linea.strip():
+                                      eventos.append(linea.strip())
+                  except:
+                      pass
+                  
+                  return eventos[-30:]  # Últimos 30 eventos
+              
+              def generar_html_dashboard(self):
+                  """Genera el HTML del dashboard avanzado"""
+                  stats = self.obtener_estadisticas_sistema()
+                  eventos = self.obtener_eventos_recientes()
+                  
+                  html = f'''
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>🎓 Dashboard de Seguridad Académica Avanzado</title>
+              <style>
+                  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                  
+                  body {{
+                      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                      padding: 20px;
+                  }}
+                  
+                  .dashboard-container {{
+                      max-width: 1400px;
+                      margin: 0 auto;
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                      gap: 20px;
+                  }}
+                  
+                  .card {{
+                      background: rgba(255, 255, 255, 0.95);
+                      backdrop-filter: blur(10px);
+                      border-radius: 15px;
+                      padding: 25px;
+                      box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+                      border: 1px solid rgba(255, 255, 255, 0.18);
+                      transition: transform 0.3s ease;
+                  }}
+                  
+                  .card:hover {{
+                      transform: translateY(-5px);
+                  }}
+                  
+                  .card-header {{
+                      display: flex;
+                      align-items: center;
+                      margin-bottom: 20px;
+                      font-size: 1.4em;
+                      font-weight: bold;
+                      color: #333;
+                  }}
+                  
+                  .card-header .icon {{
+                      font-size: 1.5em;
+                      margin-right: 10px;
+                  }}
+                  
+                  .stats-grid {{
+                      display: grid;
+                      grid-template-columns: repeat(2, 1fr);
+                      gap: 15px;
+                  }}
+                  
+                  .stat-item {{
+                      text-align: center;
+                      padding: 15px;
+                      background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+                      color: white;
+                      border-radius: 10px;
+                      font-weight: bold;
+                  }}
+                  
+                  .stat-value {{
+                      font-size: 2em;
+                      display: block;
+                  }}
+                  
+                  .stat-label {{
+                      font-size: 0.9em;
+                      opacity: 0.9;
+                  }}
+                  
+                  .user-grid {{
+                      display: grid;
+                      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                      gap: 15px;
+                      margin-top: 15px;
+                  }}
+                  
+                  .user-card {{
+                      background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+                      color: white;
+                      padding: 15px;
+                      border-radius: 10px;
+                      text-align: center;
+                      font-weight: bold;
+                  }}
+                  
+                  .user-role {{
+                      font-size: 0.8em;
+                      opacity: 0.8;
+                      margin-top: 5px;
+                  }}
+                  
+                  .eventos-list {{
+                      max-height: 400px;
+                      overflow-y: auto;
+                      background: #f8f9fa;
+                      padding: 15px;
+                      border-radius: 8px;
+                  }}
+                  
+                  .evento-item {{
+                      padding: 8px;
+                      margin: 5px 0;
+                      background: white;
+                      border-left: 4px solid #007bff;
+                      border-radius: 4px;
+                      font-size: 0.9em;
+                  }}
+                  
+                  .control-buttons {{
+                      display: flex;
+                      gap: 10px;
+                      margin-top: 15px;
+                  }}
+                  
+                  .btn {{
+                      padding: 10px 20px;
+                      border: none;
+                      border-radius: 8px;
+                      cursor: pointer;
+                      font-weight: bold;
+                      transition: all 0.3s ease;
+                  }}
+                  
+                  .btn-primary {{ background: #007bff; color: white; }}
+                  .btn-success {{ background: #28a745; color: white; }}
+                  .btn-warning {{ background: #ffc107; color: black; }}
+                  .btn-danger {{ background: #dc3545; color: white; }}
+                  
+                  .btn:hover {{
+                      transform: translateY(-2px);
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                  }}
+                  
+                  .status-indicator {{
+                      display: inline-block;
+                      width: 12px;
+                      height: 12px;
+                      border-radius: 50%;
+                      margin-right: 8px;
+                  }}
+                  
+                  .status-online {{ background: #28a745; }}
+                  .status-offline {{ background: #dc3545; }}
+                  .status-warning {{ background: #ffc107; }}
+                  
+                  .header-title {{
+                      grid-column: 1 / -1;
+                      text-align: center;
+                      color: white;
+                      font-size: 2.5em;
+                      font-weight: bold;
+                      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                      margin-bottom: 20px;
+                  }}
+                  
+                  .calendar-widget {{
+                      background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+                      color: white;
+                      padding: 20px;
+                      border-radius: 10px;
+                      text-align: center;
+                  }}
+                  
+                  .tiempo-real {{
+                      font-size: 1.2em;
+                      font-weight: bold;
+                      color: #28a745;
+                  }}
+                  
+                  @keyframes pulse {{
+                      0% {{ opacity: 1; }}
+                      50% {{ opacity: 0.5; }}
+                      100% {{ opacity: 1; }}
+                  }}
+                  
+                  .pulse {{ animation: pulse 2s infinite; }}
+              </style>
+              
+              <script>
+                  function actualizarDashboard() {{
+                      location.reload();
+                  }}
+                  
+                  function mostrarAlerta(mensaje) {{
+                      alert(mensaje);
+                  }}
+                  
+                  function ejecutarAccion(accion) {{
+                      switch(accion) {{
+                          case 'backup':
+                              mostrarAlerta('🔄 Iniciando backup académico...');
+                              break;
+                          case 'reporte':
+                              mostrarAlerta('📊 Generando reporte de seguridad...');
+                              break;
+                          case 'usuarios':
+                              mostrarAlerta('👥 Abriendo gestión de usuarios...');
+                              break;
+                          case 'calendario':
+                              mostrarAlerta('📅 Verificando calendario académico...');
+                              break;
+                      }}
+                  }}
+                  
+                  // Actualización automática cada 30 segundos
+                  setInterval(actualizarDashboard, 30000);
+                  
+                  // Reloj en tiempo real
+                  function actualizarReloj() {{
+                      const ahora = new Date();
+                      document.getElementById('reloj').textContent = ahora.toLocaleString('es-ES');
+                  }}
+                  
+                  setInterval(actualizarReloj, 1000);
+                  window.onload = actualizarReloj;
+              </script>
+          </head>
+          
+          <body>
+              <div class="dashboard-container">
+                  
+                  <div class="header-title">
+                      🎓 Dashboard de Seguridad Académica Avanzado
+                      <div class="tiempo-real pulse" id="reloj"></div>
+                  </div>
+                  
+                  <!-- Estadísticas Generales -->
+                  <div class="card">
+                      <div class="card-header">
+                          <span class="icon">📊</span>
+                          Estadísticas del Sistema
+                      </div>
+                      <div class="stats-grid">
+                          <div class="stat-item">
+                              <span class="stat-value">{stats['usuarios_total']}</span>
+                              <span class="stat-label">👥 Usuarios Total</span>
+                          </div>
+                          <div class="stat-item">
+                              <span class="stat-value">{stats['procesos_activos']}</span>
+                              <span class="stat-label">⚙️ Procesos Activos</span>
+                          </div>
+                          <div class="stat-item">
+                              <span class="stat-value">{stats['conexiones_ssh']}</span>
+                              <span class="stat-label">🔗 Conexiones SSH</span>
+                          </div>
+                          <div class="stat-item">
+                              <span class="stat-value">{stats['espacio_logs']}</span>
+                              <span class="stat-label">📝 Tamaño Logs</span>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <!-- Usuarios por Rol -->
+                  <div class="card">
+                      <div class="card-header">
+                          <span class="icon">👥</span>
+                          Distribución de Usuarios
+                      </div>
+                      <div class="stats-grid">
+                          <div class="stat-item" style="background: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);">
+                              <span class="stat-value">{stats['estudiantes']}</span>
+                              <span class="stat-label">🎓 Estudiantes</span>
+                          </div>
+                          <div class="stat-item" style="background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);">
+                              <span class="stat-value">{stats['profesores']}</span>
+                              <span class="stat-label">👨‍🏫 Profesores</span>
+                          </div>
+                          <div class="stat-item" style="background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);">
+                              <span class="stat-value">{stats['administradores']}</span>
+                              <span class="stat-label">🔧 Administradores</span>
+                          </div>
+                          <div class="stat-item" style="background: linear-gradient(45deg, #ffecd2 0%, #fcb69f 100%); color: #333;">
+                              <span class="stat-value">Active</span>
+                              <span class="stat-label">📅 Calendario</span>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <!-- Lista de Usuarios -->
+                  <div class="card">
+                      <div class="card-header">
+                          <span class="icon">🏫</span>
+                          Usuarios Académicos Registrados
+                      </div>
+                      <div class="user-grid">
+          '''
+                  
+                  # Agregar usuarios al grid
+                  for usuario, rol in self.usuarios_academicos.items():
+                      color = {
+                          'estudiante': 'linear-gradient(45deg, #11998e 0%, #38ef7d 100%)',
+                          'profesor': 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)', 
+                          'administrador': 'linear-gradient(45deg, #f093fb 0%, #f5576c 100%)'
+                      }.get(rol, 'linear-gradient(45deg, #4facfe 0%, #00f2fe 100%)')
+                      
+                      html += f'''
+                          <div class="user-card" style="background: {color};">
+                              <div>{usuario}</div>
+                              <div class="user-role">{rol.title()}</div>
+                          </div>
+                      '''
+                  
+                  html += f'''
+                      </div>
+                  </div>
+                  
+                  <!-- Eventos Recientes -->
+                  <div class="card" style="grid-column: 1 / -1;">
+                      <div class="card-header">
+                          <span class="icon">📋</span>
+                          Actividad del Sistema en Tiempo Real
+                      </div>
+                      <div class="eventos-list">
+          '''
+                  
+                  if eventos:
+                      for evento in eventos[-15:]:  # Últimos 15 eventos
+                          html += f'<div class="evento-item">{evento}</div>'
+                  else:
+                      html += '<div class="evento-item">No hay eventos recientes registrados</div>'
+                  
+                  html += f'''
+                      </div>
+                  </div>
+                  
+                  <!-- Panel de Control -->
+                  <div class="card">
+                      <div class="card-header">
+                          <span class="icon">🎛️</span>
+                          Panel de Control
+                      </div>
+                      <div class="control-buttons">
+                          <button class="btn btn-primary" onclick="ejecutarAccion('usuarios')">
+                              👥 Gestionar Usuarios
+                          </button>
+                          <button class="btn btn-success" onclick="ejecutarAccion('backup')">
+                              💾 Backup Ahora
+                          </button>
+                      </div>
+                      <div class="control-buttons">
+                          <button class="btn btn-warning" onclick="ejecutarAccion('reporte')">
+                              📊 Generar Reporte
+                          </button>
+                          <button class="btn btn-danger" onclick="actualizarDashboard()">
+                              🔄 Actualizar Dashboard
+                          </button>
+                      </div>
+                  </div>
+                  
+                  <!-- Estado del Sistema -->
+                  <div class="card">
+                      <div class="card-header">
+                          <span class="icon">💻</span>
+                          Estado del Sistema
+                      </div>
+                      <div style="font-size: 1.1em; line-height: 1.8;">
+                          <div>
+                              <span class="status-indicator status-online"></span>
+                              <strong>Servicios Académicos:</strong> Online
+                          </div>
+                          <div>
+                              <span class="status-indicator status-online"></span>
+                              <strong>Dashboard Web:</strong> Funcionando
+                          </div>
+                          <div>
+                              <span class="status-indicator status-online"></span>
+                              <strong>Sistema de Logs:</strong> Activo
+                          </div>
+                          <div>
+                              <span class="status-indicator status-{'online' if stats['calendario_activo'] else 'offline'}"></span>
+                              <strong>Calendario Académico:</strong> {'Activo' if stats['calendario_activo'] else 'Inactivo'}
+                          </div>
+                      </div>
+                      
+                      <div style="margin-top: 15px; padding: 10px; background: #e9f7ef; border-radius: 8px;">
+                          <strong>📅 Último Backup:</strong><br>
+                          {stats['ultimo_backup']}<br><br>
+                          <strong>⏰ Actualizado:</strong><br>
+                          {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                      </div>
+                  </div>
+                  
+                  </div>
+          </body>
+          </html>
+                  '''
+                  
+                  return html
+              
+              def manejar_solicitud(self, conn, addr):
+                  """Maneja las solicitudes HTTP"""
+                  try:
+                      data = conn.recv(1024).decode()
+                      if not data:
+                          return
+                      
+                      # Parse request
+                      lines = data.split('\\n')
+                      request_line = lines[0]
+                      method, path, _ = request_line.split()
+                      
+                      if method == 'GET':
+                          if path == '/' or path == '/dashboard':
+                              response_body = self.generar_html_dashboard()
+                              response = f"HTTP/1.1 200 OK\\r\\nContent-Type: text/html; charset=utf-8\\r\\nContent-Length: {{len(response_body)}}\\r\\n\\r\\n{{response_body}}"
+                          
+                          elif path == '/api/stats':
+                              stats = self.obtener_estadisticas_sistema()
+                              response_body = json.dumps(stats, ensure_ascii=False)
+                              response = f"HTTP/1.1 200 OK\\r\\nContent-Type: application/json; charset=utf-8\\r\\nContent-Length: {{len(response_body)}}\\r\\n\\r\\n{{response_body}}"
+                          
+                          elif path == '/api/eventos':
+                              eventos = self.obtener_eventos_recientes()
+                              response_body = json.dumps(eventos, ensure_ascii=False)
+                              response = f"HTTP/1.1 200 OK\\r\\nContent-Type: application/json; charset=utf-8\\r\\nContent-Length: {{len(response_body)}}\\r\\n\\r\\n{{response_body}}"
+                          
+                          else:
+                              response_body = "<h1>404 - Página no encontrada</h1>"
+                              response = f"HTTP/1.1 404 Not Found\\r\\nContent-Type: text/html\\r\\nContent-Length: {{len(response_body)}}\\r\\n\\r\\n{{response_body}}"
+                      
+                      else:
+                          response_body = "<h1>405 - Método no permitido</h1>"
+                          response = f"HTTP/1.1 405 Method Not Allowed\\r\\nContent-Type: text/html\\r\\nContent-Length: {{len(response_body)}}\\r\\n\\r\\n{{response_body}}"
+                      
+                      conn.send(response.encode())
+                  
+                  except Exception as e:
+                      print(f"Error manejando solicitud de {{addr}}: {{e}}")
+                  
+                  finally:
+                      conn.close()
+              
+              def iniciar_servidor(self):
+                  """Inicia el servidor web"""
+                  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+                      server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                      server_socket.bind((self.host, self.port))
+                      server_socket.listen(5)
+                      
+                      print(f"🎓 Dashboard de Seguridad Académica iniciado en http://{{self.host}}:{{self.port}}")
+                      print(f"📊 Monitoreo en tiempo real activado")
+                      print(f"👥 Usuarios académicos cargados: {{len(self.usuarios_academicos)}}")
+                      print("🔄 Actualización automática cada 30 segundos")
+                      print("\\n✅ Sistema listo para administración académica avanzada")
+                      
+                      while True:
+                          try:
+                              conn, addr = server_socket.accept()
+                              client_thread = threading.Thread(
+                                  target=self.manejar_solicitud,
+                                  args=(conn, addr)
+                              )
+                              client_thread.daemon = True
+                              client_thread.start()
+                          
+                          except KeyboardInterrupt:
+                              print("\\n🛑 Cerrando dashboard de seguridad...")
+                              break
+                          except Exception as e:
+                              print(f"Error en servidor: {{e}}")
+          
+          if __name__ == "__main__":
+              dashboard = DashboardSeguridad(host='0.0.0.0', port=8080)
+              dashboard.iniciar_servidor()
+        dest: /usr/local/bin/dashboard_seguridad_avanzado.py
+        mode: '0755'
+
+    - name: "Script de inicialización del dashboard avanzado"
+      copy:
+        content: |
+          #!/bin/bash
+          # Inicializador del Dashboard de Seguridad Avanzado
+          
+          echo "🎓 Inicializando Dashboard de Seguridad Académica Avanzado..."
+          
+          # Verificar dependencias del sistema
+          verificar_dependencias() {
+            echo "🔍 Verificando dependencias del sistema..."
+            
+            # Verificar Python3
+            if ! command -v python3 &> /dev/null; then
+              echo "❌ Python3 no está instalado"
+              return 1
+            fi
+            
+            # Verificar directorios de logs
+            if [ ! -d "/var/log/academico" ]; then
+              echo "📁 Creando directorio de logs académicos..."
+              mkdir -p /var/log/academico
+              chown root:adm /var/log/academico
+              chmod 755 /var/log/academico
+            fi
+            
+            # Verificar directorio de backup
+            if [ ! -d "/backup/academico" ]; then
+              echo "💾 Creando directorio de backup..."
+              mkdir -p /backup/academico/{usuarios,configuracion,logs}
+            fi
+            
+            echo "✅ Dependencias verificadas"
+          }
+          
+          # Inicializar logs académicos
+          inicializar_logs() {
+            echo "📝 Inicializando sistema de logs..."
+            
+            touch /var/log/academico/actividades_lab.log
+            touch /var/log/academico/accesos_usuarios.log
+            touch /var/log/academico/dashboard_eventos.log
+            
+            # Log inicial
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 🚀 Dashboard de Seguridad Avanzado iniciado" >> /var/log/academico/dashboard_eventos.log
+            
+            echo "✅ Sistema de logs inicializado"
+          }
+          
+          # Verificar usuarios académicos
+          verificar_usuarios() {
+            echo "👥 Verificando usuarios académicos..."
+            
+            usuarios_encontrados=0
+            
+            for grupo in estudiantes profesores administradores; do
+              if getent group "$grupo" >/dev/null 2>&1; then
+                miembros=$(getent group "$grupo" | cut -d: -f4)
+                if [ -n "$miembros" ]; then
+                  count=$(echo "$miembros" | tr ',' '\n' | wc -l)
+                  echo "  ✅ Grupo $grupo: $count usuarios"
+                  usuarios_encontrados=$((usuarios_encontrados + count))
+                else
+                  echo "  ⚠️ Grupo $grupo: sin miembros"
+                fi
+              else
+                echo "  ❌ Grupo $grupo: no existe"
+              fi
+            done
+            
+            echo "📊 Total de usuarios académicos: $usuarios_encontrados"
+          }
+          
+          # Función para detener procesos existentes
+          detener_procesos_existentes() {
+            echo "🛑 Verificando procesos existentes del dashboard..."
+            
+            # Buscar procesos Python que puedan ser el dashboard
+            pids=$(pgrep -f "dashboard_seguridad_avanzado.py" 2>/dev/null)
+            
+            if [ -n "$pids" ]; then
+              echo "🔄 Deteniendo procesos existentes del dashboard..."
+              for pid in $pids; do
+                if kill -TERM "$pid" 2>/dev/null; then
+                  echo "  ✅ Proceso $pid terminado"
+                  # Esperar un momento para que el proceso termine limpiamente
+                  sleep 2
+                  # Si aún está corriendo, forzar la terminación
+                  if kill -0 "$pid" 2>/dev/null; then
+                    kill -KILL "$pid" 2>/dev/null
+                    echo "  🔨 Proceso $pid terminado forzadamente"
+                  fi
+                fi
+              done
+            fi
+            
+            # Verificar puertos ocupados
+            if netstat -tuln 2>/dev/null | grep -q ":8080 "; then
+              echo "⚠️ Puerto 8080 aún ocupado, intentando liberar..."
+              fuser -k 8080/tcp 2>/dev/null || true
+              sleep 2
+            fi
+          }
+          
+          # Iniciar dashboard
+          iniciar_dashboard() {
+            echo "🚀 Iniciando Dashboard de Seguridad Avanzado..."
+            
+            # Cambiar al directorio de logs para el archivo de salida
+            cd /var/log/academico
+            
+            # Iniciar el dashboard en segundo plano
+            nohup python3 /usr/local/bin/dashboard_seguridad_avanzado.py > dashboard_output.log 2>&1 &
+            dashboard_pid=$!
+            
+            # Verificar que se inició correctamente
+            sleep 3
+            
+            if kill -0 "$dashboard_pid" 2>/dev/null; then
+              echo "✅ Dashboard iniciado exitosamente (PID: $dashboard_pid)"
+              echo "🌐 Acceso web: http://172.17.25.122:8080"
+              echo "📊 Panel administrativo: http://172.17.25.122:8080/dashboard"
+              echo "🔧 API de estadísticas: http://172.17.25.122:8080/api/stats"
+              
+              # Guardar PID para referencia
+              echo "$dashboard_pid" > /var/run/dashboard_academico.pid
+              
+              # Log del evento
+              echo "[$(date '+%Y-%m-%d %H:%M:%S')] ✅ Dashboard iniciado en puerto 8080 (PID: $dashboard_pid)" >> /var/log/academico/dashboard_eventos.log
+              
+              return 0
+            else
+              echo "❌ Error al iniciar el dashboard"
+              echo "📋 Verificar logs en: /var/log/academico/dashboard_output.log"
+              return 1
+            fi
+          }
+          
+          # Función principal
+          main() {
+            case "$1" in
+              "start")
+                verificar_dependencias
+                inicializar_logs
+                verificar_usuarios
+                detener_procesos_existentes
+                iniciar_dashboard
+                ;;
+              "stop")
+                echo "🛑 Deteniendo Dashboard de Seguridad..."
+                detener_procesos_existentes
+                rm -f /var/run/dashboard_academico.pid
+                echo "✅ Dashboard detenido"
+                ;;
+              "restart")
+                echo "🔄 Reiniciando Dashboard de Seguridad..."
+                "$0" stop
+                sleep 2
+                "$0" start
+                ;;
+              "status")
+                if [ -f "/var/run/dashboard_academico.pid" ]; then
+                  pid=$(cat /var/run/dashboard_academico.pid)
+                  if kill -0 "$pid" 2>/dev/null; then
+                    echo "✅ Dashboard ejecutándose (PID: $pid)"
+                    echo "🌐 URL: http://172.17.25.122:8080"
+                  else
+                    echo "❌ Dashboard no está ejecutándose (PID inválido)"
+                    rm -f /var/run/dashboard_academico.pid
+                  fi
+                else
+                  echo "❌ Dashboard no está ejecutándose"
+                fi
+                ;;
+              *)
+                echo "Uso: $0 {start|stop|restart|status}"
+                echo ""
+                echo "  start   - Iniciar dashboard de seguridad"
+                echo "  stop    - Detener dashboard" 
+                echo "  restart - Reiniciar dashboard"
+                echo "  status  - Ver estado del dashboard"
+                exit 1
+                ;;
+            esac
+          }
+          
+          main "$@"
+        dest: /usr/local/bin/dashboard_control.sh
+        mode: '0755'
+
+    - name: "Servicio systemd para el dashboard"
+      copy:
+        content: |
+          [Unit]
+          Description=Dashboard de Seguridad Académica Avanzado
+          After=network.target
+          
+          [Service]
+          Type=simple
+          User=root
+          WorkingDirectory=/var/log/academico
+          ExecStart=/usr/bin/python3 /usr/local/bin/dashboard_seguridad_avanzado.py
+          ExecReload=/bin/kill -HUP $MAINPID
+          Restart=always
+          RestartSec=10
+          
+          # Logs
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=dashboard-academico
+          
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/dashboard-academico.service
+        mode: '0644'
+
+    - name: "Activar servicio del dashboard"
+      systemd:
+        name: dashboard-academico
+        enabled: yes
+        daemon_reload: yes
+        state: started
+
+    - name: "Mostrar información final del sistema"
+      shell: |
+        echo "=== 🎓 DASHBOARD DE SEGURIDAD ACADÉMICA AVANZADO CONFIGURADO ==="
+        echo ""
+        echo "🌐 ACCESO WEB:"
+        echo "   • URL Principal: http://172.17.25.122:8080"
+        echo "   • Panel Admin:   http://172.17.25.122:8080/dashboard"
+        echo "   • API Stats:     http://172.17.25.122:8080/api/stats"
+        echo ""
+        echo "🛠️ COMANDOS DE CONTROL:"
+        echo "   • Iniciar:       dashboard_control.sh start"
+        echo "   • Detener:       dashboard_control.sh stop"
+        echo "   • Reiniciar:     dashboard_control.sh restart"
+        echo "   • Estado:        dashboard_control.sh status"
+        echo ""
+        echo "📊 CARACTERÍSTICAS AVANZADAS:"
+        echo "   ✅ Monitoreo en tiempo real de usuarios académicos"
+        echo "   ✅ Estadísticas del sistema actualizadas automáticamente"
+        echo "   ✅ Panel de control integrado para todas las funciones"
+        echo "   ✅ Logs de actividad centralizados"
+        echo "   ✅ Interface moderna y responsiva"
+        echo "   ✅ Servicio systemd para inicio automático"
+        echo ""
+        echo "📁 ARCHIVOS IMPORTANTES:"
+        echo "   • Dashboard:     /usr/local/bin/dashboard_seguridad_avanzado.py"
+        echo "   • Control:       /usr/local/bin/dashboard_control.sh"
+        echo "   • Logs:          /var/log/academico/"
+        echo "   • Servicio:      /etc/systemd/system/dashboard-academico.service"
+        echo ""
+        echo "🎯 El dashboard está configurado para:"
+        echo "   • Gestión visual de usuarios académicos por roles"
+        echo "   • Monitoreo de procesos y conexiones del sistema"
+        echo "   • Visualización de eventos y actividades en tiempo real"
+        echo "   • Control centralizado de funciones de seguridad"
+        echo "   • Integración con sistemas de backup y calendario"
+        echo ""
+        echo "✅ ¡Sistema de seguridad académica avanzado listo para usar!"

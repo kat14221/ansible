@@ -1,0 +1,292 @@
+---
+- name: "Evidencia - Sistema de Backup y Recuperación Académica"
+  hosts: debian-router
+  gather_facts: no
+  become: true
+  
+  tasks:
+    - name: "Configurar sistema de backup académico"
+      shell: |
+        echo "=== CONFIGURANDO BACKUP ACADÉMICO ==="
+        
+        # Directorio de backups
+        mkdir -p /backup/academico/{usuarios,configuracion,logs}
+        mkdir -p /backup/restore
+        
+        # Configurar permisos
+        chown -R root:administradores /backup
+        chmod -R 750 /backup
+        
+        echo "✅ Estructura de backup creada"
+
+    - name: "Script automatizado de backup"
+      copy:
+        content: |
+          #!/bin/bash
+          # Sistema de Backup Académico Automático
+          
+          BACKUP_DIR="/backup/academico"
+          FECHA=$(date +%Y%m%d_%H%M%S)
+          LOG_FILE="/var/log/academico/backup_$FECHA.log"
+          
+          echo "=== BACKUP ACADÉMICO - $(date) ===" | tee $LOG_FILE
+          
+          # Función de logging
+          log_backup() {
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a $LOG_FILE
+          }
+          
+          # Backup de usuarios académicos
+          backup_usuarios() {
+            log_backup "🏫 Iniciando backup de usuarios académicos..."
+            
+            # Backup de /etc/passwd y /etc/group
+            cp /etc/passwd $BACKUP_DIR/usuarios/passwd_$FECHA
+            cp /etc/group $BACKUP_DIR/usuarios/group_$FECHA
+            cp /etc/shadow $BACKUP_DIR/usuarios/shadow_$FECHA
+            
+            # Crear lista de usuarios académicos
+            cat > $BACKUP_DIR/usuarios/usuarios_academicos_$FECHA.txt << EOF
+          === USUARIOS ACADÉMICOS - $FECHA ===
+          
+          ESTUDIANTES:
+          $(getent group estudiantes | cut -d: -f4 | tr ',' '\n')
+          
+          PROFESORES:
+          $(getent group profesores | cut -d: -f4 | tr ',' '\n')
+          
+          ADMINISTRADORES:
+          $(getent group administradores | cut -d: -f4 | tr ',' '\n')
+          EOF
+          
+            # Backup de directorios home académicos
+            if [ -d "/home/academico" ]; then
+              tar -czf $BACKUP_DIR/usuarios/homes_academicos_$FECHA.tar.gz /home/academico
+              log_backup "✅ Backup de directorios home completado"
+            fi
+            
+            log_backup "✅ Backup de usuarios completado"
+          }
+          
+          # Backup de configuraciones
+          backup_configuracion() {
+            log_backup "⚙️ Iniciando backup de configuración..."
+            
+            # SSH configuration
+            cp -r /etc/ssh $BACKUP_DIR/configuracion/ssh_$FECHA
+            
+            # Sudoers
+            cp /etc/sudoers $BACKUP_DIR/configuracion/sudoers_$FECHA
+            
+            # Configuración de grupos y permisos
+            cat > $BACKUP_DIR/configuracion/permisos_$FECHA.txt << EOF
+          === CONFIGURACIÓN DE PERMISOS - $FECHA ===
+          
+          GRUPOS DEL SISTEMA:
+          $(cat /etc/group | grep -E "(estudiantes|profesores|administradores|laboratorio)")
+          
+          PERMISOS DIRECTORIOS ACADÉMICOS:
+          $(ls -la /home/academico/ 2>/dev/null || echo "Directorio no existe")
+          
+          SUDOERS ACADÉMICOS:
+          $(cat /etc/sudoers | grep -E "(estudiantes|profesores|administradores)" 2>/dev/null || echo "Sin configuración sudo")
+          EOF
+          
+            log_backup "✅ Backup de configuración completado"
+          }
+          
+          # Backup de logs académicos
+          backup_logs() {
+            log_backup "📋 Iniciando backup de logs académicos..."
+            
+            if [ -d "/var/log/academico" ]; then
+              tar -czf $BACKUP_DIR/logs/logs_academicos_$FECHA.tar.gz /var/log/academico
+              log_backup "✅ Backup de logs completado"
+            fi
+          }
+          
+          # Verificar integridad
+          verificar_backup() {
+            log_backup "🔍 Verificando integridad del backup..."
+            
+            # Verificar archivos críticos
+            archivos_criticos=(
+              "$BACKUP_DIR/usuarios/passwd_$FECHA"
+              "$BACKUP_DIR/usuarios/group_$FECHA"
+              "$BACKUP_DIR/configuracion/permisos_$FECHA.txt"
+            )
+            
+            for archivo in "${archivos_criticos[@]}"; do
+              if [ -f "$archivo" ]; then
+                tamaño=$(stat -f%z "$archivo" 2>/dev/null || stat -c%s "$archivo" 2>/dev/null)
+                log_backup "✅ $archivo - Tamaño: $tamaño bytes"
+              else
+                log_backup "❌ FALTA: $archivo"
+              fi
+            done
+            
+            # Generar checksum
+            find $BACKUP_DIR -type f -name "*_$FECHA*" -exec md5sum {} \; > $BACKUP_DIR/checksums_$FECHA.md5
+            log_backup "✅ Checksums generados"
+          }
+          
+          # Limpiar backups antiguos (mantener últimos 7 días)
+          limpiar_antiguos() {
+            log_backup "🧹 Limpiando backups antiguos..."
+            find $BACKUP_DIR -type f -mtime +7 -name "*_*" -delete
+            log_backup "✅ Limpieza completada"
+          }
+          
+          # Ejecutar backup completo
+          main() {
+            case "$1" in
+              "completo")
+                backup_usuarios
+                backup_configuracion  
+                backup_logs
+                verificar_backup
+                limpiar_antiguos
+                log_backup "🎉 BACKUP COMPLETO FINALIZADO"
+                ;;
+              "usuarios")
+                backup_usuarios
+                ;;
+              "config")
+                backup_configuracion
+                ;;
+              "verificar")
+                verificar_backup
+                ;;
+              *)
+                echo "Uso: $0 {completo|usuarios|config|verificar}"
+                exit 1
+                ;;
+            esac
+          }
+          
+          main "$@"
+        dest: /usr/local/bin/backup_academico.sh
+        mode: '0755'
+
+    - name: "Script de recuperación"
+      copy:
+        content: |
+          #!/bin/bash
+          # Sistema de Recuperación Académica
+          
+          BACKUP_DIR="/backup/academico"
+          RESTORE_DIR="/backup/restore"
+          
+          echo "=== SISTEMA DE RECUPERACIÓN ACADÉMICA ==="
+          
+          # Listar backups disponibles
+          listar_backups() {
+            echo "📋 BACKUPS DISPONIBLES:"
+            echo ""
+            
+            echo "USUARIOS:"
+            ls -la $BACKUP_DIR/usuarios/ | grep passwd_ | awk '{print $9, $5, $6, $7, $8}'
+            
+            echo ""
+            echo "CONFIGURACIÓN:"
+            ls -la $BACKUP_DIR/configuracion/ | grep permisos_ | awk '{print $9, $5, $6, $7, $8}'
+            
+            echo ""
+            echo "LOGS:"
+            ls -la $BACKUP_DIR/logs/ | grep logs_ | awk '{print $9, $5, $6, $7, $8}'
+          }
+          
+          # Restaurar usuarios desde backup
+          restaurar_usuarios() {
+            local fecha_backup=$1
+            
+            if [ -z "$fecha_backup" ]; then
+              echo "❌ Debe especificar fecha del backup (YYYYMMDD_HHMMSS)"
+              return 1
+            fi
+            
+            echo "⚠️ ADVERTENCIA: Esta operación restaurará usuarios y grupos académicos"
+            echo "¿Continuar? (s/N):"
+            read -r respuesta
+            
+            if [[ $respuesta =~ ^[Ss]$ ]]; then
+              # Crear backup de seguridad actual
+              cp /etc/passwd /etc/passwd.pre-restore
+              cp /etc/group /etc/group.pre-restore
+              
+              # Restaurar archivos
+              if [ -f "$BACKUP_DIR/usuarios/passwd_$fecha_backup" ]; then
+                cp "$BACKUP_DIR/usuarios/passwd_$fecha_backup" /etc/passwd
+                cp "$BACKUP_DIR/usuarios/group_$fecha_backup" /etc/group
+                echo "✅ Usuarios restaurados desde $fecha_backup"
+              else
+                echo "❌ Backup no encontrado: $fecha_backup"
+              fi
+            fi
+          }
+          
+          # Mostrar estadísticas de backup
+          estadisticas_backup() {
+            echo "📊 ESTADÍSTICAS DE BACKUP:"
+            echo ""
+            
+            echo "Espacio usado por backups:"
+            du -sh $BACKUP_DIR
+            
+            echo ""
+            echo "Último backup:"
+            find $BACKUP_DIR -name "*_*" -type f | sort | tail -1 | xargs ls -la
+            
+            echo ""
+            echo "Cantidad de backups por tipo:"
+            echo "- Usuarios: $(ls $BACKUP_DIR/usuarios/ | wc -l)"
+            echo "- Configuración: $(ls $BACKUP_DIR/configuracion/ | wc -l)"
+            echo "- Logs: $(ls $BACKUP_DIR/logs/ | wc -l)"
+          }
+          
+          case "$1" in
+            "listar")
+              listar_backups
+              ;;
+            "restaurar")
+              restaurar_usuarios "$2"
+              ;;
+            "stats")
+              estadisticas_backup
+              ;;
+            *)
+              echo "Uso: $0 {listar|restaurar FECHA|stats}"
+              echo ""
+              echo "Ejemplos:"
+              echo "  $0 listar"
+              echo "  $0 restaurar 20241201_143000"
+              echo "  $0 stats"
+              exit 1
+              ;;
+          esac
+        dest: /usr/local/bin/restore_academico.sh
+        mode: '0755'
+
+    - name: "Configurar cron para backup automático"
+      cron:
+        name: "Backup académico diario"
+        minute: "0"
+        hour: "2"
+        job: "/usr/local/bin/backup_academico.sh completo"
+        user: root
+
+    - name: "Crear informe inicial de backup"
+      shell: |
+        echo "=== CONFIGURACIÓN DE BACKUP COMPLETADA ==="
+        echo ""
+        echo "📁 Directorios creados:"
+        ls -la /backup/
+        echo ""
+        echo "⏰ Backup automático configurado: Diario a las 02:00"
+        echo ""
+        echo "🛠️ Comandos disponibles:"
+        echo "- backup_academico.sh completo    # Backup completo"
+        echo "- restore_academico.sh listar     # Ver backups"
+        echo "- restore_academico.sh stats      # Estadísticas"
+        echo ""
+        echo "✅ Sistema de backup académico listo"

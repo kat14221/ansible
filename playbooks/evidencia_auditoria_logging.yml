@@ -1,0 +1,155 @@
+---
+- name: "Evidencia - Sistema de Auditoría Académica"
+  hosts: debian-router
+  gather_facts: no
+  become: true
+  
+  tasks:
+    - name: "Configurar logging de actividades académicas"
+      shell: |
+        echo "=== CONFIGURANDO SISTEMA DE AUDITORÍA ==="
+        
+        # Crear directorio de logs académicos
+        mkdir -p /var/log/academico
+        
+        # Log de accesos por usuario
+        touch /var/log/academico/accesos_usuarios.log
+        touch /var/log/academico/actividades_lab.log
+        touch /var/log/academico/cambios_permisos.log
+        
+        # Configurar permisos
+        chown root:adm /var/log/academico/*
+        chmod 640 /var/log/academico/*
+        
+        echo "✅ Sistema de logs académicos creado"
+
+    - name: "Script de monitoreo de actividades"
+      copy:
+        content: |
+          #!/bin/bash
+          # Monitor de actividades académicas
+          
+          LOG_DIR="/var/log/academico"
+          FECHA=$(date '+%Y-%m-%d %H:%M:%S')
+          
+          # Función para registrar actividad
+          log_actividad() {
+            local usuario=$1
+            local accion=$2
+            local detalle=$3
+            echo "[$FECHA] Usuario: $usuario | Acción: $accion | Detalle: $detalle" >> $LOG_DIR/actividades_lab.log
+          }
+          
+          # Monitorear conexiones SSH
+          monitor_ssh() {
+            while IFS= read -r linea; do
+              if echo "$linea" | grep -q "Accepted publickey\|Accepted password"; then
+                usuario=$(echo "$linea" | awk '{print $9}')
+                ip=$(echo "$linea" | awk '{print $11}')
+                echo "[$FECHA] LOGIN_SSH | Usuario: $usuario | IP: $ip" >> $LOG_DIR/accesos_usuarios.log
+                
+                # Verificar grupo del usuario
+                if groups "$usuario" 2>/dev/null | grep -q "estudiantes"; then
+                  log_actividad "$usuario" "LOGIN_ESTUDIANTE" "Acceso SSH desde $ip"
+                elif groups "$usuario" 2>/dev/null | grep -q "profesores"; then
+                  log_actividad "$usuario" "LOGIN_PROFESOR" "Acceso SSH desde $ip"
+                fi
+              fi
+            done < <(tail -f /var/log/auth.log)
+          }
+          
+          # Generar reporte diario
+          generar_reporte() {
+            local fecha_hoy=$(date +%Y-%m-%d)
+            local reporte="/var/log/academico/reporte_$fecha_hoy.txt"
+            
+            echo "=== REPORTE ACADÉMICO - $fecha_hoy ===" > $reporte
+            echo "" >> $reporte
+            
+            echo "📊 ESTADÍSTICAS DE ACCESO:" >> $reporte
+            echo "Estudiantes conectados:" >> $reporte
+            grep "$fecha_hoy" $LOG_DIR/accesos_usuarios.log | grep "estudiantes" | wc -l >> $reporte
+            
+            echo "Profesores conectados:" >> $reporte  
+            grep "$fecha_hoy" $LOG_DIR/accesos_usuarios.log | grep "profesores" | wc -l >> $reporte
+            
+            echo "" >> $reporte
+            echo "🔐 ACTIVIDADES DE SEGURIDAD:" >> $reporte
+            grep "$fecha_hoy" $LOG_DIR/cambios_permisos.log | tail -10 >> $reporte
+            
+            echo "✅ Reporte generado: $reporte"
+          }
+          
+          case "$1" in
+            "monitor")
+              echo "🔍 Iniciando monitoreo de actividades académicas..."
+              monitor_ssh &
+              ;;
+            "reporte") 
+              generar_reporte
+              ;;
+            *)
+              echo "Uso: $0 {monitor|reporte}"
+              exit 1
+              ;;
+          esac
+        dest: /usr/local/bin/monitor_academico.sh
+        mode: '0755'
+
+    - name: "Dashboard de estadísticas académicas"
+      copy:
+        content: |
+          #!/usr/bin/env python3
+          import json
+          import subprocess
+          from datetime import datetime, timedelta
+          import os
+          
+          def generar_estadisticas():
+              """Genera estadísticas del sistema académico"""
+              
+              stats = {
+                  "timestamp": datetime.now().isoformat(),
+                  "usuarios_por_grupo": {},
+                  "actividad_reciente": [],
+                  "accesos_hoy": 0,
+                  "laboratorio_activo": False
+              }
+              
+              # Contar usuarios por grupo
+              try:
+                  for grupo in ['estudiantes', 'profesores', 'administradores']:
+                      resultado = subprocess.run(['getent', 'group', grupo], 
+                                               capture_output=True, text=True)
+                      if resultado.returncode == 0:
+                          miembros = resultado.stdout.split(':')[-1].strip()
+                          count = len(miembros.split(',')) if miembros else 0
+                          stats["usuarios_por_grupo"][grupo] = count
+              except:
+                  pass
+              
+              # Actividad reciente
+              try:
+                  if os.path.exists('/var/log/academico/actividades_lab.log'):
+                      with open('/var/log/academico/actividades_lab.log', 'r') as f:
+                          lineas = f.readlines()[-10:]  # Últimas 10 actividades
+                          stats["actividad_reciente"] = [l.strip() for l in lineas]
+              except:
+                  pass
+              
+              # Accesos de hoy
+              try:
+                  hoy = datetime.now().strftime('%Y-%m-%d')
+                  resultado = subprocess.run(['grep', hoy, '/var/log/academico/accesos_usuarios.log'], 
+                                           capture_output=True, text=True)
+                  stats["accesos_hoy"] = len(resultado.stdout.split('\n')) if resultado.stdout else 0
+              except:
+                  pass
+              
+              return stats
+          
+          if __name__ == "__main__":
+              estadisticas = generar_estadisticas()
+              print(json.dumps(estadisticas, indent=2, ensure_ascii=False))
+        dest: /usr/local/bin/stats_academico.py
+        mode: '0755'

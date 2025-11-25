@@ -1,0 +1,458 @@
+---
+- name: "Evidencia - Calendario Académico Integrado"
+  hosts: debian-router
+  gather_facts: no
+  become: true
+  
+  tasks:
+    - name: "Sistema de calendario académico"
+      copy:
+        content: |
+          #!/usr/bin/env python3
+          """
+          Sistema de Calendario Académico Integrado
+          Gestiona horarios, periodos académicos y acceso basado en calendario
+          """
+          
+          import json
+          import datetime
+          import os
+          from typing import Dict, List, Tuple
+          
+          class CalendarioAcademico:
+              def __init__(self):
+                  self.config_file = "/etc/academico/calendario.json"
+                  self.log_file = "/var/log/academico/calendario_eventos.log"
+                  self.cargar_configuracion()
+              
+              def cargar_configuracion(self):
+                  """Carga configuración del calendario académico"""
+                  configuracion_default = {
+                      "periodos_academicos": {
+                          "semestre_1": {
+                              "inicio": "2024-02-01",
+                              "fin": "2024-06-30",
+                              "descripcion": "Primer Semestre 2024"
+                          },
+                          "semestre_2": {
+                              "inicio": "2024-08-01", 
+                              "fin": "2024-12-15",
+                              "descripcion": "Segundo Semestre 2024"
+                          }
+                      },
+                      "horarios_laboratorio": {
+                          "lunes_viernes": {
+                              "estudiantes": ["08:00-12:00", "14:00-18:00"],
+                              "profesores": ["07:00-20:00"]
+                          },
+                          "sabado": {
+                              "estudiantes": ["09:00-13:00"],
+                              "profesores": ["08:00-16:00"]  
+                          },
+                          "domingo": {
+                              "estudiantes": [],
+                              "profesores": ["10:00-14:00"]
+                          }
+                      },
+                      "eventos_especiales": [
+                          {
+                              "fecha": "2024-12-25",
+                              "tipo": "feriado",
+                              "descripcion": "Navidad",
+                              "acceso_restringido": True
+                          },
+                          {
+                              "fecha": "2024-06-15",
+                              "tipo": "examenes",
+                              "descripcion": "Período de Exámenes Finales",
+                              "horario_extendido": True
+                          }
+                      ],
+                      "politicas_acceso": {
+                          "periodo_examenes": {
+                              "estudiantes": "24h_solo_laboratorio",
+                              "profesores": "24h_completo"
+                          },
+                          "periodo_vacaciones": {
+                              "estudiantes": "sin_acceso",
+                              "profesores": "horario_reducido"
+                          }
+                      }
+                  }
+                  
+                  # Crear directorio si no existe
+                  os.makedirs("/etc/academico", exist_ok=True)
+                  
+                  if not os.path.exists(self.config_file):
+                      with open(self.config_file, 'w') as f:
+                          json.dump(configuracion_default, f, indent=2, ensure_ascii=False)
+                  
+                  with open(self.config_file, 'r') as f:
+                      self.config = json.load(f)
+              
+              def obtener_periodo_actual(self) -> str:
+                  """Determina el período académico actual"""
+                  hoy = datetime.date.today()
+                  
+                  for periodo, datos in self.config["periodos_academicos"].items():
+                      inicio = datetime.datetime.strptime(datos["inicio"], "%Y-%m-%d").date()
+                      fin = datetime.datetime.strptime(datos["fin"], "%Y-%m-%d").date()
+                      
+                      if inicio <= hoy <= fin:
+                          return periodo
+                  
+                  return "fuera_periodo"
+              
+              def verificar_acceso_horario(self, usuario: str, grupo: str) -> Tuple[bool, str]:
+                  """Verifica si el usuario puede acceder en el horario actual"""
+                  ahora = datetime.datetime.now()
+                  dia_semana = ahora.strftime("%A").lower()
+                  hora_actual = ahora.strftime("%H:%M")
+                  
+                  # Mapear días de la semana
+                  if dia_semana in ["monday", "tuesday", "wednesday", "thursday", "friday"]:
+                      dia_config = "lunes_viernes"
+                  elif dia_semana == "saturday":
+                      dia_config = "sabado"
+                  else:
+                      dia_config = "domingo"
+                  
+                  # Verificar eventos especiales
+                  evento_hoy = self.verificar_evento_especial(ahora.date())
+                  if evento_hoy:
+                      return self.manejar_evento_especial(evento_hoy, grupo, hora_actual)
+                  
+                  # Horarios normales
+                  horarios = self.config["horarios_laboratorio"][dia_config]
+                  
+                  if grupo in ["estudiantes", "profesores"]:
+                      horarios_permitidos = horarios.get(grupo, [])
+                      
+                      for horario in horarios_permitidos:
+                          inicio, fin = horario.split("-")
+                          if inicio <= hora_actual <= fin:
+                              return True, f"Acceso permitido en horario {horario}"
+                      
+                      return False, f"Fuera del horario permitido. Horarios: {', '.join(horarios_permitidos)}"
+                  
+                  # Administradores siempre tienen acceso
+                  if grupo == "administradores":
+                      return True, "Acceso de administrador - sin restricciones"
+                  
+                  return False, "Grupo no reconocido"
+              
+              def verificar_evento_especial(self, fecha: datetime.date) -> Dict:
+                  """Verifica si hay eventos especiales en la fecha dada"""
+                  fecha_str = fecha.strftime("%Y-%m-%d")
+                  
+                  for evento in self.config["eventos_especiales"]:
+                      if evento["fecha"] == fecha_str:
+                          return evento
+                  
+                  return None
+              
+              def manejar_evento_especial(self, evento: Dict, grupo: str, hora: str) -> Tuple[bool, str]:
+                  """Maneja el acceso durante eventos especiales"""
+                  if evento["tipo"] == "feriado" and evento.get("acceso_restringido"):
+                      if grupo == "administradores":
+                          return True, f"Acceso de emergencia en {evento['descripcion']}"
+                      else:
+                          return False, f"Acceso restringido por {evento['descripcion']}"
+                  
+                  elif evento["tipo"] == "examenes" and evento.get("horario_extendido"):
+                      if grupo in ["estudiantes", "profesores"]:
+                          return True, f"Horario extendido por {evento['descripcion']}"
+                  
+                  return True, f"Evento especial: {evento['descripcion']}"
+              
+              def generar_reporte_calendario(self) -> str:
+                  """Genera reporte del estado del calendario académico"""
+                  hoy = datetime.date.today()
+                  periodo = self.obtener_periodo_actual()
+                  
+                  reporte = f"""
+          === REPORTE CALENDARIO ACADÉMICO ===
+          Fecha: {hoy.strftime('%Y-%m-%d')}
+          Período actual: {periodo}
+          
+          📅 PERÍODOS ACADÉMICOS:
+          """
+                  
+                  for periodo_id, datos in self.config["periodos_academicos"].items():
+                      estado = "🟢 ACTIVO" if periodo_id == periodo else "⚪ INACTIVO"
+                      reporte += f"- {datos['descripcion']}: {datos['inicio']} a {datos['fin']} {estado}\n"
+                  
+                  reporte += f"""
+          
+          ⏰ HORARIOS DE HOY ({hoy.strftime('%A')}):
+          """
+                  
+                  dia_semana = hoy.strftime("%A").lower()
+                  if dia_semana in ["monday", "tuesday", "wednesday", "thursday", "friday"]:
+                      dia_config = "lunes_viernes"
+                  elif dia_semana == "saturday":
+                      dia_config = "sabado"
+                  else:
+                      dia_config = "domingo"
+                  
+                  horarios_hoy = self.config["horarios_laboratorio"][dia_config]
+                  for grupo, horarios in horarios_hoy.items():
+                      if horarios:
+                          reporte += f"- {grupo.capitalize()}: {', '.join(horarios)}\n"
+                      else:
+                          reporte += f"- {grupo.capitalize()}: Sin acceso programado\n"
+                  
+                  # Eventos especiales próximos
+                  eventos_proximos = []
+                  for evento in self.config["eventos_especiales"]:
+                      fecha_evento = datetime.datetime.strptime(evento["fecha"], "%Y-%m-%d").date()
+                      if fecha_evento >= hoy:
+                          dias_hasta = (fecha_evento - hoy).days
+                          eventos_proximos.append((dias_hasta, evento))
+                  
+                  if eventos_proximos:
+                      reporte += "\n🎯 PRÓXIMOS EVENTOS:\n"
+                      eventos_proximos.sort()
+                      for dias, evento in eventos_proximos[:5]:
+                          if dias == 0:
+                              reporte += f"- HOY: {evento['descripcion']}\n"
+                          elif dias == 1:
+                              reporte += f"- MAÑANA: {evento['descripcion']}\n"
+                          else:
+                              reporte += f"- En {dias} días ({evento['fecha']}): {evento['descripcion']}\n"
+                  
+                  return reporte
+              
+              def log_evento(self, mensaje: str):
+                  """Registra eventos en el log"""
+                  timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                  with open(self.log_file, 'a') as f:
+                      f.write(f"[{timestamp}] {mensaje}\n")
+          
+          def main():
+              calendario = CalendarioAcademico()
+              
+              import sys
+              if len(sys.argv) < 2:
+                  print("Uso: python3 calendario_academico.py {verificar|reporte|config}")
+                  sys.exit(1)
+              
+              comando = sys.argv[1]
+              
+              if comando == "verificar":
+                  if len(sys.argv) != 4:
+                      print("Uso: python3 calendario_academico.py verificar USUARIO GRUPO")
+                      sys.exit(1)
+                  
+                  usuario = sys.argv[2]
+                  grupo = sys.argv[3]
+                  
+                  puede_acceder, motivo = calendario.verificar_acceso_horario(usuario, grupo)
+                  
+                  estado = "✅ PERMITIDO" if puede_acceder else "❌ DENEGADO"
+                  print(f"{estado}: {motivo}")
+                  
+                  calendario.log_evento(f"Verificación acceso - Usuario: {usuario}, Grupo: {grupo}, Resultado: {estado}")
+              
+              elif comando == "reporte":
+                  print(calendario.generar_reporte_calendario())
+              
+              elif comando == "config":
+                  print(f"📁 Archivo de configuración: {calendario.config_file}")
+                  print("📋 Configuración actual:")
+                  print(json.dumps(calendario.config, indent=2, ensure_ascii=False))
+              
+              else:
+                  print(f"Comando no reconocido: {comando}")
+                  sys.exit(1)
+          
+          if __name__ == "__main__":
+              main()
+        dest: /usr/local/bin/calendario_academico.py
+        mode: '0755'
+
+    - name: "Script de integración con sistema de acceso"
+      copy:
+        content: |
+          #!/bin/bash
+          # Integración Calendario + Sistema de Acceso
+          
+          LOG_FILE="/var/log/academico/acceso_calendario.log"
+          
+          log_acceso() {
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> $LOG_FILE
+          }
+          
+          verificar_usuario_calendario() {
+            local usuario=$1
+            
+            # Determinar grupo del usuario
+            local grupo=""
+            if groups "$usuario" 2>/dev/null | grep -q "estudiantes"; then
+              grupo="estudiantes"
+            elif groups "$usuario" 2>/dev/null | grep -q "profesores"; then
+              grupo="profesores" 
+            elif groups "$usuario" 2>/dev/null | grep -q "administradores"; then
+              grupo="administradores"
+            else
+              log_acceso "❌ Usuario $usuario no pertenece a ningún grupo académico"
+              return 1
+            fi
+            
+            # Verificar acceso con calendario
+            resultado=$(python3 /usr/local/bin/calendario_academico.py verificar "$usuario" "$grupo")
+            
+            log_acceso "Usuario: $usuario | Grupo: $grupo | $resultado"
+            
+            # Retornar código según el resultado
+            if echo "$resultado" | grep -q "PERMITIDO"; then
+              echo "✅ $resultado"
+              return 0
+            else
+              echo "❌ $resultado"
+              return 1
+            fi
+          }
+          
+          # Generar dashboard de acceso en tiempo real
+          dashboard_acceso_tiempo_real() {
+            cat << 'EOF' > /tmp/dashboard_acceso.html
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Dashboard de Acceso - Tiempo Real</title>
+              <meta charset="UTF-8">
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+                  .container { max-width: 1200px; margin: 0 auto; }
+                  .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .status-ok { color: #28a745; }
+                  .status-error { color: #dc3545; }
+                  .horario { background: #e9f7ef; padding: 10px; border-left: 4px solid #28a745; margin: 10px 0; }
+                  .evento { background: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin: 10px 0; }
+                  .refresh-btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+              </style>
+              <script>
+                  function actualizarDashboard() {
+                      // En una implementación real, esto haría una llamada AJAX
+                      location.reload();
+                  }
+                  
+                  setInterval(actualizarDashboard, 30000); // Actualizar cada 30 segundos
+              </script>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🎓 Dashboard de Acceso Académico - Tiempo Real</h1>
+                  
+                  <div class="card">
+                      <h2>📅 Estado del Calendario</h2>
+                      <div id="calendario-status">
+          EOF
+          
+            # Insertar información del calendario
+            python3 /usr/local/bin/calendario_academico.py reporte >> /tmp/dashboard_acceso.html
+            
+            cat << 'EOF' >> /tmp/dashboard_acceso.html
+                      </div>
+                  </div>
+                  
+                  <div class="card">
+                      <h2>👥 Verificación de Usuarios</h2>
+                      <div>
+                          <button class="refresh-btn" onclick="actualizarDashboard()">🔄 Actualizar</button>
+                      </div>
+                      <div id="usuarios-status">
+          EOF
+          
+            # Verificar usuarios académicos activos
+            echo "<h3>Estado de Acceso por Usuario:</h3>" >> /tmp/dashboard_acceso.html
+            
+            for usuario in alumno1 alumno2 alumno3 profesor1 profesor2 admin; do
+              if id "$usuario" >/dev/null 2>&1; then
+                resultado=$(verificar_usuario_calendario "$usuario" 2>/dev/null)
+                if echo "$resultado" | grep -q "PERMITIDO"; then
+                  echo "<div class='status-ok'>✅ $usuario: $resultado</div>" >> /tmp/dashboard_acceso.html
+                else
+                  echo "<div class='status-error'>❌ $usuario: $resultado</div>" >> /tmp/dashboard_acceso.html
+                fi
+              fi
+            done
+            
+            cat << 'EOF' >> /tmp/dashboard_acceso.html
+                      </div>
+                  </div>
+                  
+                  <div class="card">
+                      <h2>📊 Estadísticas de Acceso</h2>
+                      <div id="estadisticas">
+          EOF
+          
+            # Estadísticas de acceso del día
+            echo "<p><strong>Verificaciones de hoy:</strong> $(grep "$(date +%Y-%m-%d)" $LOG_FILE 2>/dev/null | wc -l)</p>" >> /tmp/dashboard_acceso.html
+            echo "<p><strong>Accesos permitidos:</strong> $(grep "$(date +%Y-%m-%d)" $LOG_FILE 2>/dev/null | grep -c "PERMITIDO")</p>" >> /tmp/dashboard_acceso.html
+            echo "<p><strong>Accesos denegados:</strong> $(grep "$(date +%Y-%m-%d)" $LOG_FILE 2>/dev/null | grep -c "DENEGADO")</p>" >> /tmp/dashboard_acceso.html
+            
+            cat << 'EOF' >> /tmp/dashboard_acceso.html
+                      </div>
+                  </div>
+                  
+                  <div class="card">
+                      <h2>📝 Últimos Eventos</h2>
+                      <div id="ultimos-eventos">
+          EOF
+          
+            # Últimos eventos del log
+            echo "<pre>" >> /tmp/dashboard_acceso.html
+            tail -10 $LOG_FILE 2>/dev/null >> /tmp/dashboard_acceso.html
+            echo "</pre>" >> /tmp/dashboard_acceso.html
+            
+            cat << 'EOF' >> /tmp/dashboard_acceso.html
+                      </div>
+                  </div>
+                  
+                  <footer class="card">
+                      <p><em>Actualizado automáticamente cada 30 segundos | Última actualización: <span id="timestamp"></span></em></p>
+                      <script>
+                          document.getElementById('timestamp').textContent = new Date().toLocaleString();
+                      </script>
+                  </footer>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+            echo "✅ Dashboard generado en /tmp/dashboard_acceso.html"
+          }
+          
+          case "$1" in
+            "verificar")
+              verificar_usuario_calendario "$2"
+              ;;
+            "dashboard")
+              dashboard_acceso_tiempo_real
+              ;;
+            "test")
+              echo "🧪 Probando sistema de calendario..."
+              for usuario in alumno1 profesor1 admin; do
+                if id "$usuario" >/dev/null 2>&1; then
+                  echo "Verificando $usuario:"
+                  verificar_usuario_calendario "$usuario"
+                  echo ""
+                fi
+              done
+              ;;
+            *)
+              echo "Uso: $0 {verificar USUARIO|dashboard|test}"
+              exit 1
+              ;;
+          esac
+        dest: /usr/local/bin/acceso_calendario.sh
+        mode: '0755'
+
+    - name: "Configurar tareas programadas del calendario"
+      cron:
+        name: "Actualizar dashboard de acceso"
+        minute: "*/5"
+        job: "/usr/local/bin/acceso_calendario.sh dashboard"
+        user: root
