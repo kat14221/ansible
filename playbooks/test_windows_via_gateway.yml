@@ -1,0 +1,43 @@
+---
+- name: Windows Security Dashboard via Gateway
+  hosts: debian_router
+  gather_facts: false
+  become: true
+  
+  tasks:
+    - name: Test if we can reach Windows PC from debian-router
+      shell: |
+        ping6 -c 3 2025:db8:101::11 || echo "Windows PC unreachable via IPv6"
+      register: ping_result
+      ignore_errors: true
+      
+    - name: Show ping result
+      debug:
+        msg: "{{ ping_result.stdout_lines }}"
+        
+    - name: Try to connect to Windows via SSH (if configured)
+      shell: |
+        timeout 10 ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no ansible@2025:db8:101::11 "echo Windows SSH accessible" || echo "Windows SSH not accessible"
+      register: ssh_result
+      ignore_errors: true
+      
+    - name: Show SSH test result
+      debug:
+        msg: "{{ ssh_result.stdout_lines }}"
+        
+    - name: Create local report about Windows connectivity
+      shell: |
+        mkdir -p /tmp/windows_report
+        echo "Windows Connectivity Report - $(date)" > /tmp/windows_report/connectivity.txt
+        echo "==================================" >> /tmp/windows_report/connectivity.txt
+        echo "Ping test:" >> /tmp/windows_report/connectivity.txt
+        echo "{{ ping_result.stdout }}" >> /tmp/windows_report/connectivity.txt
+        echo "" >> /tmp/windows_report/connectivity.txt
+        echo "SSH test:" >> /tmp/windows_report/connectivity.txt  
+        echo "{{ ssh_result.stdout }}" >> /tmp/windows_report/connectivity.txt
+        cat /tmp/windows_report/connectivity.txt
+      register: report_result
+      
+    - name: Show connectivity report
+      debug:
+        msg: "{{ report_result.stdout_lines }}"

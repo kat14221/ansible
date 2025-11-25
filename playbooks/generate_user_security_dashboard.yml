@@ -14,12 +14,35 @@
 
 - name: "Gestión de seguridad por usuario (Windows)"
   hosts: windows_hosts
-  gather_facts: true
+  gather_facts: false
   serial: 1
   strategy: linear
   vars:
-    ansible_winrm_operation_timeout_sec: 120
-    ansible_winrm_read_timeout_sec: 150
-  roles:
-    - { role: user-security-hardening, ignore_errors: yes }
-    - { role: user-security-dashboard, ignore_errors: yes }
+    ansible_winrm_operation_timeout_sec: 300
+    ansible_winrm_read_timeout_sec: 360
+    ansible_winrm_connection_timeout_sec: 180
+  tasks:
+    - name: Test Windows connectivity first
+      win_ping:
+      timeout: 60
+      ignore_errors: true
+      register: windows_ping
+      
+    - name: Run Windows security roles only if reachable
+      include_role:
+        name: "{{ item }}"
+      loop:
+        - user-security-hardening
+        - user-security-dashboard
+      when: windows_ping is succeeded
+      ignore_errors: true
+      
+    - name: Show Windows connection status
+      debug:
+        msg: |
+          {% if windows_ping is succeeded %}
+          Windows PC is reachable - Security dashboard tasks executed
+          {% else %}
+          Windows PC is not reachable - Skipping Windows security tasks
+          Check network connectivity to 2025:db8:101::11
+          {% endif %}

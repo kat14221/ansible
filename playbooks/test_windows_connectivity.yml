@@ -1,0 +1,52 @@
+---
+- name: Test Windows connectivity and basic security dashboard
+  hosts: windows_hosts
+  gather_facts: false
+  vars:
+    ansible_winrm_operation_timeout_sec: 300
+    ansible_winrm_read_timeout_sec: 360
+    
+  tasks:
+    - name: Test basic Windows connectivity
+      win_ping:
+      timeout: 60
+      
+    - name: Test basic PowerShell command
+      win_shell: |
+        Write-Output "Connection successful"
+        Get-Date
+      register: test_result
+      timeout: 60
+      ignore_errors: true
+      
+    - name: Show connection test result
+      debug:
+        msg: "{{ test_result.stdout_lines | default('Connection failed') }}"
+      when: test_result is defined
+      
+    - name: Create simple Windows security dashboard
+      win_shell: |
+        $dashboardPath = "C:\SecurityDashboard"
+        if (-not (Test-Path $dashboardPath)) {
+          New-Item -Path $dashboardPath -ItemType Directory -Force
+        }
+        
+        # Basic user info
+        Get-LocalUser | Select-Object Name,Enabled,LastLogon | 
+          ConvertTo-Html -Title "Local Users" | 
+          Out-File "$dashboardPath\users.html" -Encoding UTF8
+        
+        # Basic group info  
+        Get-LocalGroup | Select-Object Name,Description |
+          ConvertTo-Html -Title "Local Groups" |
+          Out-File "$dashboardPath\groups.html" -Encoding UTF8
+          
+        Write-Output "Dashboard created at $dashboardPath"
+      register: dashboard_result
+      timeout: 120
+      ignore_errors: true
+      
+    - name: Show dashboard creation result
+      debug:
+        msg: "{{ dashboard_result.stdout_lines | default('Dashboard creation failed') }}"
+      when: dashboard_result is defined
