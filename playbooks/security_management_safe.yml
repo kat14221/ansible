@@ -399,8 +399,16 @@
 
     - name: Detener procesos anteriores
       shell: |
-        pkill -f "security_app.py" || true
-        sleep 2
+        # Buscar y terminar procesos anteriores de forma segura
+        if pgrep -f "security_app.py" > /dev/null; then
+          echo "Terminando procesos anteriores..."
+          pkill -f "security_app.py"
+          sleep 2
+        else
+          echo "No hay procesos anteriores ejecutándose"
+        fi
+        # Limpiar archivos PID antiguos
+        rm -f /home/ansible/app.pid
       become: false
       ignore_errors: yes
 
@@ -415,12 +423,21 @@
     - name: Ejecutar aplicación en background
       shell: |
         cd /home/ansible
-        python3 security_app.py &
+        # Ejecutar con nohup para evitar que se termine cuando se cierre la terminal
+        nohup python3 security_app.py > security_app.log 2>&1 &
         echo $! > app.pid
-        sleep 5
+        sleep 3
+        # Verificar que el proceso inició correctamente
+        if [ -f app.pid ]; then
+          pid=$(cat app.pid)
+          if ps -p $pid > /dev/null; then
+            echo "Proceso iniciado correctamente con PID: $pid"
+          else
+            echo "Error: El proceso no se inició correctamente"
+            exit 1
+          fi
+        fi
       become: false
-      async: 30
-      poll: 0
 
     - name: Esperar inicio de aplicación
       pause:
