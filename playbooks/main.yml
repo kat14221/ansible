@@ -1,44 +1,56 @@
 ---
-# tasks file for windows-academic-users
-# Crea los grupos y usuarios para el laboratorio académico en Windows.
+# Rol para instalar y configurar el dashboard de monitoreo Netdata
 
-- name: Crear grupo para Alumnos
-  win_group:
-    name: Alumnos
+- name: "MONITORING: Instalar dependencias para el script de instalación"
+  apt:
+    name:
+      - curl
+      - git
+      - gcc
+      - make
+      - autoconf
+      - automake
+      - pkg-config
+      - zlib1g-dev
+      - uuid-dev
     state: present
+    update_cache: yes
+  become: yes
 
-- name: Crear grupo para Profesores
-  win_group:
-    name: Profesores
-    state: present
+- name: "MONITORING: Descargar el script de instalación de Netdata"
+  get_url:
+    url: "https://my-netdata.io/kickstart.sh"
+    dest: "/tmp/kickstart.sh"
+    mode: '0755'
+  become: yes
 
-- name: Crear usuarios alumnos
-  win_user:
-    name: "{{ item.name }}"
-    password: "{{ item.pass }}"
-    groups:
-      - Alumnos
-    state: present
-  loop:
-    - { name: 'alumno1', pass: 'Alumno.123!' }
-    - { name: 'alumno2', pass: 'Alumno.123!' }
-    - { name: 'alumno3', pass: 'Alumno.123!' }
+- name: "MONITORING: Ejecutar el script de instalación de Netdata (modo no interactivo)"
+  # Usamos --dont-wait para que no bloquee el playbook y --disable-telemetry por privacidad
+  shell: /tmp/kickstart.sh --dont-wait --disable-telemetry
+  args:
+    creates: /etc/netdata/netdata.conf # No se ejecuta si Netdata ya está instalado
+  become: yes
+  changed_when: true # Siempre marcamos como cambio si se ejecuta
 
-- name: Crear usuarios profesores
-  win_user:
-    name: "{{ item.name }}"
-    password: "{{ item.pass }}"
-    groups:
-      - Profesores
-    state: present
-  loop:
-    - { name: 'profesor1', pass: 'Profesor.123!' }
-    - { name: 'profesor2', pass: 'Profesor.123!' }
+- name: "MONITORING: Permitir acceso al puerto de Netdata (19999) en el firewall"
+  # Usamos nftables, que es el firewall que ya tienes configurado en el rol debian-ipv6-router
+  shell: |
+    nft list ruleset | grep -q 'tcp dport 19999 accept' || nft add rule inet ansible input tcp dport 19999 accept comment \"Allow Netdata Dashboard\"
+  become: yes
+  changed_when: true
+  failed_when: false # No fallar si el comando nft falla (ej. la cadena 'ansible' no existe aún)
 
-- name: Crear usuario admin y añadirlo a Administradores
-  win_user:
-    name: admin
-    password: "Admin.123!"
-    groups:
-      - Administrators
-    state: present
+- name: "MONITORING: Mostrar URL de acceso al dashboard"
+  debug:
+    msg:
+      - "==================================================================="
+      - "✅ Dashboard de Monitoreo Netdata Instalado y Configurado"
+      - "==================================================================="
+      - ""
+      - "Accede al dashboard interactivo en tu navegador:"
+      - "   👉 http://{{ ansible_host }}:19999"
+      - "   👉 http://[2025:db8:101::1]:19999"
+      - ""
+      - "Espera unos 30 segundos para que recolecte los primeros datos."
+      - "==================================================================="
+  run_once: true
