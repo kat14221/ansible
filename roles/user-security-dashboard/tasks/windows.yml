@@ -94,34 +94,28 @@
     $md = $mdLines -join "`r`n"
     $md | Out-File -FilePath "$base\\SEGURIDAD_DASHBOARD.md" -Encoding utf8
 
-- name: Slurp usuarios section (Windows)
-  win_slurp:
-    path: "{{ security_dashboard_windows_workdir }}\\01_usuarios.txt"
+- name: Read usuarios section (Windows)
+  win_shell: Get-Content "{{ security_dashboard_windows_workdir }}\\01_usuarios.txt" -Raw
   register: win_users_raw
 
-- name: Slurp grupos section (Windows)
-  win_slurp:
-    path: "{{ security_dashboard_windows_workdir }}\\02_grupos.txt"
+- name: Read grupos section (Windows)
+  win_shell: Get-Content "{{ security_dashboard_windows_workdir }}\\02_grupos.txt" -Raw
   register: win_groups_raw
 
-- name: Slurp password policy (Windows)
-  win_slurp:
-    path: "{{ security_dashboard_windows_workdir }}\\03_politica_contrasenas.txt"
+- name: Read password policy (Windows)
+  win_shell: Get-Content "{{ security_dashboard_windows_workdir }}\\03_politica_contrasenas.txt" -Raw
   register: win_passpol_raw
 
-- name: Slurp privileges section (Windows)
-  win_slurp:
-    path: "{{ security_dashboard_windows_workdir }}\\04_privilegios.txt"
+- name: Read privileges section (Windows)
+  win_shell: Get-Content "{{ security_dashboard_windows_workdir }}\\04_privilegios.txt" -Raw
   register: win_priv_raw
 
-- name: Slurp ACL section (Windows)
-  win_slurp:
-    path: "{{ security_dashboard_windows_workdir }}\\05_acl_evidence.txt"
+- name: Read ACL section (Windows)
+  win_shell: Get-Content "{{ security_dashboard_windows_workdir }}\\05_acl_evidence.txt" -Raw
   register: win_acl_raw
 
-- name: Slurp audit section (Windows)
-  win_slurp:
-    path: "{{ security_dashboard_windows_workdir }}\\06_audit_rules.txt"
+- name: Read audit section (Windows)
+  win_shell: Get-Content "{{ security_dashboard_windows_workdir }}\\06_audit_rules.txt" -Raw
   register: win_audit_raw
 
 - name: Ensure Windows dashboard web root exists
