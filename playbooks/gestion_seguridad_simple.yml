@@ -1,0 +1,277 @@
+---
+- name: "Gestión de Seguridad por Usuario - Versión Simplificada"
+  hosts: debian-router
+  gather_facts: no
+  become: true
+  
+  tasks:
+    - name: "Detener procesos existentes en puerto 8085"
+      shell: |
+        pkill -f "gestion_seguridad" 2>/dev/null || true
+        fuser -k 8085/tcp 2>/dev/null || true
+        sleep 2
+      ignore_errors: yes
+
+    - name: "Crear sistema de gestión de seguridad simplificado"
+      copy:
+        content: |
+          #!/usr/bin/env python3
+          import socket, threading, json, subprocess, datetime, os
+          
+          class GestionSeguridad:
+              def __init__(self):
+                  self.host = '0.0.0.0'
+                  self.port = 8085
+              
+              def obtener_usuarios(self):
+                  try:
+                      result = subprocess.run(['getent', 'passwd'], capture_output=True, text=True)
+                      usuarios = []
+                      for line in result.stdout.split('\n'):
+                          if '/home/' in line and ':' in line:
+                              parts = line.split(':')
+                              if len(parts) >= 6:
+                                  username = parts[0]
+                                  uid = parts[2]
+                                  
+                                  # Obtener grupos
+                                  groups_cmd = subprocess.run(['groups', username], capture_output=True, text=True)
+                                  grupos = groups_cmd.stdout.split(':')[1].strip() if groups_cmd.returncode == 0 else ''
+                                  
+                                  # Determinar rol
+                                  rol = 'administrador' if 'sudo' in grupos else 'profesor' if 'profesor' in grupos else 'estudiante'
+                                  
+                                  usuarios.append({
+                                      'username': username,
+                                      'uid': uid,
+                                      'grupos': grupos,
+                                      'rol': rol,
+                                      'estado': 'activo'
+                                  })
+                      return usuarios
+                  except:
+                      return []
+              
+              def generar_html(self):
+                  usuarios = self.obtener_usuarios()
+                  return f'''<!DOCTYPE html>
+          <html>
+          <head>
+              <title>Gestión de Seguridad por Usuario</title>
+              <meta charset="UTF-8">
+              <style>
+                  body {{ font-family: Arial; background: linear-gradient(135deg, #2c3e50, #34495e); color: white; margin: 0; }}
+                  .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+                  .header {{ text-align: center; padding: 20px; background: rgba(0,0,0,0.2); margin-bottom: 30px; border-radius: 10px; }}
+                  .users-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }}
+                  .user-card {{ background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); }}
+                  .user-header {{ display: flex; align-items: center; margin-bottom: 15px; }}
+                  .user-icon {{ font-size: 3em; margin-right: 15px; }}
+                  .user-info h3 {{ margin: 0; color: #ecf0f1; }}
+                  .rol-badge {{ display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 0.9em; font-weight: bold; margin: 5px 0; }}
+                  .rol-admin {{ background: #e74c3c; }}
+                  .rol-profesor {{ background: #3498db; }}
+                  .rol-estudiante {{ background: #27ae60; }}
+                  .politicas {{ margin-top: 15px; }}
+                  .politica-item {{ display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }}
+                  .btn {{ padding: 8px 16px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; background: #3498db; color: white; }}
+                  .btn:hover {{ background: #2980b9; }}
+                  .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; }}
+                  .stat-card {{ background: rgba(255,255,255,0.1); padding: 20px; text-align: center; border-radius: 10px; }}
+                  .stat-value {{ font-size: 2.5em; font-weight: bold; color: #3498db; }}
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🛡️ Gestión de Seguridad por Usuario</h1>
+                      <p>Políticas Seguras con Restricciones Claras</p>
+                      <p><em>Actualizado: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</em></p>
+                  </div>
+                  
+                  <div class="stats">
+                      <div class="stat-card">
+                          <div class="stat-value">{len(usuarios)}</div>
+                          <div>Total Usuarios</div>
+                      </div>
+                      <div class="stat-card">
+                          <div class="stat-value">{len([u for u in usuarios if u["rol"] == "administrador"])}</div>
+                          <div>Administradores</div>
+                      </div>
+                      <div class="stat-card">
+                          <div class="stat-value">{len([u for u in usuarios if u["rol"] == "profesor"])}</div>
+                          <div>Profesores</div>
+                      </div>
+                      <div class="stat-card">
+                          <div class="stat-value">{len([u for u in usuarios if u["rol"] == "estudiante"])}</div>
+                          <div>Estudiantes</div>
+                      </div>
+                  </div>
+                  
+                  <div class="users-grid">'''
+                  
+                  for usuario in usuarios:
+                      icon = '🔧' if usuario['rol'] == 'administrador' else '👨‍🏫' if usuario['rol'] == 'profesor' else '🎓'
+                      
+                      # Políticas según rol
+                      if usuario['rol'] == 'administrador':
+                          politicas = {
+                              'Horario': '24/7 - Sin restricciones',
+                              'Sesión Max': 'Ilimitado',
+                              'Directorios': 'Acceso completo',
+                              'Comandos': 'Todos permitidos'
+                          }
+                      elif usuario['rol'] == 'profesor':
+                          politicas = {
+                              'Horario': '07:00-20:00 L-S',
+                              'Sesión Max': '12 horas',
+                              'Directorios': '/home/academico, /opt',
+                              'Comandos': 'Limitados'
+                          }
+                      else:
+                          politicas = {
+                              'Horario': '08:00-18:00 L-V',
+                              'Sesión Max': '8 horas',
+                              'Directorios': '/home/academico/estudiantes',
+                              'Comandos': 'Muy limitados'
+                          }
+                      
+                      html += f'''
+                      <div class="user-card">
+                          <div class="user-header">
+                              <div class="user-icon">{icon}</div>
+                              <div class="user-info">
+                                  <h3>{usuario["username"]}</h3>
+                                  <span class="rol-badge rol-{usuario["rol"].replace("administrador", "admin")}">{usuario["rol"].title()}</span>
+                                  <div style="font-size: 0.9em; opacity: 0.8;">UID: {usuario["uid"]} | Grupos: {usuario["grupos"][:50]}...</div>
+                              </div>
+                          </div>
+                          
+                          <div class="politicas">
+                              <h4 style="color: #3498db; margin-bottom: 10px;">🛡️ Políticas de Seguridad:</h4>'''
+                      
+                      for key, value in politicas.items():
+                          html += f'''
+                              <div class="politica-item">
+                                  <span><strong>{key}:</strong></span>
+                                  <span style="color: #ecf0f1;">{value}</span>
+                              </div>'''
+                      
+                      html += f'''
+                          </div>
+                          
+                          <div style="margin-top: 15px;">
+                              <button class="btn" onclick="alert('Editando políticas de {usuario["username"]}')">✏️ Editar Políticas</button>
+                              <button class="btn" onclick="alert('Detalles de {usuario["username"]}')">📋 Ver Detalles</button>
+                          </div>
+                      </div>'''
+                  
+                  html += '''
+                  </div>
+                  
+                  <div style="text-align: center; margin-top: 30px; padding: 20px; background: rgba(0,0,0,0.2); border-radius: 10px;">
+                      <h3>🔐 Funcionalidades de Seguridad Implementadas</h3>
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
+                          <div>✅ Restricciones de horario por rol</div>
+                          <div>✅ Límites de tiempo de sesión</div>
+                          <div>✅ Control de directorios permitidos</div>
+                          <div>✅ Bloqueo de comandos peligrosos</div>
+                          <div>✅ Políticas diferenciadas por usuario</div>
+                          <div>✅ Monitoreo en tiempo real</div>
+                      </div>
+                      <button class="btn" style="margin-top: 15px;" onclick="location.reload()">🔄 Actualizar Dashboard</button>
+                  </div>
+              </div>
+              
+              <script>
+                  // Auto-refresh cada 60 segundos
+                  setTimeout(function(){ location.reload(); }, 60000);
+              </script>
+          </body>
+          </html>'''
+                  return html
+              
+              def manejar_conexion(self, conn, addr):
+                  try:
+                      data = conn.recv(1024).decode()
+                      if 'GET /' in data:
+                          response_body = self.generar_html()
+                      elif 'GET /api/usuarios' in data:
+                          usuarios = self.obtener_usuarios()
+                          response_body = json.dumps(usuarios, indent=2, ensure_ascii=False)
+                      else:
+                          response_body = '<h1>404 - No encontrado</h1>'
+                      
+                      response = f"HTTP/1.1 200 OK\\r\\nContent-Type: text/html; charset=utf-8\\r\\nContent-Length: {len(response_body)}\\r\\n\\r\\n{response_body}"
+                      conn.send(response.encode('utf-8'))
+                  except Exception as e:
+                      print(f"Error: {e}")
+                  finally:
+                      conn.close()
+              
+              def iniciar_servidor(self):
+                  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                      s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                      s.bind((self.host, self.port))
+                      s.listen(5)
+                      print(f"🛡️ Servidor iniciado en http://{self.host}:{self.port}")
+                      
+                      while True:
+                          try:
+                              conn, addr = s.accept()
+                              thread = threading.Thread(target=self.manejar_conexion, args=(conn, addr))
+                              thread.daemon = True
+                              thread.start()
+                          except KeyboardInterrupt:
+                              break
+          
+          if __name__ == "__main__":
+              servidor = GestionSeguridad()
+              servidor.iniciar_servidor()
+        dest: /usr/local/bin/gestion_seguridad_simple.py
+        mode: '0755'
+
+    - name: "Crear directorio de seguridad"
+      file:
+        path: /etc/seguridad
+        state: directory
+        mode: '0755'
+
+    - name: "Iniciar servidor de gestión de seguridad"
+      shell: |
+        echo "🚀 Iniciando servidor de gestión de seguridad..."
+        cd /usr/local/bin
+        nohup python3 gestion_seguridad_simple.py > /var/log/seguridad_server.log 2>&1 &
+        sleep 3
+        
+        if pgrep -f "gestion_seguridad_simple.py" > /dev/null; then
+          echo "✅ Servidor iniciado correctamente"
+        else
+          echo "❌ Error iniciando servidor"
+          cat /var/log/seguridad_server.log
+        fi
+
+    - name: "Verificar servidor activo"
+      wait_for:
+        port: 8085
+        host: 172.17.25.122
+        timeout: 10
+      ignore_errors: yes
+
+    - name: "Mostrar información del sistema"
+      debug:
+        msg:
+          - "🛡️ SISTEMA DE GESTIÓN DE SEGURIDAD CONFIGURADO"
+          - "=============================================="
+          - ""
+          - "🌐 Acceso Principal: http://172.17.25.122:8085"
+          - "📊 API Usuarios: http://172.17.25.122:8085/api/usuarios"
+          - ""
+          - "🔐 POLÍTICAS IMPLEMENTADAS:"
+          - "   🎓 Estudiantes: 8-18h L-V, acceso limitado"
+          - "   👨‍🏫 Profesores: 7-20h L-S, permisos medios"
+          - "   🔧 Admins: 24/7, acceso completo"
+          - ""
+          - "✅ Dashboard funcional con gestión visual de usuarios"
+          - "✅ Políticas de seguridad diferenciadas por rol"
+          - "✅ Monitoreo en tiempo real de usuarios y permisos"

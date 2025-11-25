@@ -709,32 +709,32 @@
                       if not data:
                           return
                       
-                      lines = data.split('\n')
+                      lines = data.split('\\n')
                       request_line = lines[0]
                       method, path, _ = request_line.split()
                       
                       if method == 'GET':
                           if path == '/' or path == '/dashboard':
                               response_body = self.generar_dashboard_html()
-                              response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {len(response_body)}\r\n\r\n{response_body}"
+                              response = f"HTTP/1.1 200 OK\\r\\nContent-Type: text/html; charset=utf-8\\r\\nContent-Length: {len(response_body)}\\r\\n\\r\\n{response_body}"
                           
                           elif path == '/api/usuarios':
                               usuarios = self.obtener_usuarios_con_politicas()
                               response_body = json.dumps(usuarios, ensure_ascii=False, indent=2)
-                              response = f"HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {len(response_body)}\r\n\r\n{response_body}"
+                              response = f"HTTP/1.1 200 OK\\r\\nContent-Type: application/json; charset=utf-8\\r\\nContent-Length: {len(response_body)}\\r\\n\\r\\n{response_body}"
                           
                           elif path == '/api/reporte':
                               reporte = self.generar_reporte_seguridad()
                               response_body = json.dumps(reporte, ensure_ascii=False, indent=2)
-                              response = f"HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {len(response_body)}\r\n\r\n{response_body}"
+                              response = f"HTTP/1.1 200 OK\\r\\nContent-Type: application/json; charset=utf-8\\r\\nContent-Length: {len(response_body)}\\r\\n\\r\\n{response_body}"
                           
                           else:
                               response_body = "<h1>404 - Página no encontrada</h1>"
-                              response = f"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: {len(response_body)}\r\n\r\n{response_body}"
+                              response = f"HTTP/1.1 404 Not Found\\r\\nContent-Type: text/html\\r\\nContent-Length: {len(response_body)}\\r\\n\\r\\n{response_body}"
                       
                       else:
                           response_body = "<h1>405 - Método no permitido</h1>"
-                          response = f"HTTP/1.1 405 Method Not Allowed\r\nContent-Type: text/html\r\nContent-Length: {len(response_body)}\r\n\r\n{response_body}"
+                          response = f"HTTP/1.1 405 Method Not Allowed\\r\\nContent-Type: text/html\\r\\nContent-Length: {len(response_body)}\\r\\n\\r\\n{response_body}"
                       
                       conn.send(response.encode())
                   
@@ -767,7 +767,7 @@
                               client_thread.start()
                           
                           except KeyboardInterrupt:
-                              print("\n🛑 Cerrando sistema de gestión de seguridad...")
+                              print("\\n🛑 Cerrando sistema de gestión de seguridad...")
                               break
                           except Exception as e:
                               print(f"Error en servidor: {e}")
