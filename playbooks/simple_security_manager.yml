@@ -1,0 +1,407 @@
+---
+- name: Sistema de Gestión de Seguridad Simplificado
+  hosts: debian_router
+  gather_facts: true
+  become: true
+  
+  tasks:
+    - name: Instalar dependencias básicas
+      package:
+        name:
+          - python3
+          - python3-pip
+        state: present
+
+    - name: Instalar Flask con pip
+      pip:
+        name:
+          - flask
+          - bcrypt
+        state: present
+
+    - name: Crear directorio para aplicación
+      file:
+        path: /var/www/security-manager
+        state: directory
+        mode: '0755'
+
+    - name: Crear aplicación Flask simplificada
+      copy:
+        content: |
+          #!/usr/bin/env python3
+          from flask import Flask, render_template_string, request, jsonify, redirect, url_for, session
+          import subprocess
+          import json
+          import os
+          from functools import wraps
+          
+          app = Flask(__name__)
+          app.secret_key = 'ansible-security-2025'
+          
+          LOGIN_TEMPLATE = '''
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Gestión de Seguridad - Login</title>
+              <meta charset="UTF-8">
+              <style>
+                  body { font-family: Arial, sans-serif; background: linear-gradient(45deg, #3498db, #2c3e50); 
+                         height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
+                  .login-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); 
+                               width: 100%; max-width: 400px; }
+                  .login-box h1 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
+                  .form-group { margin-bottom: 20px; }
+                  .form-group label { display: block; margin-bottom: 5px; color: #2c3e50; font-weight: bold; }
+                  .form-group input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; 
+                                      font-size: 16px; box-sizing: border-box; }
+                  .form-group input:focus { border-color: #3498db; outline: none; }
+                  .login-btn { width: 100%; background: #3498db; color: white; border: none; padding: 15px; 
+                               border-radius: 8px; font-size: 16px; cursor: pointer; }
+                  .login-btn:hover { background: #2980b9; }
+                  .error { background: #e74c3c; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+              </style>
+          </head>
+          <body>
+              <div class="login-box">
+                  <h1>🔐 Gestión de Seguridad</h1>
+                  {% if error %}
+                      <div class="error">{{ error }}</div>
+                  {% endif %}
+                  <form method="POST">
+                      <div class="form-group">
+                          <label>Usuario:</label>
+                          <input type="text" name="username" required>
+                      </div>
+                      <div class="form-group">
+                          <label>Contraseña:</label>
+                          <input type="password" name="password" required>
+                      </div>
+                      <button type="submit" class="login-btn">Iniciar Sesión</button>
+                  </form>
+              </div>
+          </body>
+          </html>
+          '''
+          
+          DASHBOARD_TEMPLATE = '''
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Dashboard de Gestión de Seguridad</title>
+              <meta charset="UTF-8">
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body { font-family: Arial, sans-serif; background: #f5f5f5; }
+                  .navbar { background: #2c3e50; color: white; padding: 15px 30px; display: flex; 
+                            justify-content: space-between; align-items: center; }
+                  .navbar h1 { font-size: 1.5em; }
+                  .container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+                  .section { background: white; margin-bottom: 30px; border-radius: 10px; padding: 25px; 
+                             box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+                  .section h2 { color: #2c3e50; margin-bottom: 20px; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+                  .tabs { display: flex; margin-bottom: 20px; }
+                  .tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; color: #666; }
+                  .tab.active { color: #3498db; border-bottom-color: #3498db; }
+                  .tab-content { display: none; }
+                  .tab-content.active { display: block; }
+                  .btn { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; 
+                         cursor: pointer; margin: 5px; }
+                  .btn:hover { background: #2980b9; }
+                  .btn.danger { background: #e74c3c; }
+                  .btn.danger:hover { background: #c0392b; }
+                  .form-group { margin-bottom: 15px; }
+                  .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+                  .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; 
+                                                          border-radius: 5px; }
+                  .users-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+                  .user-card { border: 1px solid #ddd; border-radius: 10px; padding: 20px; }
+                  .user-card:hover { border-color: #3498db; }
+                  .user-header { display: flex; align-items: center; margin-bottom: 15px; }
+                  .user-icon { font-size: 2em; margin-right: 15px; }
+                  .alert { padding: 15px; margin-bottom: 20px; border-radius: 5px; display: none; }
+                  .alert.success { background: #d4edda; color: #155724; }
+                  .alert.error { background: #f8d7da; color: #721c24; }
+              </style>
+          </head>
+          <body>
+              <div class="navbar">
+                  <h1>🛡️ Gestión de Seguridad</h1>
+                  <div>
+                      <span>👤 {{ session.username }}</span>
+                      <a href="/logout" style="color: white; margin-left: 20px;">Salir</a>
+                  </div>
+              </div>
+              
+              <div class="container">
+                  <div id="alert" class="alert"></div>
+                  
+                  <div class="section">
+                      <h2>Gestión de Usuarios</h2>
+                      
+                      <div class="tabs">
+                          <div class="tab active" onclick="showTab('users')">Usuarios</div>
+                          <div class="tab" onclick="showTab('create')">Crear Usuario</div>
+                      </div>
+                      
+                      <div id="users" class="tab-content active">
+                          <button class="btn" onclick="loadUsers()">🔄 Actualizar</button>
+                          <div class="users-grid" id="usersContainer"></div>
+                      </div>
+                      
+                      <div id="create" class="tab-content">
+                          <form onsubmit="createUser(event)">
+                              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                  <div class="form-group">
+                                      <label>Usuario:</label>
+                                      <input type="text" id="newUsername" required>
+                                  </div>
+                                  <div class="form-group">
+                                      <label>Contraseña:</label>
+                                      <input type="password" id="newPassword" required>
+                                  </div>
+                                  <div class="form-group">
+                                      <label>Rol:</label>
+                                      <select id="newRole">
+                                          <option value="alumno">Alumno</option>
+                                          <option value="profesor">Profesor</option>
+                                          <option value="admin">Administrador</option>
+                                      </select>
+                                  </div>
+                              </div>
+                              <button type="submit" class="btn">Crear Usuario</button>
+                          </form>
+                      </div>
+                  </div>
+              </div>
+              
+              <script>
+                  function showTab(tabName) {
+                      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                      document.getElementById(tabName).classList.add('active');
+                      event.target.classList.add('active');
+                      if (tabName === 'users') loadUsers();
+                  }
+                  
+                  function loadUsers() {
+                      fetch('/api/users')
+                          .then(response => response.json())
+                          .then(users => {
+                              const container = document.getElementById('usersContainer');
+                              container.innerHTML = '';
+                              users.forEach(user => {
+                                  const roleIcon = user.groups.includes('sudo') ? '🔧' : 
+                                                  user.groups.includes('profesor') ? '👨‍🏫' : '🎓';
+                                  const card = document.createElement('div');
+                                  card.className = 'user-card';
+                                  card.innerHTML = `
+                                      <div class="user-header">
+                                          <div class="user-icon">${roleIcon}</div>
+                                          <div>
+                                              <h4>${user.username}</h4>
+                                              <p>UID: ${user.uid}</p>
+                                              <p>Grupos: ${user.groups}</p>
+                                          </div>
+                                      </div>
+                                      <button class="btn danger" onclick="deleteUser('${user.username}')">Eliminar</button>
+                                  `;
+                                  container.appendChild(card);
+                              });
+                          });
+                  }
+                  
+                  function createUser(event) {
+                      event.preventDefault();
+                      const data = {
+                          username: document.getElementById('newUsername').value,
+                          password: document.getElementById('newPassword').value,
+                          role: document.getElementById('newRole').value
+                      };
+                      
+                      fetch('/api/create_user', {
+                          method: 'POST',
+                          headers: {'Content-Type': 'application/json'},
+                          body: JSON.stringify(data)
+                      })
+                      .then(response => response.json())
+                      .then(result => {
+                          showAlert(result.message || result.error, result.success ? 'success' : 'error');
+                          if (result.success) {
+                              event.target.reset();
+                              showTab('users');
+                          }
+                      });
+                  }
+                  
+                  function deleteUser(username) {
+                      if (confirm(`¿Eliminar usuario ${username}?`)) {
+                          fetch('/api/delete_user', {
+                              method: 'POST',
+                              headers: {'Content-Type': 'application/json'},
+                              body: JSON.stringify({username: username})
+                          })
+                          .then(response => response.json())
+                          .then(result => {
+                              showAlert(result.message || result.error, result.success ? 'success' : 'error');
+                              if (result.success) loadUsers();
+                          });
+                      }
+                  }
+                  
+                  function showAlert(message, type) {
+                      const alert = document.getElementById('alert');
+                      alert.className = `alert ${type}`;
+                      alert.textContent = message;
+                      alert.style.display = 'block';
+                      setTimeout(() => alert.style.display = 'none', 5000);
+                  }
+                  
+                  // Cargar usuarios al iniciar
+                  loadUsers();
+              </script>
+          </body>
+          </html>
+          '''
+          
+          def run_command(cmd):
+              try:
+                  result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+                  return {'success': True, 'stdout': result.stdout}
+              except subprocess.CalledProcessError as e:
+                  return {'success': False, 'error': str(e)}
+          
+          @app.route('/')
+          def home():
+              if 'username' not in session:
+                  return redirect(url_for('login'))
+              return render_template_string(DASHBOARD_TEMPLATE, session=session)
+          
+          @app.route('/login', methods=['GET', 'POST'])
+          def login():
+              if request.method == 'POST':
+                  username = request.form['username']
+                  password = request.form['password']
+                  
+                  # Verificar credenciales básicas
+                  if username in ['admin', 'ansible'] and len(password) > 3:
+                      session['username'] = username
+                      return redirect(url_for('home'))
+                  else:
+                      return render_template_string(LOGIN_TEMPLATE, error='Credenciales inválidas')
+              
+              return render_template_string(LOGIN_TEMPLATE)
+          
+          @app.route('/logout')
+          def logout():
+              session.pop('username', None)
+              return redirect(url_for('login'))
+          
+          @app.route('/api/users')
+          def get_users():
+              if 'username' not in session:
+                  return jsonify({'error': 'No autorizado'}), 401
+              
+              result = run_command("getent passwd | awk -F: '$3 >= 1000 && $3 < 65534'")
+              users = []
+              
+              if result['success']:
+                  for line in result['stdout'].strip().split('\n'):
+                      if line:
+                          parts = line.split(':')
+                          if len(parts) >= 6:
+                              groups_result = run_command(f"groups {parts[0]}")
+                              groups = groups_result['stdout'].split(':')[1].strip() if groups_result['success'] else ""
+                              
+                              users.append({
+                                  'username': parts[0],
+                                  'uid': parts[2],
+                                  'home': parts[5],
+                                  'groups': groups
+                              })
+              
+              return jsonify(users)
+          
+          @app.route('/api/create_user', methods=['POST'])
+          def create_user():
+              if 'username' not in session:
+                  return jsonify({'error': 'No autorizado'}), 401
+              
+              data = request.get_json()
+              username = data.get('username')
+              password = data.get('password')
+              role = data.get('role', 'alumno')
+              
+              if not username or not password:
+                  return jsonify({'success': False, 'error': 'Faltan datos'})
+              
+              # Crear usuario
+              cmd = f"useradd -m -s /bin/bash {username}"
+              result = run_command(cmd)
+              
+              if not result['success']:
+                  return jsonify({'success': False, 'error': 'Error creando usuario'})
+              
+              # Establecer contraseña
+              cmd = f"echo '{username}:{password}' | chpasswd"
+              run_command(cmd)
+              
+              # Asignar grupos según rol
+              if role == 'admin':
+                  run_command(f"usermod -aG sudo {username}")
+              elif role == 'profesor':
+                  run_command(f"groupadd -f profesores && usermod -aG profesores {username}")
+              
+              return jsonify({'success': True, 'message': f'Usuario {username} creado'})
+          
+          @app.route('/api/delete_user', methods=['POST'])
+          def delete_user():
+              if 'username' not in session:
+                  return jsonify({'error': 'No autorizado'}), 401
+              
+              data = request.get_json()
+              username = data.get('username')
+              
+              if username in ['root', 'ansible', 'admin']:
+                  return jsonify({'success': False, 'error': 'No se puede eliminar'})
+              
+              result = run_command(f"userdel -r {username}")
+              
+              if result['success']:
+                  return jsonify({'success': True, 'message': f'Usuario {username} eliminado'})
+              else:
+                  return jsonify({'success': False, 'error': 'Error eliminando usuario'})
+          
+          if __name__ == '__main__':
+              app.run(host='0.0.0.0', port=8090, debug=False)
+        dest: /var/www/security-manager/app.py
+        mode: '0755'
+
+    - name: Iniciar aplicación de gestión
+      shell: |
+        cd /var/www/security-manager
+        pkill -f "app.py" || true
+        sleep 2
+        nohup python3 app.py > /var/log/security-manager.log 2>&1 &
+        sleep 3
+
+    - name: Verificar que esté funcionando
+      wait_for:
+        port: 8090
+        host: 0.0.0.0
+        timeout: 10
+
+    - name: Mostrar información de acceso
+      debug:
+        msg:
+          - "🛡️ SISTEMA DE GESTIÓN DESPLEGADO"
+          - "================================"
+          - ""
+          - "🌐 URL: http://172.17.25.122:8090"
+          - "👤 Usuarios: admin, ansible"
+          - "🔐 Contraseña: cualquier contraseña (demo)"
+          - ""
+          - "✨ Funciones disponibles:"
+          - "   👥 Ver usuarios del sistema"
+          - "   ➕ Crear nuevos usuarios"
+          - "   🗑️  Eliminar usuarios"
+          - "   🔧 Asignar roles automáticamente"
