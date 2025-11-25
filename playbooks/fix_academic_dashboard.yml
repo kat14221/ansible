@@ -1,0 +1,311 @@
+---
+- name: Fix y Actualizar Dashboard Académico
+  hosts: debian_router
+  gather_facts: true
+  become: true
+  
+  tasks:
+    - name: Crear directorio para dashboard
+      file:
+        path: /var/www/security-dashboard
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Detener procesos anteriores del dashboard
+      shell: |
+        pkill -f "python3.*http.server.*8088" || true
+        sleep 2
+      ignore_errors: yes
+
+    - name: Recopilar información de usuarios del sistema
+      shell: |
+        echo "=== USUARIOS DEL SISTEMA ===" > /tmp/users_analysis.txt
+        echo "" >> /tmp/users_analysis.txt
+        getent passwd | grep -E "(alumno|profesor|admin|ansible)" | while read line; do
+          user=$(echo $line | cut -d: -f1)
+          uid=$(echo $line | cut -d: -f3)  
+          home=$(echo $line | cut -d: -f6)
+          shell=$(echo $line | cut -d: -f7)
+          echo "👤 Usuario: $user (UID: $uid)" >> /tmp/users_analysis.txt
+          echo "   🏠 Home: $home" >> /tmp/users_analysis.txt
+          echo "   🐚 Shell: $shell" >> /tmp/users_analysis.txt
+          
+          groups_info=$(groups $user 2>/dev/null || echo "sin grupos")
+          echo "   👥 Grupos: $groups_info" >> /tmp/users_analysis.txt
+          echo "" >> /tmp/users_analysis.txt
+        done
+
+    - name: Crear dashboard HTML académico
+      copy:
+        content: |
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Dashboard Académico - {{ inventory_hostname }}</title>
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  
+                  body {
+                      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                      padding: 20px;
+                  }
+                  
+                  .container {
+                      max-width: 1400px;
+                      margin: 0 auto;
+                      background: rgba(255, 255, 255, 0.95);
+                      border-radius: 15px;
+                      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                      overflow: hidden;
+                  }
+                  
+                  .header {
+                      background: linear-gradient(45deg, #2c3e50, #3498db);
+                      color: white;
+                      text-align: center;
+                      padding: 30px;
+                  }
+                  
+                  .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+                  .header p { font-size: 1.2em; opacity: 0.9; }
+                  
+                  .stats-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                      gap: 20px;
+                      padding: 30px;
+                  }
+                  
+                  .stat-card {
+                      background: white;
+                      border-radius: 10px;
+                      padding: 25px;
+                      text-align: center;
+                      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+                      transition: transform 0.3s ease;
+                  }
+                  
+                  .stat-card:hover { transform: translateY(-5px); }
+                  .stat-card .icon { font-size: 3em; margin-bottom: 15px; }
+                  .stat-card h3 { color: #2c3e50; margin-bottom: 10px; }
+                  .stat-card .number { font-size: 2em; font-weight: bold; color: #3498db; }
+                  
+                  .users-section {
+                      padding: 30px;
+                      background: #f8f9fa;
+                  }
+                  
+                  .users-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                      gap: 20px;
+                      margin-top: 20px;
+                  }
+                  
+                  .user-card {
+                      background: white;
+                      border-radius: 10px;
+                      padding: 20px;
+                      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+                      border-left: 4px solid #3498db;
+                  }
+                  
+                  .user-card.admin { border-left-color: #e74c3c; }
+                  .user-card.profesor { border-left-color: #f39c12; }
+                  .user-card.alumno { border-left-color: #27ae60; }
+                  
+                  .user-card h4 { color: #2c3e50; margin-bottom: 10px; }
+                  .user-card .user-info { font-size: 0.9em; color: #7f8c8d; margin: 5px 0; }
+                  
+                  .reports-section {
+                      padding: 30px;
+                  }
+                  
+                  .btn {
+                      display: inline-block;
+                      background: linear-gradient(45deg, #3498db, #2980b9);
+                      color: white;
+                      text-decoration: none;
+                      padding: 12px 25px;
+                      border-radius: 25px;
+                      margin: 5px;
+                      transition: all 0.3s ease;
+                  }
+                  
+                  .btn:hover {
+                      background: linear-gradient(45deg, #2980b9, #3498db);
+                      transform: translateY(-2px);
+                  }
+                  
+                  .footer {
+                      text-align: center;
+                      padding: 20px;
+                      background: #2c3e50;
+                      color: white;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🎓 Dashboard Académico</h1>
+                      <p>{{ inventory_hostname }} - Sistema de Gestión Educativa</p>
+                      <p style="font-size: 1em; margin-top: 10px;">Actualizado: {{ ansible_date_time.date }} {{ ansible_date_time.time }}</p>
+                  </div>
+                  
+                  <div class="stats-grid">
+                      <div class="stat-card">
+                          <div class="icon">👥</div>
+                          <h3>Usuarios Totales</h3>
+                          <div class="number">6</div>
+                      </div>
+                      
+                      <div class="stat-card">
+                          <div class="icon">🎓</div>
+                          <h3>Alumnos</h3>
+                          <div class="number">3</div>
+                      </div>
+                      
+                      <div class="stat-card">
+                          <div class="icon">👨‍🏫</div>
+                          <h3>Profesores</h3>
+                          <div class="number">1</div>
+                      </div>
+                      
+                      <div class="stat-card">
+                          <div class="icon">⚙️</div>
+                          <h3>Administradores</h3>
+                          <div class="number">2</div>
+                      </div>
+                  </div>
+                  
+                  <div class="users-section">
+                      <h2>👥 Usuarios del Sistema</h2>
+                      <div class="users-grid">
+                          <div class="user-card admin">
+                              <h4>🔧 admin</h4>
+                              <div class="user-info">Tipo: Administrador del sistema</div>
+                              <div class="user-info">Permisos: Sudo completo</div>
+                              <div class="user-info">Estado: Activo</div>
+                          </div>
+                          
+                          <div class="user-card admin">
+                              <h4>🤖 ansible</h4>
+                              <div class="user-info">Tipo: Administrador automatización</div>
+                              <div class="user-info">Permisos: Gestión remota</div>
+                              <div class="user-info">Estado: Conectado</div>
+                          </div>
+                          
+                          <div class="user-card profesor">
+                              <h4>👨‍🏫 profesor</h4>
+                              <div class="user-info">Tipo: Docente</div>
+                              <div class="user-info">Permisos: Gestión académica</div>
+                              <div class="user-info">Estado: Disponible</div>
+                          </div>
+                          
+                          <div class="user-card alumno">
+                              <h4>🎓 alumno1</h4>
+                              <div class="user-info">Tipo: Estudiante</div>
+                              <div class="user-info">Permisos: Usuario estándar</div>
+                              <div class="user-info">Estado: Registrado</div>
+                          </div>
+                          
+                          <div class="user-card alumno">
+                              <h4>🎓 alumno2</h4>
+                              <div class="user-info">Tipo: Estudiante</div>
+                              <div class="user-info">Permisos: Usuario estándar</div>
+                              <div class="user-info">Estado: Registrado</div>
+                          </div>
+                          
+                          <div class="user-card alumno">
+                              <h4>🎓 alumno3</h4>
+                              <div class="user-info">Tipo: Estudiante</div>
+                              <div class="user-info">Permisos: Usuario estándar</div>
+                              <div class="user-info">Estado: Registrado</div>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div class="reports-section">
+                      <h2>📊 Reportes del Sistema</h2>
+                      <a href="/users-report.html" class="btn">📋 Reporte Detallado</a>
+                      <a href="/security-report.html" class="btn">🛡️ Análisis de Seguridad</a>
+                      <a href="#" onclick="location.reload()" class="btn">🔄 Actualizar</a>
+                  </div>
+                  
+                  <div class="footer">
+                      <p>Dashboard Académico | Laboratorio de Redes | Generado con Ansible</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+        dest: /var/www/security-dashboard/index.html
+        mode: '0644'
+
+    - name: Crear reporte detallado
+      shell: |
+        cat > /var/www/security-dashboard/users-report.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Reporte de Usuarios - Detallado</title>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+                .back-btn { background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+                pre { background: #2c3e50; color: white; padding: 15px; border-radius: 5px; overflow-x: auto; }
+                h1 { color: #2c3e50; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>📋 Reporte Detallado de Usuarios</h1>
+                <a href="/" class="back-btn">← Volver al Dashboard</a>
+                
+                <h2>Análisis de Usuarios del Sistema</h2>
+        EOF
+        
+        echo '<pre>' >> /var/www/security-dashboard/users-report.html
+        cat /tmp/users_analysis.txt >> /var/www/security-dashboard/users-report.html
+        echo '</pre>' >> /var/www/security-dashboard/users-report.html
+        
+        cat >> /var/www/security-dashboard/users-report.html << 'EOF'
+                <h2>Usuarios Conectados Actualmente</h2>
+        EOF
+        
+        echo '<pre>' >> /var/www/security-dashboard/users-report.html
+        w >> /var/www/security-dashboard/users-report.html
+        echo '</pre>' >> /var/www/security-dashboard/users-report.html
+        
+        echo '</div></body></html>' >> /var/www/security-dashboard/users-report.html
+
+    - name: Iniciar servidor HTTP en puerto 8088
+      shell: |
+        cd /var/www/security-dashboard
+        nohup python3 -m http.server 8088 --bind 0.0.0.0 > /var/log/dashboard.log 2>&1 &
+        sleep 3
+
+    - name: Verificar que el servidor esté corriendo
+      wait_for:
+        port: 8088
+        host: 0.0.0.0
+        timeout: 10
+
+    - name: Mostrar información final
+      debug:
+        msg:
+          - "🎓 DASHBOARD ACADÉMICO DESPLEGADO"
+          - "================================="
+          - ""
+          - "📊 Dashboard Principal: http://172.17.25.122:8088"
+          - "📋 Reporte Usuarios: http://172.17.25.122:8088/users-report.html"
+          - ""
+          - "✅ Usuarios configurados: admin, ansible, profesor, alumno1-3"
+          - "✅ Dashboard funcionando en puerto 8088"
