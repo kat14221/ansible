@@ -1,0 +1,177 @@
+# Windows workflow for user-security-dashboard
+- name: Ensure Windows dashboard workdir exists
+  win_file:
+    path: "{{ security_dashboard_windows_workdir }}"
+    state: directory
+
+- name: Capture local users
+  win_shell: |
+    $users = Get-LocalUser | Select-Object Name,Enabled,LastLogon,PasswordExpires | Format-Table | Out-String
+    "# Usuarios locales`r`n$users" | Out-File -FilePath "{{ security_dashboard_windows_workdir }}\\01_usuarios.txt" -Encoding utf8
+
+- name: Capture critical groups
+  win_shell: |
+    $groups = 'Administrators','Remote Desktop Users','Users','Backup Operators'
+    $output = "# Grupos críticos" + "`r`n"
+    foreach ($group in $groups) {
+      $output += "## $group" + "`r`n"
+      try {
+        $members = Get-LocalGroupMember -Group $group | Select-Object Name, ObjectClass | Format-Table | Out-String
+        $output += $members + "`r`n"
+      } catch {
+        $output += "(Grupo no encontrado)" + "`r`n"
+      }
+    }
+    $output | Out-File -FilePath "{{ security_dashboard_windows_workdir }}\\02_grupos.txt" -Encoding utf8
+
+- name: Capture password policy details (net accounts)
+  win_shell: |
+    "# Política de contraseñas" | Out-File -FilePath "{{ security_dashboard_windows_workdir }}\\03_politica_contrasenas.txt" -Encoding utf8
+    net accounts >> "{{ security_dashboard_windows_workdir }}\\03_politica_contrasenas.txt"
+
+- name: Capture privileged commands (Administrators membership)
+  win_shell: |
+    $members = Get-LocalGroupMember -Group 'Administrators' | Select-Object Name, ObjectClass | Format-Table | Out-String
+    "# Privilegios administrativos`r`n$members" | Out-File -FilePath "{{ security_dashboard_windows_workdir }}\\04_privilegios.txt" -Encoding utf8
+
+- name: Capture ACLs for evidence repository
+  win_shell: |
+    $path = "{{ security_dashboard_windows_evidence_path }}"
+    if (Test-Path $path) {
+      icacls $path | Out-File -FilePath "{{ security_dashboard_windows_workdir }}\\05_acl_evidence.txt" -Encoding utf8
+    } else {
+      "Ruta $path no existe" | Out-File -FilePath "{{ security_dashboard_windows_workdir }}\\05_acl_evidence.txt" -Encoding utf8
+    }
+
+- name: Capture audit policy
+  win_shell: |
+    auditpol /get /category:* | Out-File -FilePath "{{ security_dashboard_windows_workdir }}\\06_audit_rules.txt" -Encoding utf8
+
+- name: Build markdown dashboard (Windows)
+  win_shell: |
+    $base = "{{ security_dashboard_windows_workdir }}"
+    $sections = @{
+      1 = Get-Content "$base\\01_usuarios.txt" -Raw
+      2 = Get-Content "$base\\02_grupos.txt" -Raw
+      3 = Get-Content "$base\\03_politica_contrasenas.txt" -Raw
+      4 = Get-Content "$base\\04_privilegios.txt" -Raw
+      5 = Get-Content "$base\\05_acl_evidence.txt" -Raw
+      6 = Get-Content "$base\\06_audit_rules.txt" -Raw
+    }
+    $md = @"
+# Dashboard de Seguridad por Usuario (Windows)
+
+## 1. Usuarios locales
+````text
+$($sections[1])
+````
+
+## 2. Grupos críticos
+````text
+$($sections[2])
+````
+
+## 3. Políticas de contraseña
+````text
+$($sections[3])
+````
+
+## 4. Privilegios administrativos
+````text
+$($sections[4])
+````
+
+## 5. ACL de evidencias
+````text
+$($sections[5])
+````
+
+## 6. Auditoría
+````text
+$($sections[6])
+````
+"@
+    $md | Out-File -FilePath "$base\\SEGURIDAD_DASHBOARD.md" -Encoding utf8
+
+- name: Slurp usuarios section (Windows)
+  win_slurp:
+    path: "{{ security_dashboard_windows_workdir }}\\01_usuarios.txt"
+  register: win_users_raw
+
+- name: Slurp grupos section (Windows)
+  win_slurp:
+    path: "{{ security_dashboard_windows_workdir }}\\02_grupos.txt"
+  register: win_groups_raw
+
+- name: Slurp password policy (Windows)
+  win_slurp:
+    path: "{{ security_dashboard_windows_workdir }}\\03_politica_contrasenas.txt"
+  register: win_passpol_raw
+
+- name: Slurp privileges section (Windows)
+  win_slurp:
+    path: "{{ security_dashboard_windows_workdir }}\\04_privilegios.txt"
+  register: win_priv_raw
+
+- name: Slurp ACL section (Windows)
+  win_slurp:
+    path: "{{ security_dashboard_windows_workdir }}\\05_acl_evidence.txt"
+  register: win_acl_raw
+
+- name: Slurp audit section (Windows)
+  win_slurp:
+    path: "{{ security_dashboard_windows_workdir }}\\06_audit_rules.txt"
+  register: win_audit_raw
+
+- name: Ensure Windows dashboard web root exists
+  win_file:
+    path: "{{ security_dashboard_site_dir_windows }}"
+    state: directory
+
+- name: Publish Windows HTML dashboard
+  win_template:
+    src: security_dashboard_windows.html.j2
+    dest: "{{ security_dashboard_site_dir_windows }}\\index.html"
+
+- name: Install IIS for dashboard hosting
+  win_feature:
+    name: Web-Server
+    state: present
+    include_management_tools: false
+
+- name: Configure IIS website for dashboard
+  win_iis_website:
+    name: "{{ security_dashboard_iis_site_name }}"
+    state: started
+    port: "{{ security_dashboard_port_windows }}"
+    physical_path: "{{ security_dashboard_site_dir_windows }}"
+
+- name: Open Windows firewall port
+  win_firewall_rule:
+    name: "SecurityDashboardPort{{ security_dashboard_port_windows }}"
+    localport: "{{ security_dashboard_port_windows }}"
+    protocol: tcp
+    action: allow
+    direction: in
+    state: present
+    enabled: yes
+
+- name: Enumerate dashboard artifacts (Windows)
+  win_find:
+    paths: "{{ security_dashboard_windows_workdir }}"
+    file_type: file
+  register: dashboard_artifacts_win
+
+- name: Fetch dashboard artifacts (Windows)
+  win_fetch:
+    src: "{{ item.path }}"
+    dest: "{{ (playbook_dir | dirname) + '/evidence/gestion-seguridad/' + inventory_hostname + '/' }}"
+    flat: yes
+  loop: "{{ dashboard_artifacts_win.files }}"
+
+- name: Show Windows summary
+  debug:
+    msg:
+      - "📁 Evidencias descargadas en evidence/gestion-seguridad/{{ inventory_hostname }}"
+      - "Incluye SEGURIDAD_DASHBOARD.md y archivos fuente (usuarios, grupos, políticas, ACL, auditoría)"
+      - "🌐 Dashboard visual: http://{{ ansible_host | default(inventory_hostname) }}:{{ security_dashboard_port_windows }}"

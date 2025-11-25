@@ -1,0 +1,24 @@
+---
+security_lab_admins_group: lab-admins
+security_lab_admins_members:
+  - academico
+  - operator
+  - admin
+security_lab_admins_allowed_commands:
+  - /usr/bin/systemctl
+  - /usr/bin/journalctl
+security_lab_admins_password_max_days: 45
+security_lab_admins_password_warn_days: 7
+security_lab_admins_password_inactive_days: 10
+security_lab_admins_evidence_dir: /srv/evidence
+security_lab_admins_acl_path: /var/log
+security_lab_admins_audit_key: sudo-policy
+security_lab_admins_audit_rule_file: /etc/audit/rules.d/lab-admins.rules
+security_windows_lab_group: "Lab-Admins"
+security_windows_evidence_path: 'C:/Evidence'
+security_windows_password_max_days: 45
+security_windows_password_min_days: 1
+security_windows_password_min_length: 10
+security_windows_password_warning_days: 7
+security_windows_lockout_threshold: 5
+security_windows_lab_admin_password: "Ansible123!"

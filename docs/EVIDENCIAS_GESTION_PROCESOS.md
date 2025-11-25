@@ -1028,6 +1028,8 @@ sudo setfacl -m g:lab-admins:rx /var/log
 # 6. Registrar auditoría sobre archivos críticos
 sudo auditctl -w /etc/sudoers.d/lab-admins -p wa -k sudo-policy
 sudo ausearch -k sudo-policy
+
+> **Nota:** Todas estas acciones ya están codificadas en el rol `user-security-hardening`. Cada vez que ejecuto el playbook `generate_user_security_dashboard.yml`, Ansible crea/actualiza el grupo `lab-admins`, ajusta los usuarios `academico`, `operator` y `admin`, despliega la política `sudoers`, endurece `/srv/evidence`, aplica la ACL sobre `/var/log` y carga la regla de `auditd` tanto en `debian-router` como en el `ubuntu-pc`. En Windows, el mismo rol crea el grupo `Lab-Admins`, garantiza la membresía y protege `C:\Evidence` con ACLs y auditorías de privilegios.
 ```
 
 ### Evidencia y Captura Recomendada
@@ -1098,12 +1100,15 @@ Para consolidar la evidencia técnica, construí el playbook `playbooks/generate
 
 ```bash
 cd ~/ansible
-ansible-playbook playbooks/generate_user_security_dashboard.yml -i inventory/hosts.yml -l debian_router -vv
-ls evidence/gestion-seguridad/debian-router/
+ansible-playbook playbooks/generate_user_security_dashboard.yml -i inventory/hosts.yml -vv
+ls evidence/gestion-seguridad/
 
-# Validar servicio web expuesto
-sudo systemctl status security-dashboard.service
-curl -I http://$(ansible-inventory -i inventory/hosts.yml --host debian_router | awk -F': ' '/ansible_host/ {print $2}'):8088
+# Validar servicios web Linux
+ansible -i inventory/hosts.yml debian_router -m shell -a "systemctl status security-dashboard"
+ansible -i inventory/hosts.yml vm_hosts -m shell -a "systemctl status security-dashboard"
+
+# Validar IIS en Windows
+ansible -i inventory/hosts.yml windows_hosts -m win_shell -a "Get-Website -Name SecurityDashboard | Select-Object Name,State,Bindings"
 ```
 
 **Figura 12B - Dashboard de seguridad por usuario (Markdown)**
@@ -1152,6 +1157,15 @@ auditorías o sustentaciones. El servicio queda activo al arranque del
 servidor y protegido por nftables, garantizando acceso controlado y
 automatizado.
 ```
+
+**URLs expuestas tras cada ejecución**
+
+- Debian Router y Ubuntu PC: `http://<IP-del-host>:8088`
+- Windows PC: `http://<IP-del-host>:8089`
+
+Cada host publica su propio dashboard, por lo que puedo comparar políticas
+entre sistemas operativos y demostrar la administración integral de usuarios,
+permisos y políticas en Linux y Windows.
 ```
 
 ---

@@ -1,0 +1,2 @@
+# Managed by Ansible - user-security-hardening
+-w /etc/sudoers.d/{{ security_lab_admins_group }} -p wa -k {{ security_lab_admins_audit_key }}

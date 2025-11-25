@@ -3,3 +3,8 @@ security_dashboard_site_dir: /srv/security-dashboard
 security_dashboard_port: 8088
 security_dashboard_service_name: security-dashboard
 security_dashboard_service_user: root
+security_dashboard_site_dir_windows: 'C:/SecurityDashboard'
+security_dashboard_port_windows: 8089
+security_dashboard_iis_site_name: 'SecurityDashboard'
+security_dashboard_windows_evidence_path: 'C:/Evidence'
+security_dashboard_windows_workdir: 'C:/Temp/user_security_dashboard'

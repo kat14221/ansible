@@ -1,0 +1,53 @@
+---
+- name: "Windows | Ensure evidence directory exists"
+  win_file:
+    path: "{{ security_windows_evidence_path }}"
+    state: directory
+
+- name: "Windows | Ensure Lab-Admins group exists"
+  win_group:
+    name: "{{ security_windows_lab_group }}"
+    description: "Operadores con permisos restringidos gestionados por Ansible"
+    state: present
+
+- name: "Windows | Ensure lab admin users exist"
+  win_user:
+    name: "{{ item }}"
+    password: "{{ security_windows_lab_admin_password }}"
+    state: present
+    groups:
+      - "{{ security_windows_lab_group }}"
+    password_never_expires: no
+    user_cannot_change_password: no
+    account_disabled: no
+  loop: "{{ security_lab_admins_members }}"
+
+- name: "Windows | Ensure lab admins group membership"
+  win_group_membership:
+    name: "{{ security_windows_lab_group }}"
+    members: "{{ security_lab_admins_members }}"
+    state: present
+
+- name: "Windows | Harden evidence directory ACL"
+  win_acl:
+    path: "{{ security_windows_evidence_path }}"
+    user: "{{ security_windows_lab_group }}"
+    rights:
+      - ReadAndExecute
+    state: present
+    type: allow
+    inherit: ContainerInherit,ObjectInherit
+
+- name: "Windows | Gather audit policy state"
+  win_shell: |
+    (Get-AuditPolicy -SubCategory "{{ item }}").Setting
+  register: audit_policy_state
+  loop:
+    - Sensitive Privilege Use
+    - User Account Management
+
+- name: "Windows | Enable auditing for critical subcategories"
+  win_shell: |
+    Set-AuditPolicy -SubCategory "{{ item.item }}" -Success Enable -Failure Enable
+  loop: "{{ audit_policy_state.results }}"
+  when: item.stdout.strip() != 'SuccessAndFailure'

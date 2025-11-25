@@ -1,0 +1,5 @@
+---
+- name: reload audit rules
+  command: augenrules --load
+  become: yes
+  when: ansible_os_family != 'Windows'

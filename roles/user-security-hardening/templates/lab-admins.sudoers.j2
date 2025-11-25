@@ -1,0 +1,3 @@
+# Managed by Ansible - user-security-hardening
+%{{ security_lab_admins_group }} ALL=(ALL) NOPASSWD: {{ security_lab_admins_allowed_commands | join(',') }}
+Defaults:%{{ security_lab_admins_group }} secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"

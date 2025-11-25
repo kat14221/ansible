@@ -1,0 +1,92 @@
+---
+- name: "Linux | Ensure security packages present"
+  apt:
+    name:
+      - acl
+      - auditd
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: "Linux | Ensure lab admins group exists"
+  group:
+    name: "{{ security_lab_admins_group }}"
+    state: present
+  become: yes
+
+- name: "Linux | Ensure lab admin users exist"
+  user:
+    name: "{{ item }}"
+    groups: "{{ security_lab_admins_group }}"
+    append: yes
+    shell: /bin/bash
+    state: present
+    create_home: yes
+  loop: "{{ security_lab_admins_members }}"
+  become: yes
+
+- name: "Linux | Check password aging for lab admins"
+  shell: |
+    chage -l {{ item }} | awk -F: '/Maximum/{gsub(/ /,"",$2);max=$2}/Warning/{gsub(/ /,"",$2);warn=$2}/Inactive/{gsub(/ /,"",$2);inactive=$2} END{print max "," warn "," inactive}'
+  args:
+    executable: /bin/bash
+  register: lab_admins_chage
+  changed_when: false
+  loop: "{{ security_lab_admins_members }}"
+  become: yes
+
+- name: "Linux | Enforce password aging policy"
+  command: >-
+    chage -M {{ security_lab_admins_password_max_days }}
+          -W {{ security_lab_admins_password_warn_days }}
+          -I {{ security_lab_admins_password_inactive_days }}
+          {{ item.item }}
+  loop: "{{ lab_admins_chage.results }}"
+  when: item.stdout.strip() != "{{ security_lab_admins_password_max_days }},{{ security_lab_admins_password_warn_days }},{{ security_lab_admins_password_inactive_days }}"
+  become: yes
+
+- name: "Linux | Deploy sudoers policy for lab admins"
+  template:
+    src: lab-admins.sudoers.j2
+    dest: "/etc/sudoers.d/{{ security_lab_admins_group }}"
+    mode: "0440"
+    owner: root
+    group: root
+    validate: 'visudo -cf %s'
+  become: yes
+
+- name: "Linux | Ensure evidence directory permissions"
+  file:
+    path: "{{ security_lab_admins_evidence_dir }}"
+    state: directory
+    owner: root
+    group: "{{ security_lab_admins_group }}"
+    mode: "0750"
+  become: yes
+
+- name: "Linux | Ensure ACL for lab admins on logs"
+  ansible.posix.acl:
+    path: "{{ security_lab_admins_acl_path }}"
+    entity: "{{ security_lab_admins_group }}"
+    etype: group
+    permissions: rx
+    state: present
+    recursive: no
+  become: yes
+
+- name: "Linux | Deploy auditd rule for sudo policy"
+  template:
+    src: lab-admins.rules.j2
+    dest: "{{ security_lab_admins_audit_rule_file }}"
+    mode: "0640"
+    owner: root
+    group: root
+  notify: reload audit rules
+  become: yes
+
+- name: "Linux | Ensure auditd service running"
+  service:
+    name: auditd
+    state: started
+    enabled: yes
+  become: yes

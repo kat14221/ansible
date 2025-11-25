@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Dashboard de Seguridad - {{ inventory_hostname }}</title>
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; }
+    header { background: linear-gradient(120deg,#9333ea,#2563eb); padding: 1.5rem 2rem; box-shadow: 0 4px 18px rgba(0,0,0,.3); }
+    header h1 { margin: 0; font-size: 1.7rem; }
+    header p { margin: .25rem 0 0; font-size: .95rem; color: rgba(255,255,255,.9); }
+    main { display: grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap: 1.2rem; padding: 1.5rem; }
+    section { background: #141c30; border-radius: 12px; padding: 1rem; box-shadow: 0 8px 24px rgba(15,23,42,.35); border: 1px solid rgba(255,255,255,.05); }
+    section h2 { margin: 0 0 .6rem; font-size: 1.05rem; color: #7dd3fc; letter-spacing: .05rem; }
+    pre { white-space: pre-wrap; word-break: break-word; background: rgba(15,23,42,.75); border-radius: 8px; padding: .75rem; max-height: 320px; overflow-y: auto; border: 1px solid rgba(255,255,255,.06); }
+    footer { text-align: center; padding: 1rem; font-size: .85rem; color: rgba(255,255,255,.6); background: #0b1120; border-top: 1px solid rgba(255,255,255,.05); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Administración de usuarios, permisos y políticas</h1>
+    <p>Host: {{ inventory_hostname }} · Actualizado: {{ ansible_date_time.iso8601 }}</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Usuarios locales</h2>
+      <pre>{{ win_users_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>2. Grupos críticos</h2>
+      <pre>{{ win_groups_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>3. Políticas de contraseñas</h2>
+      <pre>{{ win_passpol_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>4. Privilegios administrativos</h2>
+      <pre>{{ win_priv_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>5. ACL de evidencia</h2>
+      <pre>{{ win_acl_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>6. Auditoría</h2>
+      <pre>{{ win_audit_raw.content | b64decode }}</pre>
+    </section>
+  </main>
+
+  <footer>
+    Dashboard generado automáticamente con Ansible · Rol user-security-dashboard
+  </footer>
+</body>
+</html>

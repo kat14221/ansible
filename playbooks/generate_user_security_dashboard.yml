@@ -1,6 +1,13 @@
 ---
-- name: "Gestión de seguridad por usuario: dashboard de evidencias"
-  hosts: debian_router
+- name: "Gestión de seguridad por usuario (Linux)"
+  hosts: linux_servers
   become: yes
   roles:
+    - user-security-hardening
+    - user-security-dashboard
+
+- name: "Gestión de seguridad por usuario (Windows)"
+  hosts: windows_hosts
+  roles:
+    - user-security-hardening
     - user-security-dashboard
