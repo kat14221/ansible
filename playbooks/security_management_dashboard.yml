@@ -7,14 +7,22 @@
   
   tasks:
     - name: Instalar dependencias para gestión web
-      package:
+      apt:
         name:
           - python3
           - python3-pip
           - python3-flask
-          - python3-bcrypt
+          - python3-venv
           - sudo
         state: present
+        update_cache: yes
+
+    - name: Instalar Flask con pip si no está disponible
+      pip:
+        name: flask
+        state: present
+        extra_args: "--break-system-packages"
+      ignore_errors: yes
 
     - name: Crear aplicación Flask de gestión
       shell: |
