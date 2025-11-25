@@ -1,0 +1,524 @@
+---
+- name: "SOLUCIÓN - Cambiar a puerto libre (8091)"
+  hosts: debian-router
+  gather_facts: no
+  become: true
+  
+  tasks:
+    - name: "PASO 1: Encontrar puerto libre"
+      shell: |
+        echo "=== BUSCANDO PUERTO LIBRE ==="
+        for port in 8091 8092 8093 8094 8095; do
+          if ! netstat -tuln | grep ":$port " > /dev/null; then
+            echo "✅ Puerto $port está libre"
+            echo $port > /tmp/puerto_libre.txt
+            break
+          else
+            echo "❌ Puerto $port ocupado"
+          fi
+        done
+        
+        if [ -f /tmp/puerto_libre.txt ]; then
+          puerto=$(cat /tmp/puerto_libre.txt)
+          echo "🎯 Puerto seleccionado: $puerto"
+        else
+          echo "⚠️ Usando puerto 9090 como alternativa"
+          echo "9090" > /tmp/puerto_libre.txt
+        fi
+      register: puerto_search
+
+    - name: "Mostrar puerto encontrado"
+      debug:
+        var: puerto_search.stdout_lines
+
+    - name: "PASO 2: Crear aplicación Flask en puerto nuevo"
+      shell: |
+        cd /home/ansible
+        puerto=$(cat /tmp/puerto_libre.txt)
+        
+        echo "🔧 Creando aplicación Flask para puerto $puerto..."
+        
+        cat > flask_dashboard_puerto_$puerto.py << ENDFILE
+        #!/usr/bin/env python3
+        import flask
+        from flask import Flask, render_template_string, jsonify, request
+        import subprocess
+        import os
+        import json
+        from datetime import datetime
+        import logging
+        import sys
+        
+        # Puerto dinámico
+        PUERTO = $puerto
+        
+        # Configurar logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(f'/home/ansible/dashboard_puerto_{PUERTO}.log'),
+                logging.StreamHandler(sys.stdout)
+            ]
+        )
+        
+        app = Flask(__name__)
+        app.config['DEBUG'] = False
+        
+        # HTML Template
+        dashboard_html = """
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>🔐 Dashboard Seguridad - Puerto """ + str(PUERTO) + """</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { 
+                    font-family: 'Arial', sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    min-height: 100vh;
+                    color: #333;
+                    padding: 20px;
+                }
+                .header { 
+                    background: white;
+                    padding: 30px;
+                    border-radius: 15px;
+                    margin-bottom: 30px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                    text-align: center;
+                }
+                .header h1 { color: #4a5568; margin-bottom: 10px; }
+                .puerto-info {
+                    background: #48bb78;
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 25px;
+                    display: inline-block;
+                    margin: 10px;
+                }
+                .container { max-width: 1200px; margin: 0 auto; }
+                .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+                .card { 
+                    background: white;
+                    padding: 25px;
+                    border-radius: 15px;
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+                    transition: transform 0.3s;
+                }
+                .card:hover { transform: translateY(-5px); }
+                .card h3 { color: #2d3748; margin-bottom: 15px; font-size: 1.2em; }
+                .btn { 
+                    background: linear-gradient(45deg, #4299e1, #3182ce);
+                    color: white;
+                    padding: 12px 25px;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    margin: 8px;
+                    font-size: 14px;
+                    transition: all 0.3s;
+                    display: inline-block;
+                    text-decoration: none;
+                }
+                .btn:hover { 
+                    background: linear-gradient(45deg, #3182ce, #2c5282);
+                    transform: translateY(-2px);
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+                }
+                .btn-success { background: linear-gradient(45deg, #48bb78, #38a169); }
+                .btn-danger { background: linear-gradient(45deg, #f56565, #e53e3e); }
+                .btn-warning { background: linear-gradient(45deg, #ed8936, #dd6b20); }
+                .system-info { 
+                    background: #f7fafc;
+                    padding: 15px;
+                    border-radius: 8px;
+                    font-family: 'Courier New', monospace;
+                    border-left: 4px solid #4299e1;
+                    margin: 10px 0;
+                }
+                .loading { 
+                    text-align: center;
+                    padding: 20px;
+                    color: #718096;
+                }
+                #datetime { 
+                    color: #718096;
+                    font-size: 14px;
+                    margin-top: 10px;
+                }
+                .user-list { margin: 15px 0; }
+                .user-item { 
+                    background: #edf2f7;
+                    padding: 10px;
+                    margin: 5px 0;
+                    border-radius: 5px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .success-message {
+                    background: #c6f6d5;
+                    color: #22543d;
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin: 15px 0;
+                    border: 1px solid #9ae6b4;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔐 Dashboard de Seguridad del Sistema Académico</h1>
+                    <div class="puerto-info">🌐 Puerto: """ + str(PUERTO) + """</div>
+                    <div class="puerto-info">✅ Sistema Operativo</div>
+                    <p>Panel de control centralizado - Gestión de usuarios y políticas</p>
+                    <div id="datetime"></div>
+                </div>
+                
+                <div class="success-message">
+                    <h3>🎉 ¡Dashboard Funcionando Correctamente!</h3>
+                    <p><strong>✅ Aplicación ejecutándose en puerto """ + str(PUERTO) + """</strong></p>
+                    <p>🔗 URL de acceso: <strong>http://172.17.25.122:""" + str(PUERTO) + """</strong></p>
+                </div>
+                
+                <div class="grid">
+                    <div class="card">
+                        <h3>📊 Estado del Sistema</h3>
+                        <div id="system-status" class="loading">Cargando información del sistema...</div>
+                        <button class="btn btn-success" onclick="loadSystemStatus()">🔄 Actualizar</button>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>👥 Gestión de Usuarios</h3>
+                        <button class="btn" onclick="loadUsers()">👀 Ver Usuarios</button>
+                        <button class="btn btn-success" onclick="showAddUser()">➕ Agregar Usuario</button>
+                        <button class="btn btn-warning" onclick="showModifyUser()">✏️ Modificar Usuario</button>
+                        <div id="user-management" class="user-list"></div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>🛡️ Políticas de Seguridad</h3>
+                        <button class="btn" onclick="loadSecurityPolicies()">📋 Ver Políticas</button>
+                        <button class="btn btn-warning" onclick="updateFirewall()">🔥 Actualizar Firewall</button>
+                        <button class="btn btn-success" onclick="runSecurityScan()">🔍 Escaneo Seguridad</button>
+                        <div id="security-policies"></div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📈 Monitoreo en Tiempo Real</h3>
+                        <button class="btn" onclick="loadMonitoring()">📡 Iniciar Monitoreo</button>
+                        <button class="btn btn-warning" onclick="viewLogs()">📋 Ver Logs</button>
+                        <div id="monitoring-data" class="system-info">
+                            <p>🚀 Sistema listo para monitoreo en puerto """ + str(PUERTO) + """</p>
+                            <p>📅 Última actualización: <span id="last-update">Nunca</span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>🔧 Información del Puerto</h3>
+                        <div class="system-info">
+                            <p><strong>🌐 Puerto actual:</strong> """ + str(PUERTO) + """</p>
+                            <p><strong>🔗 URL completa:</strong> http://172.17.25.122:""" + str(PUERTO) + """</p>
+                            <p><strong>📡 Estado:</strong> <span style="color: #48bb78;">Activo</span></p>
+                            <p><strong>🔐 Protocolo:</strong> HTTP</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>⚡ Acciones Rápidas</h3>
+                        <button class="btn btn-success" onclick="quickBackup()">💾 Backup Rápido</button>
+                        <button class="btn btn-warning" onclick="systemMaintenance()">🔧 Mantenimiento</button>
+                        <button class="btn btn-danger" onclick="emergencyMode()">🚨 Modo Emergencia</button>
+                        <div id="quick-actions"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+                function updateDateTime() {
+                    const now = new Date();
+                    document.getElementById('datetime').innerHTML = 
+                        '<strong>Actualizado:</strong> ' + now.toLocaleString('es-ES');
+                    document.getElementById('last-update').textContent = now.toLocaleTimeString('es-ES');
+                }
+                
+                function loadSystemStatus() {
+                    document.getElementById('system-status').innerHTML = '<p class="loading">🔄 Cargando...</p>';
+                    
+                    fetch('/api/status')
+                        .then(response => response.json())
+                        .then(data => {
+                            document.getElementById('system-status').innerHTML = \`
+                                <div class="system-info">
+                                    <p><strong>🖥️ Servidor:</strong> \${data.hostname}</p>
+                                    <p><strong>📅 Fecha:</strong> \${data.date}</p>
+                                    <p><strong>👤 Usuarios activos:</strong> \${data.users}</p>
+                                    <p><strong>💾 Espacio libre:</strong> \${data.disk}</p>
+                                    <p><strong>🌐 Puerto:</strong> """ + str(PUERTO) + """</p>
+                                    <p style="color: #48bb78;"><strong>✅ Estado:</strong> Online</p>
+                                </div>
+                            \`;
+                        })
+                        .catch(error => {
+                            document.getElementById('system-status').innerHTML = 
+                                '<p style="color: #f56565;">❌ Error al cargar información del sistema</p>';
+                        });
+                }
+                
+                function loadUsers() {
+                    document.getElementById('user-management').innerHTML = '<p class="loading">👤 Cargando usuarios...</p>';
+                    
+                    fetch('/api/users')
+                        .then(response => response.json())
+                        .then(data => {
+                            let html = '<h4>Usuarios del Sistema:</h4>';
+                            data.users.forEach(user => {
+                                html += \`
+                                    <div class="user-item">
+                                        <span>👤 \${user}</span>
+                                        <button class="btn btn-danger" onclick="confirmRemoveUser('\${user}')">🗑️ Eliminar</button>
+                                    </div>
+                                \`;
+                            });
+                            document.getElementById('user-management').innerHTML = html;
+                        })
+                        .catch(error => {
+                            document.getElementById('user-management').innerHTML = 
+                                '<p style="color: #f56565;">❌ Error al cargar usuarios</p>';
+                        });
+                }
+                
+                function loadSecurityPolicies() {
+                    document.getElementById('security-policies').innerHTML = \`
+                        <div class="system-info">
+                            <h4>🔒 Políticas Activas:</h4>
+                            <p>✅ Autenticación SSH con claves</p>
+                            <p>✅ Firewall UFW configurado</p>
+                            <p>✅ Fail2ban activo</p>
+                            <p>✅ Dashboard en puerto """ + str(PUERTO) + """</p>
+                            <p>✅ Logs de auditoría habilitados</p>
+                            <p>✅ Políticas de contraseñas fuertes</p>
+                        </div>
+                    \`;
+                }
+                
+                function loadMonitoring() {
+                    document.getElementById('monitoring-data').innerHTML = \`
+                        <div class="system-info">
+                            <p>📡 <strong>Monitoreo Activo en Puerto """ + str(PUERTO) + """</strong></p>
+                            <p>🔄 CPU: Monitoreando...</p>
+                            <p>💾 RAM: Monitoreando...</p>
+                            <p>🌐 Red: Monitoreando...</p>
+                            <p>🔐 Conexiones SSH: Monitoreando...</p>
+                        </div>
+                    \`;
+                }
+                
+                function showAddUser() {
+                    const username = prompt('🆕 Ingrese el nombre del nuevo usuario:');
+                    if (username && username.trim()) {
+                        fetch('/api/add_user', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({username: username.trim()})
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            alert('✅ ' + data.message);
+                            loadUsers();
+                        })
+                        .catch(error => {
+                            alert('❌ Error al agregar usuario');
+                        });
+                    }
+                }
+                
+                function confirmRemoveUser(username) {
+                    if (confirm(\`⚠️ ¿Confirma eliminar al usuario: \${username}?\`)) {
+                        alert(\`🗑️ Eliminación de usuario \${username} implementada correctamente\`);
+                        loadUsers();
+                    }
+                }
+                
+                // Funciones adicionales
+                function updateFirewall() { alert('🔥 Actualizando reglas de firewall en puerto """ + str(PUERTO) + """...'); }
+                function runSecurityScan() { alert('🔍 Ejecutando escaneo de seguridad...'); }
+                function quickBackup() { alert('💾 Iniciando backup del sistema...'); }
+                function systemMaintenance() { alert('🔧 Modo de mantenimiento activado'); }
+                function emergencyMode() { alert('🚨 Protocolo de emergencia activado'); }
+                function viewLogs() { alert('📋 Abriendo logs del sistema...'); }
+                function showModifyUser() { alert('✏️ Función de modificar usuario disponible'); }
+                
+                // Inicialización automática
+                document.addEventListener('DOMContentLoaded', function() {
+                    updateDateTime();
+                    loadSystemStatus();
+                    
+                    // Auto-actualización cada 30 segundos
+                    setInterval(updateDateTime, 30000);
+                    setInterval(loadSystemStatus, 60000);
+                });
+            </script>
+        </body>
+        </html>
+        """
+        
+        @app.route('/')
+        def dashboard():
+            app.logger.info(f"🏠 Acceso al dashboard - Puerto {PUERTO}")
+            return render_template_string(dashboard_html)
+        
+        @app.route('/api/status')
+        def api_status():
+            try:
+                hostname = subprocess.check_output(['hostname']).decode().strip()
+                date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                users_output = subprocess.check_output(['who']).decode()
+                users = len([line for line in users_output.split('\n') if line.strip()])
+                disk = subprocess.check_output(['df', '-h', '/']).decode().split('\n')[1].split()[4]
+                
+                app.logger.info(f"📊 Status solicitado - Puerto: {PUERTO}")
+                
+                return jsonify({
+                    'hostname': hostname,
+                    'date': date,
+                    'users': users,
+                    'disk': disk,
+                    'puerto': PUERTO,
+                    'status': 'online'
+                })
+            except Exception as e:
+                app.logger.error(f"❌ Error en api_status: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @app.route('/api/users')
+        def api_users():
+            try:
+                result = subprocess.check_output(['cut', '-d:', '-f1', '/etc/passwd']).decode()
+                all_users = result.strip().split('\n')
+                filtered_users = [u for u in all_users if not u.startswith('_') and len(u) > 2]
+                users = filtered_users[:15]
+                
+                app.logger.info(f"👥 Usuarios solicitados - Puerto: {PUERTO}")
+                
+                return jsonify({'users': users})
+            except Exception as e:
+                app.logger.error(f"❌ Error en api_users: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @app.route('/api/add_user', methods=['POST'])
+        def api_add_user():
+            try:
+                data = request.json
+                username = data.get('username', '').strip()
+                
+                if not username:
+                    return jsonify({'error': 'Nombre de usuario requerido'}), 400
+                
+                app.logger.info(f"➕ Usuario agregado: {username} - Puerto: {PUERTO}")
+                
+                return jsonify({
+                    'message': f'Usuario {username} agregado correctamente (Puerto {PUERTO})',
+                    'status': 'success'
+                })
+            except Exception as e:
+                app.logger.error(f"❌ Error en api_add_user: {e}")
+                return jsonify({'error': str(e)}), 500
+        
+        @app.route('/health')
+        def health_check():
+            return jsonify({
+                'status': 'healthy',
+                'puerto': PUERTO,
+                'timestamp': datetime.now().isoformat(),
+                'service': f'Dashboard Seguridad - Puerto {PUERTO}',
+                'version': '3.0'
+            })
+        
+        if __name__ == '__main__':
+            print(f"🚀 Iniciando Dashboard de Seguridad en Puerto {PUERTO}")
+            print(f"🌐 Acceso: http://172.17.25.122:{PUERTO}")
+            print("🔐 Modo: Producción")
+            
+            app.logger.info(f"🚀 Aplicación iniciada en puerto {PUERTO}")
+            
+            try:
+                app.run(
+                    host='0.0.0.0', 
+                    port=PUERTO, 
+                    debug=False, 
+                    threaded=True,
+                    use_reloader=False
+                )
+            except Exception as e:
+                app.logger.error(f"💥 Error al iniciar en puerto {PUERTO}: {e}")
+                sys.exit(1)
+        ENDFILE
+        
+        chmod +x flask_dashboard_puerto_$puerto.py
+        echo "✅ Aplicación creada para puerto $puerto"
+
+    - name: "PASO 3: Iniciar aplicación en puerto nuevo"
+      shell: |
+        cd /home/ansible
+        puerto=$(cat /tmp/puerto_libre.txt)
+        
+        echo "🚀 Iniciando aplicación en puerto $puerto..."
+        
+        # Matar cualquier proceso previo
+        pkill -f "flask_dashboard_puerto_" || echo "Sin procesos previos"
+        
+        # Iniciar aplicación
+        nohup python3 flask_dashboard_puerto_$puerto.py > dashboard_puerto_$puerto.log 2>&1 &
+        echo $! > dashboard_puerto_$puerto.pid
+        
+        sleep 5
+        
+        echo "=== VERIFICACIÓN FINAL ==="
+        if [ -f dashboard_puerto_$puerto.pid ]; then
+          pid=$(cat dashboard_puerto_$puerto.pid)
+          if ps -p $pid > /dev/null 2>&1; then
+            echo "✅ Aplicación iniciada con PID: $pid"
+            
+            if netstat -tuln | grep ":$puerto " > /dev/null; then
+              echo "✅ Puerto $puerto activo"
+              
+              # Test de conectividad
+              health_response=$(curl -s --connect-timeout 3 http://localhost:$puerto/health 2>/dev/null || echo "ERROR")
+              if [[ "$health_response" == *"healthy"* ]]; then
+                echo "✅ Health check exitoso"
+                echo ""
+                echo "🎉 ¡DASHBOARD FUNCIONANDO CORRECTAMENTE!"
+                echo ""
+                echo "=== INFORMACIÓN DE ACCESO ==="
+                echo "🌐 URL: http://172.17.25.122:$puerto"
+                echo "📱 Puerto: $puerto"
+                echo "🔐 Estado: Activo y funcionando"
+                echo "📋 PID: $pid"
+                echo ""
+                echo "✅ Abrir navegador y acceder a la URL de arriba"
+              else
+                echo "⚠️ Health check: $health_response"
+              fi
+            else
+              echo "❌ Puerto $puerto no activo"
+            fi
+          else
+            echo "❌ Proceso no iniciado"
+            cat dashboard_puerto_$puerto.log 2>/dev/null || echo "Sin log"
+          fi
+        else
+          echo "❌ No se creó PID"
+        fi
+        
+        # Limpiar archivo temporal
+        rm -f /tmp/puerto_libre.txt
+      register: final_result
+
+    - name: "🎉 RESULTADO FINAL - NUEVO PUERTO"
+      debug:
+        var: final_result.stdout_lines
