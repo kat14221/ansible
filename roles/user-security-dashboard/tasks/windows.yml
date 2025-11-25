@@ -58,39 +58,40 @@
       5 = Get-Content "$base\\05_acl_evidence.txt" -Raw
       6 = Get-Content "$base\\06_audit_rules.txt" -Raw
     }
-    $md = @"
-    # Dashboard de Seguridad por Usuario (Windows)
-
-    ## 1. Usuarios locales
-    ````text
-    $($sections[1])
-    ````
-
-    ## 2. Grupos críticos
-    ````text
-    $($sections[2])
-    ````
-
-    ## 3. Políticas de contraseña
-    ````text
-    $($sections[3])
-    ````
-
-    ## 4. Privilegios administrativos
-    ````text
-    $($sections[4])
-    ````
-
-    ## 5. ACL de evidencias
-    ````text
-    $($sections[5])
-    ````
-
-    ## 6. Auditoría
-    ````text
-    $($sections[6])
-    ````
-"@
+    $mdLines = @(
+      "# Dashboard de Seguridad por Usuario (Windows)",
+      "",
+      "## 1. Usuarios locales",
+      "````text",
+      $sections[1],
+      "````",
+      "",
+      "## 2. Grupos críticos",
+      "````text",
+      $sections[2],
+      "````",
+      "",
+      "## 3. Políticas de contraseña",
+      "````text",
+      $sections[3],
+      "````",
+      "",
+      "## 4. Privilegios administrativos",
+      "````text",
+      $sections[4],
+      "````",
+      "",
+      "## 5. ACL de evidencias",
+      "````text",
+      $sections[5],
+      "````",
+      "",
+      "## 6. Auditoría",
+      "````text",
+      $sections[6],
+      "````"
+    )
+    $md = $mdLines -join "`r`n"
     $md | Out-File -FilePath "$base\\SEGURIDAD_DASHBOARD.md" -Encoding utf8
 
 - name: Slurp usuarios section (Windows)
