@@ -1,0 +1,98 @@
+---
+- name: Debug y reparar dashboard HTTP
+  hosts: debian_router
+  gather_facts: true
+  become: true
+  
+  tasks:
+    - name: Instalar usuario www-data si no existe
+      user:
+        name: www-data
+        system: yes
+        shell: /usr/sbin/nologin
+        home: /var/www
+        create_home: no
+      ignore_errors: yes
+
+    - name: Crear directorio web con permisos correctos
+      file:
+        path: /var/www/security-dashboard
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Crear página HTML simple de prueba
+      copy:
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Dashboard de Seguridad - {{ inventory_hostname }}</title>
+              <meta charset="UTF-8">
+              <style>
+                  body { 
+                      font-family: Arial, sans-serif; 
+                      background: linear-gradient(45deg, #3498db, #2c3e50);
+                      color: white; 
+                      text-align: center; 
+                      padding: 50px;
+                  }
+                  .container {
+                      background: rgba(255,255,255,0.1);
+                      border-radius: 15px;
+                      padding: 40px;
+                      max-width: 800px;
+                      margin: 0 auto;
+                  }
+                  h1 { color: #ecf0f1; margin-bottom: 30px; }
+                  .status { background: #27ae60; padding: 10px; border-radius: 5px; margin: 20px 0; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🛡️ Dashboard de Seguridad</h1>
+                  <div class="status">✅ Servidor funcionando correctamente</div>
+                  <p><strong>Host:</strong> {{ inventory_hostname }}</p>
+                  <p><strong>IP:</strong> {{ ansible_default_ipv4.address }}</p>
+                  <p><strong>IPv6:</strong> {{ ansible_default_ipv6.address | default('No disponible') }}</p>
+                  <p><strong>Fecha:</strong> {{ ansible_date_time.iso8601 }}</p>
+                  <hr>
+                  <h2>📊 Dashboard en construcción...</h2>
+                  <p>El análisis de seguridad se está procesando.</p>
+              </div>
+          </body>
+          </html>
+        dest: /var/www/security-dashboard/index.html
+        mode: '0644'
+
+    - name: Detener servicio anterior si existe
+      systemd:
+        name: security-dashboard
+        state: stopped
+      ignore_errors: yes
+
+    - name: Iniciar servidor HTTP simple directamente
+      shell: |
+        cd /var/www/security-dashboard
+        nohup python3 -m http.server 8080 --bind 0.0.0.0 > /var/log/dashboard.log 2>&1 &
+        sleep 2
+        
+    - name: Verificar que el puerto esté abierto
+      wait_for:
+        port: 8080
+        host: 0.0.0.0
+        timeout: 10
+
+    - name: Mostrar información de conexión
+      debug:
+        msg:
+          - "🌐 DASHBOARD DESPLEGADO EXITOSAMENTE"
+          - "=================================="
+          - ""
+          - "📊 Accede desde tu navegador:"
+          - "   http://{{ ansible_default_ipv4.address }}:8080"
+          - "   http://[{{ ansible_default_ipv6.address }}]:8080" 
+          - "   http://172.17.25.122:8080"
+          - ""
+          - "🔍 Para debug: ssh ansible@172.17.25.122 'netstat -tlnp | grep 8080'"

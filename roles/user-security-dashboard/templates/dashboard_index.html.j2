@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Seguridad - {{ inventory_hostname }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card .icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .reports-section {
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        
+        .reports-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .report-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+        
+        .report-card h4 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            text-decoration: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: linear-gradient(45deg, #2980b9, #3498db);
+            transform: translateY(-2px);
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #2c3e50;
+            color: white;
+        }
+        
+        .timestamp {
+            font-style: italic;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ Dashboard de Seguridad</h1>
+            <p>{{ inventory_hostname }} - Análisis de Seguridad del Sistema</p>
+            <p class="timestamp">Generado: {{ ansible_date_time.iso8601 }}</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="icon">👥</div>
+                <h3>Usuarios del Sistema</h3>
+                <div class="number" id="users-count">-</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="icon">🔥</div>
+                <h3>Reglas de Firewall</h3>
+                <div class="number" id="firewall-rules">-</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="icon">⚙️</div>
+                <h3>Procesos Activos</h3>
+                <div class="number" id="processes-count">-</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="icon">🌐</div>
+                <h3>Interfaces de Red</h3>
+                <div class="number" id="network-interfaces">-</div>
+            </div>
+        </div>
+        
+        <div class="reports-section">
+            <h2>📊 Reportes Detallados</h2>
+            <div class="reports-grid">
+                <div class="report-card">
+                    <h4>🔐 Análisis de Usuarios</h4>
+                    <p>Información detallada sobre usuarios del sistema, grupos y permisos.</p>
+                    <a href="/users-report.html" class="btn">Ver Reporte</a>
+                </div>
+                
+                <div class="report-card">
+                    <h4>🔥 Estado del Firewall</h4>
+                    <p>Configuración actual del firewall y reglas de seguridad.</p>
+                    <a href="/firewall-report.html" class="btn">Ver Reporte</a>
+                </div>
+                
+                <div class="report-card">
+                    <h4>⚙️ Procesos del Sistema</h4>
+                    <p>Listado de procesos en ejecución y uso de recursos.</p>
+                    <a href="/processes-report.html" class="btn">Ver Reporte</a>
+                </div>
+                
+                <div class="report-card">
+                    <h4>🌐 Configuración de Red</h4>
+                    <p>Interfaces de red, direcciones IP y configuración IPv6.</p>
+                    <a href="/network-report.html" class="btn">Ver Reporte</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Generado por Ansible Dashboard System | {{ ansible_date_time.date }}</p>
+        </div>
+    </div>
+
+    <script>
+        // Simulación de carga de datos (se reemplazará con datos reales)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Estos valores serán reemplazados por Ansible con datos reales
+            document.getElementById('users-count').textContent = '{{ users_count | default("N/A") }}';
+            document.getElementById('firewall-rules').textContent = '{{ firewall_rules_count | default("N/A") }}';
+            document.getElementById('processes-count').textContent = '{{ processes_count | default("N/A") }}';
+            document.getElementById('network-interfaces').textContent = '{{ network_interfaces_count | default("N/A") }}';
+        });
+    </script>
+</body>
+</html>

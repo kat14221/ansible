@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Ubuntu - {{ host_info.hostname }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #e95420, #ff6b35);
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.2em; opacity: 0.9; }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .info-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid #e95420;
+        }
+        
+        .info-card .icon { font-size: 3em; margin-bottom: 15px; }
+        .info-card h3 { color: #2c3e50; margin-bottom: 10px; }
+        .info-card .value { font-size: 1.5em; font-weight: bold; color: #e95420; }
+        
+        .navigation {
+            padding: 30px;
+            background: #f8f9fa;
+            text-align: center;
+        }
+        
+        .nav-btn {
+            display: inline-block;
+            background: linear-gradient(45deg, #e95420, #ff6b35);
+            color: white;
+            text-decoration: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-btn:hover {
+            background: linear-gradient(45deg, #ff6b35, #e95420);
+            transform: translateY(-2px);
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #2c3e50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐧 Dashboard Ubuntu</h1>
+            <p>{{ host_info.hostname }} - Sistema de Monitoreo Ubuntu</p>
+            <p style="font-size: 1em; margin-top: 10px;">{{ ansible_date_time.iso8601 }}</p>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="icon">🖥️</div>
+                <h3>Hostname</h3>
+                <div class="value">{{ host_info.hostname }}</div>
+            </div>
+            
+            <div class="info-card">
+                <div class="icon">🐧</div>
+                <h3>Sistema Operativo</h3>
+                <div class="value">{{ host_info.os }}</div>
+            </div>
+            
+            <div class="info-card">
+                <div class="icon">🌐</div>
+                <h3>Dirección IPv4</h3>
+                <div class="value">{{ host_info.ip }}</div>
+            </div>
+            
+            <div class="info-card">
+                <div class="icon">🔗</div>
+                <h3>Dirección IPv6</h3>
+                <div class="value">{{ host_info.ipv6 }}</div>
+            </div>
+        </div>
+        
+        <div class="navigation">
+            <h2>🔗 Enlaces del Sistema</h2>
+            <a href="http://172.17.25.122:8088" class="nav-btn">📊 Dashboard Debian</a>
+            <a href="#" onclick="location.reload()" class="nav-btn">🔄 Actualizar Ubuntu</a>
+            <a href="/metrics" class="nav-btn">📈 Métricas</a>
+        </div>
+        
+        <div class="footer">
+            <p>Ubuntu Security Dashboard | Generado por Ansible | {{ ansible_date_time.date }}</p>
+        </div>
+    </div>
+</body>
+</html>

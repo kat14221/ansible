@@ -22,6 +22,10 @@
   import_tasks: linux.yml
   when: ansible_os_family != 'Windows'
 
+- name: Deploy web dashboard
+  import_tasks: deploy_web.yml
+  when: ansible_os_family != 'Windows'
+
 # Windows deshabilitado temporalmente
 # - name: Include Windows workflow  
 #   import_tasks: windows.yml

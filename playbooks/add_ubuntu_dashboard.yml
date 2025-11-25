@@ -1,0 +1,64 @@
+---
+- name: Agregar Ubuntu al Dashboard de Seguridad
+  hosts: ubuntu_hosts
+  gather_facts: true
+  become: true
+  
+  tasks:
+    - name: Verificar conectividad Ubuntu
+      debug:
+        msg:
+          - "✅ Conectado a {{ inventory_hostname }}"
+          - "🐧 OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "📍 IP: {{ ansible_default_ipv4.address }}"
+    
+    - name: Instalar dependencias para dashboard
+      package:
+        name:
+          - python3
+          - curl
+          - net-tools
+        state: present
+    
+    - name: Crear directorio para dashboard Ubuntu
+      file:
+        path: /var/www/security-dashboard-ubuntu
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Generar página de dashboard Ubuntu
+      template:
+        src: ubuntu_dashboard.html.j2
+        dest: /var/www/security-dashboard-ubuntu/index.html
+        mode: '0644'
+      vars:
+        host_info:
+          hostname: "{{ ansible_hostname }}"
+          os: "{{ ansible_distribution }} {{ ansible_distribution_version }}"
+          ip: "{{ ansible_default_ipv4.address }}"
+          ipv6: "{{ ansible_default_ipv6.address | default('No disponible') }}"
+    
+    - name: Iniciar servidor HTTP para Ubuntu
+      shell: |
+        cd /var/www/security-dashboard-ubuntu
+        nohup python3 -m http.server 8081 --bind 0.0.0.0 > /var/log/ubuntu-dashboard.log 2>&1 &
+        sleep 2
+      
+    - name: Verificar puerto Ubuntu dashboard
+      wait_for:
+        port: 8081
+        host: 0.0.0.0
+        timeout: 10
+
+    - name: Mostrar información Ubuntu dashboard
+      debug:
+        msg:
+          - "🐧 UBUNTU DASHBOARD DESPLEGADO"
+          - "================================"
+          - ""
+          - "📊 Ubuntu Dashboard: http://{{ ansible_default_ipv4.address }}:8081"
+          - "🔗 Debian Dashboard: http://172.17.25.122:8088"
+          - ""
+          - "💡 Ahora tienes dashboards para ambos sistemas!"

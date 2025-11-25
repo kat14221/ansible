@@ -1,0 +1,67 @@
+---
+# Desplegar dashboard como servidor HTTP
+- name: Instalar servidor HTTP ligero (Python)
+  package:
+    name: python3
+    state: present
+
+- name: Crear directorio para dashboard web
+  file:
+    path: /var/www/security-dashboard
+    state: directory
+    mode: '0755'
+    owner: www-data
+    group: www-data
+  become: true
+
+- name: Copiar archivos del dashboard a directorio web
+  copy:
+    src: "{{ item }}"
+    dest: "/var/www/security-dashboard/"
+    mode: '0644'
+    owner: www-data
+    group: www-data
+  with_fileglob:
+    - "/tmp/dashboard_*"
+  become: true
+
+- name: Crear archivo index.html principal
+  template:
+    src: dashboard_index.html.j2
+    dest: /var/www/security-dashboard/index.html
+    mode: '0644'
+    owner: www-data
+    group: www-data
+  become: true
+
+- name: Crear servicio systemd para dashboard HTTP
+  template:
+    src: security-dashboard.service.j2
+    dest: /etc/systemd/system/security-dashboard.service
+    mode: '0644'
+  become: true
+  notify: 
+    - Reload systemd
+    - Start security dashboard
+
+- name: Habilitar e iniciar servicio dashboard
+  systemd:
+    name: security-dashboard
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+- name: Mostrar URL del dashboard
+  debug:
+    msg:
+      - "=================================="
+      - "🌐 DASHBOARD DE SEGURIDAD DESPLEGADO"
+      - "=================================="
+      - ""
+      - "📊 URL Principal: http://{{ ansible_default_ipv4.address }}:8080"
+      - "📊 URL IPv6: http://[{{ ansible_default_ipv6.address }}]:8080"
+      - "📊 URL Local: http://172.17.25.122:8080"
+      - ""
+      - "🔗 Accede desde tu navegador para ver el dashboard interactivo"
+      - "=================================="
