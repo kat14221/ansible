@@ -1,259 +1,195 @@
+---
 # Linux workflow for user-security-dashboard
+
 - name: Ensure remote dashboard directory exists
   file:
     path: /tmp/user_security_dashboard
     state: directory
-    mode: '0750'
-  become: yes
+    mode: 0750
+  become: true
 
 - name: Capture local users with login shell
-  shell: |
-    {
-      echo "# Usuarios con shell válido";
-      printf "%-18s %-6s %-6s %-25s %-20s\n" "USUARIO" "UID" "GID" "DIRECTORIO" "SHELL";
-      getent passwd | awk -F: '$7 ~ /(bash|sh|zsh)$/{printf "%-18s %-6s %-6s %-25s %-20s\n", $1, $3, $4, $6, $7}' | sort;
-    } > /tmp/user_security_dashboard/01_usuarios.txt
-  become: yes
+  shell: >
+    echo "# Usuarios con shell valido" > /tmp/user_security_dashboard/01_usuarios.txt &&
+    printf "%-18s %-6s %-6s %-25s %-20s\n" "USUARIO" "UID" "GID" "DIRECTORIO" "SHELL" >> /tmp/user_security_dashboard/01_usuarios.txt &&
+    getent passwd | awk -F: '$7 ~ /(bash|sh|zsh)$/{printf "%-18s %-6s %-6s %-25s %-20s\n", $1, $3, $4, $6, $7}' | sort >> /tmp/user_security_dashboard/01_usuarios.txt
+  become: true
 
 - name: Capture key groups
-  shell: |
-    {
-      echo "# Grupos críticos";
-      getent group alumnos profesores lab-admins operator sudo 2>/dev/null;
-    } > /tmp/user_security_dashboard/02_grupos.txt
+  shell: >
+    echo "# Grupos criticos" > /tmp/user_security_dashboard/02_grupos.txt &&
+    getent group alumnos profesores lab-admins operator sudo >> /tmp/user_security_dashboard/02_grupos.txt 2>/dev/null || true
   failed_when: false
-  become: yes
+  become: true
 
 - name: Capture password policy details
-  shell: |
-    {
-      echo "# Política de contraseñas";
-      for usr in academico operator admin {{ vault_ansible_user | default('ansible') }}; do
-        chage -l "$usr" 2>/dev/null && echo "";
-      done;
-      echo "# /etc/login.defs";
-      egrep 'PASS_(MIN|MAX|WARN)' /etc/login.defs;
-    } > /tmp/user_security_dashboard/03_politica_contrasenas.txt
+  shell: >
+    echo "# Politica de contraseñas" > /tmp/user_security_dashboard/03_politica_contrasenas.txt &&
+    for usr in academico operator admin ansible; do
+      chage -l "$usr" >> /tmp/user_security_dashboard/03_politica_contrasenas.txt 2>/dev/null || true;
+    done &&
+    echo "# /etc/login.defs" >> /tmp/user_security_dashboard/03_politica_contrasenas.txt &&
+    egrep 'PASS_(MIN|MAX|WARN)' /etc/login.defs >> /tmp/user_security_dashboard/03_politica_contrasenas.txt 2>/dev/null || true
   failed_when: false
-  become: yes
+  become: true
 
 - name: Capture sudo policies
-  shell: |
-    {
-      echo "# sudoers.d";
-      ls /etc/sudoers.d 2>/dev/null || true;
-      echo "";
-      for file in /etc/sudoers.d/*; do
-        [ -e "$file" ] || continue;
-        echo "## $file";
-        cat "$file";
-        echo "";
-      done;
-    } > /tmp/user_security_dashboard/04_sudo_policies.txt
-  become: yes
+  shell: >
+    echo "# sudoers.d" > /tmp/user_security_dashboard/04_sudo_policies.txt &&
+    ls /etc/sudoers.d >> /tmp/user_security_dashboard/04_sudo_policies.txt 2>/dev/null || true &&
+    for file in /etc/sudoers.d/*; do
+      if [ -e "$file" ]; then
+        echo "## $file" >> /tmp/user_security_dashboard/04_sudo_policies.txt;
+        cat "$file" >> /tmp/user_security_dashboard/04_sudo_policies.txt 2>/dev/null || true;
+      fi;
+    done
+  become: true
 
 - name: Capture ACLs for evidence repository
-  shell: |
-    getfacl -p /srv/evidence 2>/dev/null > /tmp/user_security_dashboard/05_acl_evidence.txt || true
+  shell: >
+    getfacl -p /srv/evidence > /tmp/user_security_dashboard/05_acl_evidence.txt 2>/dev/null ||
+    echo "No ACLs found or getfacl not available" > /tmp/user_security_dashboard/05_acl_evidence.txt
   failed_when: false
-  become: yes
+  become: true
 
 - name: Capture audit rules related to identity
-  shell: |
-    auditctl -l 2>/dev/null | egrep '(identity|sudo|sshd)' > /tmp/user_security_dashboard/06_audit_rules.txt || true
+  shell: >
+    auditctl -l 2>/dev/null | egrep '(identity|sudo|sshd)' > /tmp/user_security_dashboard/06_audit_rules.txt ||
+    echo "No audit rules found" > /tmp/user_security_dashboard/06_audit_rules.txt
   failed_when: false
-  become: yes
+  become: true
 
 - name: Build markdown dashboard
-  shell: |
-    {
-  printf '# Dashboard de Seguridad por Usuario
-
-';
-  printf '## 1. Usuarios con Shell Activo
-
-````text
-';
-  cat /tmp/user_security_dashboard/01_usuarios.txt;
-  printf '````
-
-';
-
-  printf '## 2. Grupos Críticos
-
-````text
-';
-  cat /tmp/user_security_dashboard/02_grupos.txt;
-  printf '````
-
-';
-
-  printf '## 3. Políticas de Contraseña
-
-````text
-';
-  cat /tmp/user_security_dashboard/03_politica_contrasenas.txt;
-  printf '````
-
-';
-
-  printf '## 4. Reglas sudoers Delegadas
-
-````text
-';
-  cat /tmp/user_security_dashboard/04_sudo_policies.txt;
-  printf '````
-
-';
-
-  printf '## 5. Permisos y ACLs sobre Evidencias
-
-````text
-';
-  cat /tmp/user_security_dashboard/05_acl_evidence.txt;
-  printf '````
-
-';
-
-  printf '## 6. Auditoría Activa
-
-````text
-';
-  cat /tmp/user_security_dashboard/06_audit_rules.txt;
-  printf '````
-';
-    } > /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
-  become: yes
+  shell: >
+    echo "# Dashboard de Seguridad por Usuario" > /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "## 1. Usuarios con Shell Activo" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```text' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    cat /tmp/user_security_dashboard/01_usuarios.txt >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "## 2. Grupos Criticos" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```text' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    cat /tmp/user_security_dashboard/02_grupos.txt >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "## 3. Politicas de Contraseña" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```text' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    cat /tmp/user_security_dashboard/03_politica_contrasenas.txt >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "## 4. Reglas sudoers Delegadas" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```text' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    cat /tmp/user_security_dashboard/04_sudo_policies.txt >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "## 5. Permisos y ACLs sobre Evidencias" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```text' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    cat /tmp/user_security_dashboard/05_acl_evidence.txt >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "## 6. Auditoria Activa" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```text' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    cat /tmp/user_security_dashboard/06_audit_rules.txt >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md &&
+    echo '```' >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
+  become: true
 
 - name: Load usuarios section
   slurp:
     src: /tmp/user_security_dashboard/01_usuarios.txt
   register: usuarios_raw
-  become: yes
+  become: true
 
 - name: Load grupos section
   slurp:
     src: /tmp/user_security_dashboard/02_grupos.txt
   register: grupos_raw
-  become: yes
+  become: true
 
-- name: Load contraseñas section
+- name: Load contrasenas section
   slurp:
     src: /tmp/user_security_dashboard/03_politica_contrasenas.txt
   register: contrasenas_raw
-  become: yes
+  become: true
 
 - name: Load sudo section
   slurp:
     src: /tmp/user_security_dashboard/04_sudo_policies.txt
   register: sudo_raw
-  become: yes
+  become: true
 
 - name: Load ACL section
   slurp:
     src: /tmp/user_security_dashboard/05_acl_evidence.txt
   register: acl_raw
-  become: yes
+  become: true
 
 - name: Load audit section
   slurp:
     src: /tmp/user_security_dashboard/06_audit_rules.txt
   register: audit_raw
-  become: yes
+  become: true
 
 - name: Check nftables table for dashboard
-  command:
-    argv:
-      - nft
-      - list
-      - table
-      - inet
-      - ansible
+  command: nft list table inet ansible
   register: user_dash_nft_table
   failed_when: false
   changed_when: false
-  become: yes
+  become: true
 
 - name: Create nftables table for dashboard when missing
-  command:
-    argv:
-      - nft
-      - add
-      - table
-      - inet
-      - ansible
+  command: nft add table inet ansible
   when: user_dash_nft_table.rc != 0
-  become: yes
+  become: true
 
 - name: Check nftables chain for dashboard
-  command:
-    argv:
-      - nft
-      - list
-      - chain
-      - inet
-      - ansible
-      - input
+  command: nft list chain inet ansible input
   register: user_dash_nft_chain
   failed_when: false
   changed_when: false
-  become: yes
+  become: true
 
 - name: Create nftables chain for dashboard when missing
-  command:
-    argv:
-      - nft
-      - add
-      - chain
-      - inet
-      - ansible
-      - input
-      - '{ type filter hook input priority 0; policy drop; }'
+  command: nft add chain inet ansible input '{ type filter hook input priority 0; policy drop; }'
   when: user_dash_nft_chain.rc != 0
-  become: yes
+  become: true
 
 - name: Check firewall rule for dashboard port
-  shell: "nft list chain inet ansible input | grep -q 'tcp dport {{ security_dashboard_port }}'"
+  shell: nft list chain inet ansible input | grep -q 'tcp dport 8080'
   register: user_dash_rule
   failed_when: false
   changed_when: false
-  become: yes
+  become: true
 
 - name: Add firewall rule for dashboard port
-  command:
-    argv:
-      - nft
-      - add
-      - rule
-      - inet
-      - ansible
-      - input
-      - tcp
-      - dport
-      - "{{ security_dashboard_port }}"
-      - counter
-      - accept
+  command: nft add rule inet ansible input tcp dport 8080 counter accept
   when: user_dash_rule.rc != 0
-  become: yes
+  become: true
 
 - name: Enumerate dashboard artifacts
   find:
     paths: /tmp/user_security_dashboard
     file_type: file
   register: dashboard_artifacts
-  become: yes
+  become: true
 
 - name: Fetch dashboard artifacts
   fetch:
     src: "{{ item.path }}"
-    dest: "{{ (playbook_dir | dirname) + '/evidence/gestion-seguridad/' + inventory_hostname + '/' }}"
-    flat: yes
+    dest: "./evidence/gestion-seguridad/{{ inventory_hostname }}/"
+    flat: true
   loop: "{{ dashboard_artifacts.files }}"
-  become: yes
+  become: true
 
 - name: Show summary
   debug:
     msg:
-      - "📁 Evidencias descargadas en evidence/gestion-seguridad/{{ inventory_hostname }}"
-      - "Incluye SEGURIDAD_DASHBOARD.md y archivos fuente (users, groups, sudo, ACL, audit)"
-      - "🌐 Dashboard visual: http://{{ ansible_host | default(inventory_hostname) }}:{{ security_dashboard_port }}"
+      - "Evidencias descargadas en evidence/gestion-seguridad/{{ inventory_hostname }}"
+      - "Incluye SEGURIDAD_DASHBOARD.md y archivos fuente"
+      - "Dashboard visual en puerto 8080"
