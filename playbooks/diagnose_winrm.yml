@@ -1,0 +1,67 @@
+---
+- name: Diagnóstico detallado de WinRM
+  hosts: debian_router
+  gather_facts: false
+  become: true
+  
+  tasks:
+    - name: Test IPv6 connectivity (ya sabemos que funciona)
+      shell: ping6 -c 3 2025:db8:101::11
+      register: ping_test
+      
+    - name: Test puerto WinRM HTTP (5985)
+      shell: |
+        timeout 10 nc -v 2025:db8:101::11 5985 < /dev/null || echo "Puerto 5985 cerrado o filtrado"
+      register: winrm_http_test
+      ignore_errors: true
+      
+    - name: Test puerto WinRM HTTPS (5986) 
+      shell: |
+        timeout 10 nc -v 2025:db8:101::11 5986 < /dev/null || echo "Puerto 5986 cerrado o filtrado"
+      register: winrm_https_test
+      ignore_errors: true
+      
+    - name: Test otros puertos comunes
+      shell: |
+        echo "Testing common Windows ports..."
+        timeout 5 nc -v 2025:db8:101::11 22 < /dev/null && echo "SSH: OPEN" || echo "SSH: CLOSED"
+        timeout 5 nc -v 2025:db8:101::11 3389 < /dev/null && echo "RDP: OPEN" || echo "RDP: CLOSED"  
+        timeout 5 nc -v 2025:db8:101::11 135 < /dev/null && echo "RPC: OPEN" || echo "RPC: CLOSED"
+        timeout 5 nc -v 2025:db8:101::11 445 < /dev/null && echo "SMB: OPEN" || echo "SMB: CLOSED"
+      register: ports_test
+      ignore_errors: true
+      
+    - name: Test WinRM con curl (simulando Ansible)
+      shell: |
+        curl -v --connect-timeout 10 --max-time 30 \
+             --user "ansible:Ansible123!" \
+             --header "Content-Type: application/soap+xml;charset=UTF-8" \
+             --header "SOAPAction: http://schemas.xmlsoap.org/ws/2004/09/enumeration/Enumerate" \
+             "http://[2025:db8:101::11]:5985/wsman" \
+             || echo "WinRM no responde correctamente"
+      register: winrm_curl_test
+      ignore_errors: true
+      
+    - name: Mostrar resultados del diagnóstico
+      debug:
+        msg:
+          - "=== DIAGNÓSTICO DE CONNECTIVIDAD WINDOWS ==="
+          - ""
+          - "✅ IPv6 Ping: FUNCIONA"
+          - "{{ ping_test.stdout_lines[-1] }}"
+          - ""
+          - "🔍 Puerto WinRM HTTP (5985):"
+          - "{{ winrm_http_test.stdout_lines | join(' ') }}"
+          - ""
+          - "🔍 Puerto WinRM HTTPS (5986):" 
+          - "{{ winrm_https_test.stdout_lines | join(' ') }}"
+          - ""
+          - "🔍 Otros puertos:"
+          - "{{ ports_test.stdout_lines | join(' | ') }}"
+          - ""
+          - "🔍 Test WinRM/SOAP:"
+          - "{{ winrm_curl_test.stdout_lines | join(' ') }}"
+          - ""
+          - "💡 PRÓXIMOS PASOS:"
+          - "Si puerto 5985 está cerrado → Re-ejecutar setup WinRM en Windows"
+          - "Si puerto 5985 está abierto → Verificar autenticación/usuario"

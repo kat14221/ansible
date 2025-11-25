@@ -1,0 +1,151 @@
+---
+- name: Generar script de diagnóstico y reparación WinRM
+  hosts: localhost
+  gather_facts: false
+  
+  tasks:
+    - name: Crear script de diagnóstico WinRM para Windows
+      copy:
+        dest: ./diagnose_winrm_windows.ps1
+        content: |
+          # Script de diagnóstico y reparación WinRM
+          # Ejecutar como Administrador en Windows
+          
+          Write-Host "========================================" -ForegroundColor Cyan
+          Write-Host "DIAGNÓSTICO WINRM PARA ANSIBLE" -ForegroundColor Cyan  
+          Write-Host "========================================" -ForegroundColor Cyan
+          
+          # 1. Verificar estado actual de WinRM
+          Write-Host "`n[1] Estado actual de WinRM:" -ForegroundColor Yellow
+          try {
+              $winrmStatus = Get-Service WinRM
+              Write-Host "Servicio WinRM: $($winrmStatus.Status)" -ForegroundColor Green
+          } catch {
+              Write-Host "Error verificando servicio WinRM: $($_.Exception.Message)" -ForegroundColor Red
+          }
+          
+          # 2. Test local de WinRM
+          Write-Host "`n[2] Test local de WinRM:" -ForegroundColor Yellow
+          try {
+              Test-WSMan -ComputerName localhost
+              Write-Host "✅ WinRM responde localmente" -ForegroundColor Green
+          } catch {
+              Write-Host "❌ WinRM NO responde localmente" -ForegroundColor Red
+              Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+          }
+          
+          # 3. Verificar configuración
+          Write-Host "`n[3] Configuración actual:" -ForegroundColor Yellow
+          try {
+              winrm get winrm/config/service
+          } catch {
+              Write-Host "Error obteniendo configuración: $($_.Exception.Message)" -ForegroundColor Red
+          }
+          
+          # 4. Verificar listeners
+          Write-Host "`n[4] Listeners configurados:" -ForegroundColor Yellow
+          try {
+              winrm enumerate winrm/config/listener
+          } catch {
+              Write-Host "Error enumerando listeners: $($_.Exception.Message)" -ForegroundColor Red
+          }
+          
+          # 5. Verificar usuario ansible
+          Write-Host "`n[5] Usuario ansible:" -ForegroundColor Yellow
+          try {
+              $user = Get-LocalUser -Name "ansible" -ErrorAction Stop
+              Write-Host "✅ Usuario ansible existe: $($user.Name)" -ForegroundColor Green
+              Write-Host "Habilitado: $($user.Enabled)" -ForegroundColor White
+              
+              # Verificar si está en Administrators
+              $isAdmin = Get-LocalGroupMember -Group "Administrators" | Where-Object {$_.Name -like "*ansible*"}
+              if ($isAdmin) {
+                  Write-Host "✅ Usuario ansible está en grupo Administrators" -ForegroundColor Green
+              } else {
+                  Write-Host "❌ Usuario ansible NO está en grupo Administrators" -ForegroundColor Red
+              }
+          } catch {
+              Write-Host "❌ Usuario ansible no existe" -ForegroundColor Red
+          }
+          
+          # 6. Verificar firewall
+          Write-Host "`n[6] Reglas de firewall:" -ForegroundColor Yellow
+          $firewallRules = Get-NetFirewallRule | Where-Object {$_.DisplayName -like "*WinRM*" -or $_.DisplayName -like "*5985*"}
+          if ($firewallRules) {
+              foreach ($rule in $firewallRules) {
+                  Write-Host "$($rule.DisplayName): $($rule.Enabled)" -ForegroundColor White
+              }
+          } else {
+              Write-Host "❌ No se encontraron reglas de firewall para WinRM" -ForegroundColor Red
+          }
+          
+          # 7. Información de red
+          Write-Host "`n[7] Configuración de red IPv6:" -ForegroundColor Yellow
+          $ipv6 = Get-NetIPAddress -AddressFamily IPv6 | Where-Object {$_.IPAddress -like "2025:*"}
+          if ($ipv6) {
+              Write-Host "✅ IPv6 configurado: $($ipv6.IPAddress)" -ForegroundColor Green
+          } else {
+              Write-Host "❌ No se encuentra IPv6 2025:db8:101::11" -ForegroundColor Red
+          }
+          
+          # 8. REPARACIÓN AUTOMÁTICA
+          Write-Host "`n========================================" -ForegroundColor Cyan
+          Write-Host "¿EJECUTAR REPARACIÓN AUTOMÁTICA? (S/N)" -ForegroundColor Cyan
+          Write-Host "========================================" -ForegroundColor Cyan
+          $repair = Read-Host "Respuesta"
+          
+          if ($repair -eq "S" -or $repair -eq "s" -or $repair -eq "Y" -or $repair -eq "y") {
+              Write-Host "`nEjecutando reparación..." -ForegroundColor Yellow
+              
+              # Detener y reiniciar WinRM
+              Stop-Service WinRM -Force -ErrorAction SilentlyContinue
+              Start-Sleep 2
+              
+              # Reconfigurar WinRM
+              Enable-PSRemoting -Force -SkipNetworkProfileCheck
+              Set-Item WSMan:\localhost\Service\Auth\Basic $true -Force
+              Set-Item WSMan:\localhost\Service\AllowUnencrypted $true -Force
+              
+              # Recrear listeners
+              winrm delete winrm/config/Listener?Address=*+Transport=HTTP 2>$null
+              winrm create winrm/config/Listener?Address=*+Transport=HTTP
+              
+              # Recrear usuario si no existe
+              try {
+                  Get-LocalUser -Name "ansible" -ErrorAction Stop | Out-Null
+              } catch {
+                  $password = ConvertTo-SecureString "Ansible123!" -AsPlainText -Force
+                  New-LocalUser -Name "ansible" -Password $password -FullName "Ansible User" -Description "Usuario para Ansible"
+                  Add-LocalGroupMember -Group "Administrators" -Member "ansible"
+              }
+              
+              # Reconfigurar firewall
+              Remove-NetFirewallRule -DisplayName "WinRM HTTP" -ErrorAction SilentlyContinue
+              New-NetFirewallRule -DisplayName "WinRM HTTP" -Direction Inbound -LocalPort 5985 -Protocol TCP -Action Allow
+              
+              # Test final
+              Write-Host "`nTest final:" -ForegroundColor Green
+              Test-WSMan -ComputerName localhost
+              
+              Write-Host "`n✅ Reparación completada" -ForegroundColor Green
+          }
+          
+          Write-Host "`n========================================" -ForegroundColor Cyan
+          Write-Host "DIAGNÓSTICO COMPLETADO" -ForegroundColor Cyan
+          Write-Host "========================================" -ForegroundColor Cyan
+        mode: '0644'
+        
+    - name: Mostrar instrucciones
+      debug:
+        msg:
+          - "📄 Script generado: diagnose_winrm_windows.ps1"
+          - ""
+          - "PASOS:"
+          - "1. Ejecutar diagnóstico desde Ansible:"
+          - "   ansible-playbook playbooks/diagnose_winrm.yml -i inventory/hosts.yml"
+          - ""
+          - "2. Copiar script a Windows:"
+          - "   scp diagnose_winrm_windows.ps1 usuario@windows-ip:C:\\Users\\usuario\\"
+          - ""
+          - "3. En Windows (como Administrador):"
+          - "   PowerShell -ExecutionPolicy Bypass -File diagnose_winrm_windows.ps1"
