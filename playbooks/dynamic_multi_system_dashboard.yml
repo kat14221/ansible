@@ -1,0 +1,180 @@
+---
+- name: Dashboard Dinámico Multi-Sistema 
+  hosts: debian_router, ubuntu-pc
+  gather_facts: true
+  become: true
+  serial: 1  # Ejecutar uno a la vez para evitar conflictos
+  
+  tasks:
+    - name: Recopilar usuarios reales del sistema
+      shell: |
+        # Crear archivo JSON con datos de usuarios
+        echo '{"hostname": "'$(hostname)'", "os": "'$(lsb_release -d | cut -f2)'", "users": [' > /tmp/users_data.json
+        
+        # Obtener usuarios reales (excluir usuarios del sistema)
+        getent passwd | awk -F: '$3 >= 1000 && $3 < 65534' | while IFS=: read user pass uid gid gecos home shell; do
+          # Determinar rol basado en grupos
+          if groups $user | grep -q sudo; then
+            if echo $user | grep -q admin; then
+              role="Administrador"
+              role_class="admin"
+            else
+              role="Profesor/Sudo"
+              role_class="profesor"
+            fi
+          elif echo $user | grep -q profesor; then
+            role="Profesor"
+            role_class="profesor"
+          elif echo $user | grep -q alumno; then
+            role="Alumno"
+            role_class="alumno"
+          else
+            role="Usuario"
+            role_class="user"
+          fi
+          
+          # Último login
+          last_login=$(last -1 $user 2>/dev/null | head -1 | awk '{print $4" "$5" "$6}' | grep -v "^$" || echo "Nunca")
+          
+          # Estado (si está logged)
+          if who | grep -q "^$user "; then
+            status="Conectado"
+          else
+            status="Desconectado"
+          fi
+          
+          # Grupos del usuario
+          user_groups=$(groups $user 2>/dev/null | cut -d: -f2 | tr ' ' ',' | sed 's/^,//')
+          
+          echo '{"name": "'$user'", "uid": '$uid', "role": "'$role'", "role_class": "'$role_class'", "home": "'$home'", "shell": "'$shell'", "groups": "'$user_groups'", "last_login": "'$last_login'", "status": "'$status'"},'
+        done >> /tmp/users_data.json
+        
+        # Remover última coma y cerrar JSON
+        sed -i '$ s/,$//' /tmp/users_data.json
+        echo ']}' >> /tmp/users_data.json
+      register: user_collection
+
+    - name: Leer datos de usuarios recopilados
+      slurp:
+        src: /tmp/users_data.json
+      register: users_json
+
+    - name: Procesar datos de usuarios
+      set_fact:
+        system_data: "{{ users_json.content | b64decode | from_json }}"
+        
+    - name: Mostrar información recopilada
+      debug:
+        msg:
+          - "🖥️  Sistema: {{ system_data.hostname }}"
+          - "🐧 OS: {{ system_data.os }}"
+          - "👥 Usuarios encontrados: {{ system_data.users | length }}"
+          - "📋 Usuarios: {{ system_data.users | map(attribute='name') | join(', ') }}"
+
+    - name: Guardar datos del sistema en controlador
+      copy:
+        content: "{{ system_data | to_nice_json }}"
+        dest: "{{ playbook_dir }}/../evidence/system_data_{{ inventory_hostname }}.json"
+      delegate_to: localhost
+
+- name: Generar Dashboard Consolidado
+  hosts: debian_router
+  gather_facts: true
+  become: true
+  
+  tasks:
+    - name: Leer datos de todos los sistemas
+      set_fact:
+        all_systems: "{{ all_systems | default([]) + [item] }}"
+      with_file:
+        - "{{ playbook_dir }}/../evidence/system_data_debian-router.json"
+        - "{{ playbook_dir }}/../evidence/system_data_ubuntu-pc.json"
+      vars:
+        item: "{{ lookup('file', item) | from_json }}"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Crear dashboard HTML dinámico
+      template:
+        src: dynamic_dashboard.html.j2
+        dest: /var/www/security-dashboard/index.html
+        mode: '0644'
+      vars:
+        systems_data: "{{ all_systems }}"
+        
+    - name: Crear API endpoint para datos en tiempo real
+      copy:
+        content: |
+          #!/usr/bin/env python3
+          import json
+          import subprocess
+          import sys
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          from urllib.parse import urlparse, parse_qs
+          
+          class DashboardAPI(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  parsed_path = urlparse(self.path)
+                  
+                  if parsed_path.path == '/api/users':
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'application/json')
+                      self.send_header('Access-Control-Allow-Origin', '*')
+                      self.end_headers()
+                      
+                      # Obtener usuarios en tiempo real
+                      users = []
+                      try:
+                          result = subprocess.run(['getent', 'passwd'], capture_output=True, text=True)
+                          for line in result.stdout.split('\n'):
+                              if ':' in line:
+                                  parts = line.split(':')
+                                  if len(parts) >= 7 and int(parts[2]) >= 1000 and int(parts[2]) < 65534:
+                                      users.append({
+                                          'name': parts[0],
+                                          'uid': parts[2],
+                                          'home': parts[5],
+                                          'shell': parts[6]
+                                      })
+                      except:
+                          pass
+                      
+                      self.wfile.write(json.dumps({'users': users}).encode())
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+          
+          if __name__ == '__main__':
+              server = HTTPServer(('0.0.0.0', 8089), DashboardAPI)
+              server.serve_forever()
+        dest: /var/www/security-dashboard/api_server.py
+        mode: '0755'
+
+    - name: Reiniciar servidores del dashboard
+      shell: |
+        # Detener procesos anteriores
+        pkill -f "python3.*http.server.*8088" || true
+        pkill -f "python3.*api_server.py" || true
+        sleep 2
+        
+        # Iniciar servidor web principal
+        cd /var/www/security-dashboard
+        nohup python3 -m http.server 8088 --bind 0.0.0.0 > /var/log/dashboard.log 2>&1 &
+        
+        # Iniciar API server
+        nohup python3 /var/www/security-dashboard/api_server.py > /var/log/api.log 2>&1 &
+        
+        sleep 3
+
+    - name: Mostrar información final
+      debug:
+        msg:
+          - "🚀 DASHBOARD DINÁMICO DESPLEGADO"
+          - "================================"
+          - ""
+          - "📊 Dashboard Principal: http://172.17.25.122:8088"
+          - "🔌 API Datos Reales: http://172.17.25.122:8089/api/users"
+          - ""
+          - "💡 El dashboard ahora lee datos reales de:"
+          - "   🖥️  Debian Router: {{ hostvars['debian-router']['system_data']['users'] | length if hostvars['debian-router']['system_data'] is defined else 'N/A' }} usuarios"
+          - "   🖥️  Ubuntu PC: {{ hostvars['ubuntu-pc']['system_data']['users'] | length if hostvars['ubuntu-pc']['system_data'] is defined else 'N/A' }} usuarios"

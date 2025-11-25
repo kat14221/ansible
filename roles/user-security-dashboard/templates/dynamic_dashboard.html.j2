@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Multi-Sistema - Laboratorio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.2em; opacity: 0.9; }
+        
+        .systems-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        
+        .system-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #3498db;
+        }
+        
+        .system-card.ubuntu { border-left-color: #e95420; }
+        .system-card.debian { border-left-color: #a80030; }
+        
+        .system-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .system-header .icon {
+            font-size: 2.5em;
+            margin-right: 15px;
+        }
+        
+        .system-header h3 {
+            color: #2c3e50;
+            font-size: 1.5em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .stat-item .number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .stat-item .label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+        
+        .users-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 3px solid #3498db;
+        }
+        
+        .user-item.admin { border-left-color: #e74c3c; }
+        .user-item.profesor { border-left-color: #f39c12; }
+        .user-item.alumno { border-left-color: #27ae60; }
+        
+        .user-item .user-icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+        
+        .user-info h5 {
+            color: #2c3e50;
+            margin-bottom: 3px;
+        }
+        
+        .user-info .details {
+            font-size: 0.8em;
+            color: #7f8c8d;
+        }
+        
+        .status-badge {
+            margin-left: auto;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .status-badge.online {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .status-badge.offline {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 50%;
+            font-size: 1.5em;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            background: #2980b9;
+            transform: scale(1.1);
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #2c3e50;
+            color: white;
+        }
+        
+        .last-update {
+            font-style: italic;
+            color: #bdc3c7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌐 Dashboard Multi-Sistema</h1>
+            <p>Gestión Centralizada de Usuarios y Permisos</p>
+            <p class="last-update">Última actualización: {{ ansible_date_time.date }} {{ ansible_date_time.time }}</p>
+        </div>
+        
+        <div class="systems-overview">
+            {% for system in systems_data %}
+            <div class="system-card {{ 'ubuntu' if 'ubuntu' in system.hostname.lower() else 'debian' }}">
+                <div class="system-header">
+                    <div class="icon">
+                        {% if 'ubuntu' in system.hostname.lower() %}🐧{% else %}🖥️{% endif %}
+                    </div>
+                    <div>
+                        <h3>{{ system.hostname }}</h3>
+                        <p>{{ system.os }}</p>
+                    </div>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="number">{{ system.users | length }}</div>
+                        <div class="label">Total Usuarios</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="number">{{ system.users | selectattr('role_class', 'equalto', 'alumno') | list | length }}</div>
+                        <div class="label">Alumnos</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="number">{{ system.users | selectattr('role_class', 'in', ['admin', 'profesor']) | list | length }}</div>
+                        <div class="label">Staff</div>
+                    </div>
+                </div>
+                
+                <div class="users-list">
+                    {% for user in system.users %}
+                    <div class="user-item {{ user.role_class }}">
+                        <div class="user-icon">
+                            {% if user.role_class == 'admin' %}🔧
+                            {% elif user.role_class == 'profesor' %}👨‍🏫
+                            {% elif user.role_class == 'alumno' %}🎓
+                            {% else %}👤{% endif %}
+                        </div>
+                        <div class="user-info">
+                            <h5>{{ user.name }}</h5>
+                            <div class="details">
+                                {{ user.role }} | UID: {{ user.uid }}<br>
+                                Grupos: {{ user.groups | default('N/A') }}<br>
+                                Último login: {{ user.last_login }}
+                            </div>
+                        </div>
+                        <div class="status-badge {{ 'online' if user.status == 'Conectado' else 'offline' }}">
+                            {{ user.status }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="footer">
+            <p>Dashboard Multi-Sistema | Gestión Educativa | Datos en tiempo real</p>
+            <p>Sistemas monitoreados: {{ systems_data | length }} | Total usuarios: {{ systems_data | sum(attribute='users') | length }}</p>
+        </div>
+    </div>
+    
+    <button class="refresh-btn" onclick="location.reload()" title="Actualizar datos">
+        🔄
+    </button>
+
+    <script>
+        // Auto-refresh cada 30 segundos
+        setTimeout(() => {
+            location.reload();
+        }, 30000);
+        
+        // Mostrar hora actual
+        function updateTime() {
+            const now = new Date();
+            document.querySelector('.last-update').textContent = 
+                `Última actualización: ${now.toLocaleString()}`;
+        }
+        
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>
