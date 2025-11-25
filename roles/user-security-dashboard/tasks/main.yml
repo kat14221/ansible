@@ -52,8 +52,6 @@
         echo "";
       done;
     } > /tmp/user_security_dashboard/04_sudo_policies.txt
-  args:
-    warn: false
   become: yes
 
 - name: Capture ACLs for evidence repository
