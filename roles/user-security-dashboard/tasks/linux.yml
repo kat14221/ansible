@@ -66,45 +66,63 @@
 
 - name: Build markdown dashboard
   shell: |
-    cat <<EOF > /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
-    # Dashboard de Seguridad por Usuario
+    {
+  printf '# Dashboard de Seguridad por Usuario
 
-    ## 1. Usuarios con Shell Activo
+';
+  printf '## 1. Usuarios con Shell Activo
 
-    ````text
-    $(cat /tmp/user_security_dashboard/01_usuarios.txt)
-    ````
+````text
+';
+  cat /tmp/user_security_dashboard/01_usuarios.txt;
+  printf '````
 
-    ## 2. Grupos Críticos
+';
 
-    ````text
-    $(cat /tmp/user_security_dashboard/02_grupos.txt)
-    ````
+  printf '## 2. Grupos Críticos
 
-    ## 3. Políticas de Contraseña
+````text
+';
+  cat /tmp/user_security_dashboard/02_grupos.txt;
+  printf '````
 
-    ````text
-    $(cat /tmp/user_security_dashboard/03_politica_contrasenas.txt)
-    ````
+';
 
-    ## 4. Reglas sudoers Delegadas
+  printf '## 3. Políticas de Contraseña
 
-    ````text
-    $(cat /tmp/user_security_dashboard/04_sudo_policies.txt)
-    ````
+````text
+';
+  cat /tmp/user_security_dashboard/03_politica_contrasenas.txt;
+  printf '````
 
-    ## 5. Permisos y ACLs sobre Evidencias
+';
 
-    ````text
-    $(cat /tmp/user_security_dashboard/05_acl_evidence.txt)
-    ````
+  printf '## 4. Reglas sudoers Delegadas
 
-    ## 6. Auditoría Activa
+````text
+';
+  cat /tmp/user_security_dashboard/04_sudo_policies.txt;
+  printf '````
 
-    ````text
-    $(cat /tmp/user_security_dashboard/06_audit_rules.txt)
-    ````
-EOF
+';
+
+  printf '## 5. Permisos y ACLs sobre Evidencias
+
+````text
+';
+  cat /tmp/user_security_dashboard/05_acl_evidence.txt;
+  printf '````
+
+';
+
+  printf '## 6. Auditoría Activa
+
+````text
+';
+  cat /tmp/user_security_dashboard/06_audit_rules.txt;
+  printf '````
+';
+    } > /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
   become: yes
 
 - name: Load usuarios section
