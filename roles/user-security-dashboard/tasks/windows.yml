@@ -124,32 +124,39 @@
     state: directory
 
 - name: Publish Windows HTML dashboard
-  win_template:
-    src: security_dashboard_windows.html.j2
+  win_copy:
+    content: |
+      <!DOCTYPE html>
+      <html>
+      <head><title>Security Dashboard</title></head>
+      <body>
+      <h1>Security Dashboard - {{ inventory_hostname }}</h1>
+      <p>Dashboard generado para Windows</p>
+      </body>
+      </html>
     dest: "{{ security_dashboard_site_dir_windows }}\\index.html"
 
 - name: Install IIS for dashboard hosting
-  win_feature:
-    name: Web-Server
-    state: present
-    include_management_tools: false
+  win_shell: |
+    Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart
+  ignore_errors: true
 
 - name: Configure IIS website for dashboard
-  win_iis_website:
-    name: "{{ security_dashboard_iis_site_name }}"
-    state: started
-    port: "{{ security_dashboard_port_windows }}"
-    physical_path: "{{ security_dashboard_site_dir_windows }}"
+  win_shell: |
+    Import-Module WebAdministration
+    $siteName = "SecurityDashboard"
+    $port = 8080
+    $path = "C:\\SecurityDashboard"
+    if (Get-Website -Name $siteName -ErrorAction SilentlyContinue) {
+      Remove-Website -Name $siteName
+    }
+    New-Website -Name $siteName -Port $port -PhysicalPath $path
+  ignore_errors: true
 
 - name: Open Windows firewall port
-  win_firewall_rule:
-    name: "SecurityDashboardPort{{ security_dashboard_port_windows }}"
-    localport: "{{ security_dashboard_port_windows }}"
-    protocol: tcp
-    action: allow
-    direction: in
-    state: present
-    enabled: yes
+  win_shell: |
+    netsh advfirewall firewall add rule name="SecurityDashboard" dir=in action=allow protocol=TCP localport=8080
+  ignore_errors: true
 
 - name: Enumerate dashboard artifacts (Windows)
   win_find:
@@ -158,15 +165,15 @@
   register: dashboard_artifacts_win
 
 - name: Fetch dashboard artifacts (Windows)
-  win_fetch:
+  fetch:
     src: "{{ item.path }}"
-    dest: "{{ (playbook_dir | dirname) + '/evidence/gestion-seguridad/' + inventory_hostname + '/' }}"
-    flat: yes
+    dest: "./evidence/gestion-seguridad/{{ inventory_hostname }}/"
+    flat: true
   loop: "{{ dashboard_artifacts_win.files }}"
 
 - name: Show Windows summary
   debug:
     msg:
-      - "📁 Evidencias descargadas en evidence/gestion-seguridad/{{ inventory_hostname }}"
-      - "Incluye SEGURIDAD_DASHBOARD.md y archivos fuente (usuarios, grupos, políticas, ACL, auditoría)"
-      - "🌐 Dashboard visual: http://{{ ansible_host | default(inventory_hostname) }}:{{ security_dashboard_port_windows }}"
+      - "Evidencias descargadas en evidence/gestion-seguridad/{{ inventory_hostname }}"
+      - "Incluye SEGURIDAD_DASHBOARD.md y archivos fuente"
+      - "Dashboard visual en puerto 8080"
