@@ -1,0 +1,6 @@
+---
+- name: "Gestión de seguridad por usuario: dashboard de evidencias"
+  hosts: debian_router
+  become: yes
+  roles:
+    - user-security-dashboard

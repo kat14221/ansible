@@ -1089,6 +1089,40 @@ administrativas.
 ✓ Configuración de sudo granular orientada a tareas.
 ✓ Endurecimiento de permisos y ACLs en rutas críticas.
 ✓ Implementación de auditoría continua sobre configuraciones sensibles.
+
+#### Automatización y Dashboard Generado
+
+Para consolidar la evidencia técnica, construí el playbook `playbooks/generate_user_security_dashboard.yml` que aplica el rol `user-security-dashboard`. Este rol recolecta información clave desde el router (`getent passwd/group`, `chage`, `sudoers`, `getfacl`, `auditctl`) y genera el archivo `SEGURIDAD_DASHBOARD.md` junto con cada fuente sin procesar en `evidence/gestion_seguridad/debian-router/`.
+
+**Ejecución:**
+
+```bash
+cd ~/ansible
+ansible-playbook playbooks/generate_user_security_dashboard.yml -i inventory/hosts.yml -l debian_router -vv
+ls evidence/gestion_seguridad/debian-router/
+```
+
+**Figura 12B - Dashboard de seguridad por usuario**
+
+- Mostrar `SEGURIDAD_DASHBOARD.md` (o abrirlo en VS Code) donde se aprecian las secciones de usuarios, grupos, políticas de contraseña, sudoers, ACLs y reglas de auditoría.
+- Adjuntar captura del terminal evidenciando la ejecución del playbook (tareas `user-security-dashboard`).
+
+**Texto sugerido:**
+
+```
+FIGURA 12B: Dashboard automatizado de seguridad por usuario
+
+Automatizé la recolección de evidencias de usuarios, grupos y políticas con
+el rol user-security-dashboard. El playbook genera un tablero Markdown donde
+documento quién tiene shell activo, a qué grupos pertenece, qué políticas de
+contraseña aplican y qué comandos sudo puede ejecutar cada rol. También
+cubro permisos de las evidencias y las reglas de auditd relacionadas con
+identidad.
+
+Gracias a esta automatización puedo regenerar la evidencia en segundos y
+garantizar que las restricciones definidas (ACLs, sudoers, expiración de
+contraseñas) se mantengan alineadas con las políticas del laboratorio.
+```
 ```
 
 ---
