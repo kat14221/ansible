@@ -1,0 +1,51 @@
+---
+- name: Test Windows connectivity (configuración original)
+  hosts: windows_hosts
+  gather_facts: false
+  
+  tasks:
+    - name: Test Windows ping (configuración original)
+      win_ping:
+      register: ping_result
+      
+    - name: Show ping result
+      debug:
+        msg: "Windows ping successful!"
+      when: ping_result is succeeded
+      
+    - name: Show connection details on success
+      win_shell: |
+        Write-Host "=== Windows Connection Test ==="
+        Write-Host "Hostname: $env:COMPUTERNAME"
+        Write-Host "User: $env:USERNAME"
+        Write-Host "Date: $(Get-Date)"
+        Write-Host "IPv6 Address:"
+        Get-NetIPAddress -AddressFamily IPv6 | Where-Object {$_.IPAddress -like "2025:*"} | Select-Object IPAddress, InterfaceAlias | Format-Table
+      register: connection_info
+      when: ping_result is succeeded
+      
+    - name: Display connection info
+      debug:
+        msg: "{{ connection_info.stdout_lines }}"
+      when: ping_result is succeeded
+        
+  rescue:
+    - name: Connection failed - show troubleshooting info
+      debug:
+        msg:
+          - "❌ Windows connection failed!"
+          - ""
+          - "Troubleshooting steps:"
+          - "1. Verify Windows VM is running"
+          - "2. Check if WinRM is configured:"
+          - "   Run on Windows: Test-WSMan -ComputerName localhost"
+          - "3. Re-run WinRM setup script:"
+          - "   PowerShell -ExecutionPolicy Bypass -File setup_winrm_windows.ps1"
+          - "4. Check IPv6 connectivity from debian-router:"
+          - "   ping6 2025:db8:101::11"
+          - ""
+          - "Expected Windows configuration:"
+          - "- WinRM enabled on port 5985"
+          - "- User 'ansible' with password 'Ansible123!'"
+          - "- IPv6 address: 2025:db8:101::11"
+      delegate_to: localhost
