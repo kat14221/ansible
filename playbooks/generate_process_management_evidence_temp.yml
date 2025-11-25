@@ -66,7 +66,7 @@
     - name: Descargar archivo de inicio a local
       fetch:
         src: "/tmp/gestion_procesos/00_INICIO.txt"
-        dest: "{{ evidence_dir }}/00_INICIO.txt"
+        dest: "/tmp/gestion_procesos/00_INICIO.txt"
         flat: yes
 
     # ========================================
@@ -95,7 +95,7 @@
     - name: Descargar inventario de servicios a local
       fetch:
         src: "/tmp/gestion_procesos/01_inventario_servicios.txt"
-        dest: "{{ evidence_dir }}/01_inventario_servicios.txt"
+        dest: "/tmp/gestion_procesos/01_inventario_servicios.txt"
         flat: yes
 
     # ========================================
@@ -126,7 +126,7 @@
 
     - name: Guardar estado de servicios críticos
       copy:
-        dest: "{{ evidence_dir }}/02_servicios_criticos.txt"
+        dest: "/tmp/gestion_procesos/02_servicios_criticos.txt"
         content: "{{ critical_services.stdout }}"
       delegate_to: localhost
       become: no
@@ -149,7 +149,7 @@
 
     - name: Guardar análisis de CPU
       copy:
-        dest: "{{ evidence_dir }}/03_top_procesos_cpu.txt"
+        dest: "/tmp/gestion_procesos/03_top_procesos_cpu.txt"
         content: "{{ top_cpu.stdout }}"
       delegate_to: localhost
       become: no
@@ -172,7 +172,7 @@
 
     - name: Guardar análisis de memoria
       copy:
-        dest: "{{ evidence_dir }}/04_top_procesos_memoria.txt"
+        dest: "/tmp/gestion_procesos/04_top_procesos_memoria.txt"
         content: "{{ top_mem.stdout }}"
       delegate_to: localhost
       become: no
@@ -207,7 +207,7 @@
 
     - name: Guardar control de servicios
       copy:
-        dest: "{{ evidence_dir }}/05_control_servicios.txt"
+        dest: "/tmp/gestion_procesos/05_control_servicios.txt"
         content: "{{ service_control.stdout }}"
       delegate_to: localhost
       become: no
@@ -238,7 +238,7 @@
 
     - name: Guardar configuración de arranque
       copy:
-        dest: "{{ evidence_dir }}/06_arranque_automatico.txt"
+        dest: "/tmp/gestion_procesos/06_arranque_automatico.txt"
         content: "{{ boot_config.stdout }}"
       delegate_to: localhost
       become: no
@@ -271,7 +271,7 @@
 
     - name: Guardar análisis de logs
       copy:
-        dest: "{{ evidence_dir }}/07_logs_servicios.txt"
+        dest: "/tmp/gestion_procesos/07_logs_servicios.txt"
         content: "{{ service_logs.stdout }}"
       delegate_to: localhost
       become: no
@@ -300,7 +300,7 @@
 
     - name: Guardar análisis de prioridades
       copy:
-        dest: "{{ evidence_dir }}/08_prioridades_procesos.txt"
+        dest: "/tmp/gestion_procesos/08_prioridades_procesos.txt"
         content: "{{ process_priority.stdout }}"
       delegate_to: localhost
       become: no
@@ -341,7 +341,7 @@
 
     - name: Guardar monitoreo de recursos
       copy:
-        dest: "{{ evidence_dir }}/09_recursos_sistema.txt"
+        dest: "/tmp/gestion_procesos/09_recursos_sistema.txt"
         content: "{{ system_resources.stdout }}"
       delegate_to: localhost
       become: no
@@ -368,7 +368,7 @@
 
     - name: Guardar dependencias de servicios
       copy:
-        dest: "{{ evidence_dir }}/10_dependencias_servicios.txt"
+        dest: "/tmp/gestion_procesos/10_dependencias_servicios.txt"
         content: "{{ service_deps.stdout }}"
       delegate_to: localhost
       become: no
@@ -470,7 +470,7 @@
 
     - name: Guardar reporte final
       copy:
-        dest: "{{ evidence_dir }}/REPORTE_FINAL.txt"
+        dest: "/tmp/gestion_procesos/REPORTE_FINAL.txt"
         content: "{{ final_report.stdout }}"
       delegate_to: localhost
       become: no
