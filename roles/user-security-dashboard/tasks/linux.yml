@@ -161,39 +161,6 @@
   register: audit_raw
   become: yes
 
-- name: Ensure dashboard web root exists
-  file:
-    path: "{{ security_dashboard_site_dir }}"
-    state: directory
-    mode: '0755'
-  become: yes
-
-- name: Publish HTML dashboard
-  template:
-    src: security_dashboard.html.j2
-    dest: "{{ security_dashboard_site_dir }}/index.html"
-    mode: '0644'
-  become: yes
-
-- name: Install systemd service for dashboard
-  template:
-    src: security-dashboard.service.j2
-    dest: "/etc/systemd/system/{{ security_dashboard_service_name }}.service"
-    mode: '0644'
-  become: yes
-
-- name: Reload systemd daemon
-  systemd:
-    daemon_reload: yes
-  become: yes
-
-- name: Ensure dashboard service is running
-  systemd:
-    name: "{{ security_dashboard_service_name }}"
-    state: restarted
-    enabled: yes
-  become: yes
-
 - name: Check nftables table for dashboard
   command:
     argv:
