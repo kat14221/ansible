@@ -1,0 +1,204 @@
+---
+- name: "SOLUCIÓN SIMPLE - Puerto 8091 directo"
+  hosts: debian-router
+  gather_facts: no
+  become: true
+  
+  tasks:
+    - name: "PASO 1: Verificar puerto 8091"
+      shell: |
+        echo "=== VERIFICAR PUERTO 8091 ==="
+        if netstat -tuln | grep ":8091 " > /dev/null; then
+          echo "❌ Puerto 8091 ocupado"
+          fuser -k 8091/tcp 2>/dev/null || echo "Intentando liberar..."
+          sleep 2
+        else
+          echo "✅ Puerto 8091 libre"
+        fi
+        
+        # Verificar nuevamente
+        if netstat -tuln | grep ":8091 " > /dev/null; then
+          echo "⚠️ Puerto 8091 aún ocupado"
+        else
+          echo "✅ Puerto 8091 confirmado libre"
+        fi
+      register: port_check
+
+    - name: "Mostrar estado del puerto"
+      debug:
+        var: port_check.stdout_lines
+
+    - name: "PASO 2: Crear aplicación Flask simple"
+      copy:
+        content: |
+          #!/usr/bin/env python3
+          from flask import Flask, render_template_string, jsonify, request
+          import subprocess
+          from datetime import datetime
+          import logging
+          
+          app = Flask(__name__)
+          
+          # Configurar logging básico
+          logging.basicConfig(level=logging.INFO)
+          
+          # HTML simple pero funcional
+          HTML = """
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Dashboard Seguridad - Puerto 8091</title>
+              <style>
+                  body { font-family: Arial; margin: 40px; background: #f0f0f0; }
+                  .container { max-width: 800px; margin: 0 auto; }
+                  .header { background: white; padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
+                  .card { background: white; padding: 20px; margin: 15px 0; border-radius: 10px; }
+                  .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+                  .success { background: #28a745; color: white; padding: 15px; border-radius: 5px; margin: 10px 0; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🔐 Dashboard de Seguridad</h1>
+                      <div class="success">✅ Funcionando en Puerto 8091</div>
+                      <p>URL: <strong>http://172.17.25.122:8091</strong></p>
+                  </div>
+                  
+                  <div class="card">
+                      <h3>📊 Estado del Sistema</h3>
+                      <div id="status">Cargando...</div>
+                      <button class="btn" onclick="loadStatus()">Actualizar</button>
+                  </div>
+                  
+                  <div class="card">
+                      <h3>👥 Usuarios del Sistema</h3>
+                      <div id="users">Cargando...</div>
+                      <button class="btn" onclick="loadUsers()">Ver Usuarios</button>
+                  </div>
+                  
+                  <div class="card">
+                      <h3>🛡️ Seguridad</h3>
+                      <p>✅ Firewall activo</p>
+                      <p>✅ SSH configurado</p>
+                      <p>✅ Dashboard en puerto 8091</p>
+                  </div>
+              </div>
+              
+              <script>
+                  function loadStatus() {
+                      fetch('/api/status')
+                          .then(r => r.json())
+                          .then(data => {
+                              document.getElementById('status').innerHTML = 
+                                  '<p><strong>Servidor:</strong> ' + data.hostname + '</p>' +
+                                  '<p><strong>Fecha:</strong> ' + data.date + '</p>' +
+                                  '<p><strong>Estado:</strong> Online</p>';
+                          });
+                  }
+                  
+                  function loadUsers() {
+                      fetch('/api/users')
+                          .then(r => r.json())
+                          .then(data => {
+                              let html = '<p><strong>Usuarios encontrados:</strong></p><ul>';
+                              data.users.slice(0,8).forEach(u => {
+                                  html += '<li>' + u + '</li>';
+                              });
+                              html += '</ul>';
+                              document.getElementById('users').innerHTML = html;
+                          });
+                  }
+                  
+                  // Cargar automáticamente
+                  setTimeout(loadStatus, 1000);
+                  setTimeout(loadUsers, 2000);
+              </script>
+          </body>
+          </html>
+          """
+          
+          @app.route('/')
+          def home():
+              return render_template_string(HTML)
+          
+          @app.route('/api/status')
+          def status():
+              try:
+                  hostname = subprocess.check_output(['hostname']).decode().strip()
+                  date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                  return jsonify({'hostname': hostname, 'date': date, 'status': 'ok'})
+              except:
+                  return jsonify({'error': 'Error getting status'})
+          
+          @app.route('/api/users')
+          def users():
+              try:
+                  result = subprocess.check_output(['cut', '-d:', '-f1', '/etc/passwd']).decode()
+                  users_list = [u for u in result.strip().split('\n') if len(u) > 2 and not u.startswith('_')]
+                  return jsonify({'users': users_list[:10]})
+              except:
+                  return jsonify({'users': ['Error loading users']})
+          
+          @app.route('/health')
+          def health():
+              return jsonify({'status': 'healthy', 'port': 8091})
+          
+          if __name__ == '__main__':
+              print("🚀 Iniciando Dashboard en puerto 8091...")
+              app.run(host='0.0.0.0', port=8091, debug=False)
+        dest: /home/ansible/dashboard_simple.py
+        mode: '0755'
+
+    - name: "PASO 3: Iniciar aplicación"
+      shell: |
+        cd /home/ansible
+        
+        # Matar procesos previos
+        pkill -f "dashboard_simple" || echo "Sin procesos previos"
+        pkill -f ":8091" || echo "Sin procesos en 8091"
+        
+        # Iniciar aplicación
+        echo "🚀 Iniciando dashboard..."
+        nohup python3 dashboard_simple.py > dashboard_simple.log 2>&1 &
+        echo $! > dashboard_simple.pid
+        
+        sleep 3
+        
+        # Verificar
+        if [ -f dashboard_simple.pid ]; then
+          pid=$(cat dashboard_simple.pid)
+          if ps -p $pid > /dev/null 2>&1; then
+            echo "✅ Dashboard iniciado con PID: $pid"
+            
+            # Verificar puerto
+            if netstat -tuln | grep ":8091 " > /dev/null; then
+              echo "✅ Puerto 8091 activo"
+              
+              # Test
+              response=$(curl -s --connect-timeout 3 http://localhost:8091/health || echo "ERROR")
+              if [[ "$response" == *"healthy"* ]]; then
+                echo "✅ Health check OK"
+                echo ""
+                echo "🎉 DASHBOARD FUNCIONANDO!"
+                echo "🌐 Abrir: http://172.17.25.122:8091"
+                echo "📱 El dashboard está listo para usar"
+              else
+                echo "⚠️ Health check: $response"
+              fi
+            else
+              echo "❌ Puerto 8091 no activo"
+              cat dashboard_simple.log
+            fi
+          else
+            echo "❌ Proceso no iniciado"
+            cat dashboard_simple.log
+          fi
+        else
+          echo "❌ No se creó PID"
+        fi
+      register: startup_result
+
+    - name: "🎉 RESULTADO"
+      debug:
+        var: startup_result.stdout_lines

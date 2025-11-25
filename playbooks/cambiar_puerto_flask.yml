@@ -38,7 +38,7 @@
         
         echo "🔧 Creando aplicación Flask para puerto $puerto..."
         
-        cat > flask_dashboard_puerto_$puerto.py << ENDFILE
+        cat > flask_dashboard_puerto_$puerto.py << "ENDFILE"
         #!/usr/bin/env python3
         import flask
         from flask import Flask, render_template_string, jsonify, request
@@ -49,8 +49,8 @@
         import logging
         import sys
         
-        # Puerto dinámico
-        PUERTO = $puerto
+        # Puerto dinámico - será reemplazado por sed
+        PUERTO = PUERTO_PLACEHOLDER
         
         # Configurar logging
         logging.basicConfig(
@@ -458,6 +458,10 @@
                 app.logger.error(f"💥 Error al iniciar en puerto {PUERTO}: {e}")
                 sys.exit(1)
         ENDFILE
+        
+        # Reemplazar placeholder con el puerto real
+        sed -i "s/PUERTO_PLACEHOLDER/$puerto/g" flask_dashboard_puerto_$puerto.py
+        sed -i "s/Puerto: PUERTO_PLACEHOLDER/Puerto: $puerto/g" flask_dashboard_puerto_$puerto.py
         
         chmod +x flask_dashboard_puerto_$puerto.py
         echo "✅ Aplicación creada para puerto $puerto"
