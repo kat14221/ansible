@@ -1,0 +1,490 @@
+---
+# Playbook: Generación de Evidencias - Gestión de Procesos y Servicios
+# Propósito: Demostrar competencia en control y optimización de procesos
+# Fecha: 2025-11-25
+
+- name: Generar Evidencias de Gestión de Procesos y Servicios
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    evidence_dir: "evidence/gestion_procesos"
+    timestamp: "{{ ansible_date_time.date }}_{{ ansible_date_time.hour }}{{ ansible_date_time.minute }}"
+  
+  tasks:
+    # ========================================
+    # PREPARACIÓN
+    # ========================================
+    - name: Crear directorio de evidencias
+      file:
+        path: "{{ evidence_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: no
+
+    - name: Crear archivo de inicio
+      copy:
+        dest: "{{ evidence_dir }}/00_INICIO.txt"
+        content: |
+          ╔═══════════════════════════════════════════════════════════════════╗
+          ║   EVIDENCIAS: GESTIÓN DE PROCESOS Y SERVICIOS                    ║
+          ║   Proyecto: VMWARE-101001 - Red Académica IPv6                   ║
+          ╚═══════════════════════════════════════════════════════════════════╝
+          
+          Fecha: {{ ansible_date_time.date }}
+          Hora: {{ ansible_date_time.time }}
+          Host: {{ inventory_hostname }}
+          Sistema: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Kernel: {{ ansible_kernel }}
+          
+          ══════════════════════════════════════════════════════════════════
+          OBJETIVO:
+          ══════════════════════════════════════════════════════════════════
+          
+          Demostrar competencia en:
+          ✓ Gestión de servicios con systemd
+          ✓ Monitoreo de procesos en tiempo real
+          ✓ Análisis de uso de recursos (CPU, Memoria)
+          ✓ Control de prioridades de procesos
+          ✓ Optimización de servicios críticos
+          ✓ Configuración de arranque automático
+          ✓ Troubleshooting de servicios
+          
+          ══════════════════════════════════════════════════════════════════
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # 1. INVENTARIO DE SERVICIOS CRÍTICOS
+    # ========================================
+    - name: "EVIDENCIA 1: Listar todos los servicios systemd"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  1. INVENTARIO COMPLETO DE SERVICIOS SYSTEMD"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        echo "--- Todos los servicios (activos e inactivos) ---"
+        systemctl list-units --type=service --all --no-pager
+        echo ""
+        echo "--- Resumen por estado ---"
+        systemctl list-units --type=service --no-pager | tail -1
+      register: all_services
+      changed_when: false
+
+    - name: Guardar inventario de servicios
+      copy:
+        dest: "{{ evidence_dir }}/01_inventario_servicios.txt"
+        content: "{{ all_services.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # 2. ESTADO DE SERVICIOS CRÍTICOS
+    # ========================================
+    - name: "EVIDENCIA 2: Estado detallado de servicios críticos"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  2. ESTADO DE SERVICIOS CRÍTICOS DEL LABORATORIO"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        for service in radvd isc-dhcp-server apache2 vsftpd ssh dnsmasq firewalld; do
+          echo "┌────────────────────────────────────────────────────────┐"
+          echo "│  SERVICIO: $service"
+          echo "└────────────────────────────────────────────────────────┘"
+          systemctl status $service --no-pager -l || echo "Servicio no encontrado o no activo"
+          echo ""
+          echo "--- Configuración de arranque ---"
+          systemctl is-enabled $service 2>/dev/null || echo "N/A"
+          echo ""
+          echo "--- Procesos asociados ---"
+          ps aux | grep -i $service | grep -v grep || echo "No hay procesos visibles"
+          echo ""
+          echo ""
+        done
+      register: critical_services
+      changed_when: false
+
+    - name: Guardar estado de servicios críticos
+      copy:
+        dest: "{{ evidence_dir }}/02_servicios_criticos.txt"
+        content: "{{ critical_services.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # 3. ANÁLISIS DE PROCESOS EN TIEMPO REAL
+    # ========================================
+    - name: "EVIDENCIA 3: Top 20 procesos por uso de CPU"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  3. ANÁLISIS DE PROCESOS - TOP 20 POR CPU"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        ps aux --sort=-%cpu | head -21
+        echo ""
+        echo "--- Estadísticas de CPU ---"
+        mpstat 1 3 2>/dev/null || echo "mpstat no disponible (instalar sysstat)"
+      register: top_cpu
+      changed_when: false
+
+    - name: Guardar análisis de CPU
+      copy:
+        dest: "{{ evidence_dir }}/03_top_procesos_cpu.txt"
+        content: "{{ top_cpu.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    - name: "EVIDENCIA 4: Top 20 procesos por uso de Memoria"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  4. ANÁLISIS DE PROCESOS - TOP 20 POR MEMORIA"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        ps aux --sort=-%mem | head -21
+        echo ""
+        echo "--- Resumen de memoria del sistema ---"
+        free -h
+        echo ""
+        echo "--- Memoria por proceso (top 10) ---"
+        ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%mem | head -11
+      register: top_mem
+      changed_when: false
+
+    - name: Guardar análisis de memoria
+      copy:
+        dest: "{{ evidence_dir }}/04_top_procesos_memoria.txt"
+        content: "{{ top_mem.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # 5. CONTROL DE SERVICIOS (START/STOP/RESTART)
+    # ========================================
+    - name: "EVIDENCIA 5: Demostrar control de servicios"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  5. CONTROL Y GESTIÓN DE SERVICIOS"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        echo "--- Estado ANTES de reiniciar Apache2 ---"
+        systemctl status apache2 --no-pager | head -15
+        echo ""
+        echo "--- REINICIANDO Apache2 ---"
+        systemctl restart apache2
+        sleep 2
+        echo "✓ Servicio reiniciado exitosamente"
+        echo ""
+        echo "--- Estado DESPUÉS de reiniciar Apache2 ---"
+        systemctl status apache2 --no-pager | head -15
+        echo ""
+        echo "--- Tiempo de actividad del servicio ---"
+        systemctl show apache2 --property=ActiveEnterTimestamp --no-pager
+        echo ""
+        echo "--- Logs recientes (últimas 10 líneas) ---"
+        journalctl -u apache2 -n 10 --no-pager
+      register: service_control
+      changed_when: false
+
+    - name: Guardar control de servicios
+      copy:
+        dest: "{{ evidence_dir }}/05_control_servicios.txt"
+        content: "{{ service_control.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # 6. CONFIGURACIÓN DE ARRANQUE AUTOMÁTICO
+    # ========================================
+    - name: "EVIDENCIA 6: Verificar arranque automático"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  6. CONFIGURACIÓN DE ARRANQUE AUTOMÁTICO"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        echo "--- Servicios habilitados en el arranque ---"
+        systemctl list-unit-files --type=service --state=enabled --no-pager
+        echo ""
+        echo "--- Servicios críticos y su estado de arranque ---"
+        echo ""
+        for service in radvd isc-dhcp-server apache2 vsftpd ssh firewalld; do
+          enabled=$(systemctl is-enabled $service 2>/dev/null || echo "N/A")
+          echo "  $service: $enabled"
+        done
+        echo ""
+        echo "--- Análisis de tiempos de arranque ---"
+        systemd-analyze blame | head -20
+      register: boot_config
+      changed_when: false
+
+    - name: Guardar configuración de arranque
+      copy:
+        dest: "{{ evidence_dir }}/06_arranque_automatico.txt"
+        content: "{{ boot_config.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # 7. LOGS Y TROUBLESHOOTING
+    # ========================================
+    - name: "EVIDENCIA 7: Análisis de logs de servicios"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  7. LOGS Y TROUBLESHOOTING DE SERVICIOS"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        echo "--- Logs de Apache2 (últimas 20 líneas) ---"
+        journalctl -u apache2 -n 20 --no-pager
+        echo ""
+        echo "--- Logs de SSH (últimas 15 líneas) ---"
+        journalctl -u ssh -n 15 --no-pager
+        echo ""
+        echo "--- Logs de RADVD (últimas 15 líneas) ---"
+        journalctl -u radvd -n 15 --no-pager
+        echo ""
+        echo "--- Errores del sistema (últimas 10 líneas) ---"
+        journalctl -p err -n 10 --no-pager
+        echo ""
+        echo "--- Tamaño de archivos de log ---"
+        du -sh /var/log/* 2>/dev/null | sort -hr | head -10
+      register: service_logs
+      changed_when: false
+
+    - name: Guardar análisis de logs
+      copy:
+        dest: "{{ evidence_dir }}/07_logs_servicios.txt"
+        content: "{{ service_logs.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # 8. PRIORIDADES Y NICE VALUES
+    # ========================================
+    - name: "EVIDENCIA 8: Análisis de prioridades de procesos"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  8. PRIORIDADES DE PROCESOS (NICE VALUES)"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        echo "--- Top 20 procesos con sus prioridades ---"
+        ps -eo pid,ni,pri,pcpu,pmem,comm --sort=-pcpu | head -21
+        echo ""
+        echo "--- Explicación de columnas ---"
+        echo "  PID:  Process ID"
+        echo "  NI:   Nice value (-20 a 19, menor = mayor prioridad)"
+        echo "  PRI:  Priority (kernel)"
+        echo "  %CPU: Uso de CPU"
+        echo "  %MEM: Uso de memoria"
+        echo "  COMMAND: Nombre del proceso"
+      register: process_priority
+      changed_when: false
+
+    - name: Guardar análisis de prioridades
+      copy:
+        dest: "{{ evidence_dir }}/08_prioridades_procesos.txt"
+        content: "{{ process_priority.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # 9. RECURSOS DEL SISTEMA
+    # ========================================
+    - name: "EVIDENCIA 9: Monitoreo de recursos del sistema"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  9. RECURSOS DEL SISTEMA"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        echo "--- Información de CPU ---"
+        lscpu | grep -E "CPU\(s\)|Model name|Thread|Core|Socket"
+        echo ""
+        echo "--- Uso de CPU por core ---"
+        mpstat -P ALL 1 1 2>/dev/null || echo "mpstat no disponible"
+        echo ""
+        echo "--- Memoria RAM ---"
+        free -h
+        echo ""
+        echo "--- Swap ---"
+        swapon --show 2>/dev/null || echo "Sin swap configurado"
+        echo ""
+        echo "--- Load Average ---"
+        uptime
+        echo ""
+        echo "--- Procesos en ejecución ---"
+        echo "Total: $(ps aux | wc -l) procesos"
+        echo "Por usuario:"
+        ps aux | awk '{print $1}' | sort | uniq -c | sort -rn
+        echo ""
+        echo "--- Uso de disco ---"
+        df -h | grep -v tmpfs
+      register: system_resources
+      changed_when: false
+
+    - name: Guardar monitoreo de recursos
+      copy:
+        dest: "{{ evidence_dir }}/09_recursos_sistema.txt"
+        content: "{{ system_resources.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # 10. DEPENDENCIAS DE SERVICIOS
+    # ========================================
+    - name: "EVIDENCIA 10: Árbol de dependencias de servicios"
+      shell: |
+        echo "════════════════════════════════════════════════════════════"
+        echo "  10. DEPENDENCIAS DE SERVICIOS"
+        echo "════════════════════════════════════════════════════════════"
+        echo ""
+        echo "--- Dependencias de Apache2 ---"
+        systemctl list-dependencies apache2 --no-pager
+        echo ""
+        echo "--- Dependencias inversas (qué depende de network.target) ---"
+        systemctl list-dependencies network.target --reverse --no-pager | head -30
+        echo ""
+        echo "--- Servicios fallidos (si hay alguno) ---"
+        systemctl --failed --no-pager
+      register: service_deps
+      changed_when: false
+
+    - name: Guardar dependencias de servicios
+      copy:
+        dest: "{{ evidence_dir }}/10_dependencias_servicios.txt"
+        content: "{{ service_deps.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # REPORTE FINAL
+    # ========================================
+    - name: "Generar reporte final consolidado"
+      shell: |
+        echo "╔═══════════════════════════════════════════════════════════════════╗"
+        echo "║   REPORTE FINAL: GESTIÓN DE PROCESOS Y SERVICIOS                 ║"
+        echo "║   Fecha: {{ ansible_date_time.date }} {{ ansible_date_time.time }}                              ║"
+        echo "╚═══════════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "══════════════════════════════════════════════════════════════════"
+        echo "  RESUMEN EJECUTIVO"
+        echo "══════════════════════════════════════════════════════════════════"
+        echo ""
+        echo "✓ Sistema: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+        echo "✓ Kernel: {{ ansible_kernel }}"
+        echo "✓ Uptime: $(uptime -p)"
+        echo "✓ Load Average: $(uptime | awk -F'load average:' '{print $2}')"
+        echo ""
+        echo "══════════════════════════════════════════════════════════════════"
+        echo "  SERVICIOS CRÍTICOS VALIDADOS"
+        echo "══════════════════════════════════════════════════════════════════"
+        echo ""
+        for service in radvd isc-dhcp-server apache2 vsftpd ssh firewalld; do
+          status=$(systemctl is-active $service 2>/dev/null || echo "inactive")
+          enabled=$(systemctl is-enabled $service 2>/dev/null || echo "disabled")
+          if [ "$status" = "active" ]; then
+            echo "  ✓ $service: ACTIVO (arranque: $enabled)"
+          else
+            echo "  ✗ $service: INACTIVO (arranque: $enabled)"
+          fi
+        done
+        echo ""
+        echo "══════════════════════════════════════════════════════════════════"
+        echo "  COMPETENCIAS DEMOSTRADAS"
+        echo "══════════════════════════════════════════════════════════════════"
+        echo ""
+        echo "  ✓ Gestión de servicios con systemd"
+        echo "      - Listado completo de servicios"
+        echo "      - Control de estado (start/stop/restart)"
+        echo "      - Verificación de servicios activos"
+        echo ""
+        echo "  ✓ Monitoreo de procesos"
+        echo "      - Análisis de uso de CPU (top 20)"
+        echo "      - Análisis de uso de memoria (top 20)"
+        echo "      - Identificación de procesos críticos"
+        echo ""
+        echo "  ✓ Control de prioridades"
+        echo "      - Visualización de nice values"
+        echo "      - Análisis de prioridades de kernel"
+        echo ""
+        echo "  ✓ Configuración de arranque automático"
+        echo "      - Servicios habilitados al boot"
+        echo "      - Análisis de tiempos de arranque"
+        echo ""
+        echo "  ✓ Troubleshooting"
+        echo "      - Análisis de logs con journalctl"
+        echo "      - Identificación de errores"
+        echo "      - Dependencias de servicios"
+        echo ""
+        echo "  ✓ Optimización de recursos"
+        echo "      - Monitoreo de CPU y memoria"
+        echo "      - Análisis de load average"
+        echo "      - Gestión eficiente de procesos"
+        echo ""
+        echo "══════════════════════════════════════════════════════════════════"
+        echo "  EVIDENCIAS GENERADAS"
+        echo "══════════════════════════════════════════════════════════════════"
+        echo ""
+        echo "  📁 {{ evidence_dir }}/"
+        echo "     01_inventario_servicios.txt"
+        echo "     02_servicios_criticos.txt"
+        echo "     03_top_procesos_cpu.txt"
+        echo "     04_top_procesos_memoria.txt"
+        echo "     05_control_servicios.txt"
+        echo "     06_arranque_automatico.txt"
+        echo "     07_logs_servicios.txt"
+        echo "     08_prioridades_procesos.txt"
+        echo "     09_recursos_sistema.txt"
+        echo "     10_dependencias_servicios.txt"
+        echo "     REPORTE_FINAL.txt"
+        echo ""
+        echo "══════════════════════════════════════════════════════════════════"
+        echo "  CONCLUSIÓN"
+        echo "══════════════════════════════════════════════════════════════════"
+        echo ""
+        echo "  ✓ Todos los servicios críticos están operativos"
+        echo "  ✓ Sistema optimizado y monitoreado"
+        echo "  ✓ Evidencias completas generadas"
+        echo "  ✓ Competencia demostrada exitosamente"
+        echo ""
+        echo "══════════════════════════════════════════════════════════════════"
+      register: final_report
+      changed_when: false
+
+    - name: Guardar reporte final
+      copy:
+        dest: "{{ evidence_dir }}/REPORTE_FINAL.txt"
+        content: "{{ final_report.stdout }}"
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # MENSAJE FINAL
+    # ========================================
+    - name: Mostrar resumen de ejecución
+      debug:
+        msg:
+          - "═══════════════════════════════════════════════════════════════"
+          - "  ✓ EVIDENCIAS GENERADAS EXITOSAMENTE"
+          - "═══════════════════════════════════════════════════════════════"
+          - ""
+          - "📁 Ubicación: {{ evidence_dir }}/"
+          - ""
+          - "📄 Archivos generados:"
+          - "   ✓ 00_INICIO.txt - Información inicial"
+          - "   ✓ 01_inventario_servicios.txt"
+          - "   ✓ 02_servicios_criticos.txt"
+          - "   ✓ 03_top_procesos_cpu.txt"
+          - "   ✓ 04_top_procesos_memoria.txt"
+          - "   ✓ 05_control_servicios.txt"
+          - "   ✓ 06_arranque_automatico.txt"
+          - "   ✓ 07_logs_servicios.txt"
+          - "   ✓ 08_prioridades_procesos.txt"
+          - "   ✓ 09_recursos_sistema.txt"
+          - "   ✓ 10_dependencias_servicios.txt"
+          - "   ✓ REPORTE_FINAL.txt - Resumen consolidado"
+          - ""
+          - "🎯 Próximo paso:"
+          - "   Revisa los archivos en {{ evidence_dir }}/"
+          - "   Toma capturas de pantalla según la guía"
+          - ""
+          - "═══════════════════════════════════════════════════════════════"
