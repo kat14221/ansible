@@ -1,0 +1,53 @@
+---
+all:
+  children:
+    # Configuración Windows - VARIANTE 1 (sin corchetes IPv6)
+    windows_test_v1:
+      hosts:
+        windows-pc-v1:
+          ansible_host: "2025:db8:101::11"
+          ansible_connection: winrm
+          ansible_winrm_transport: basic
+          ansible_winrm_server_cert_validation: ignore
+          ansible_port: 5985
+          ansible_user: ansible
+          ansible_password: "Ansible123!"
+          
+    # Configuración Windows - VARIANTE 2 (con corchetes IPv6)
+    windows_test_v2:
+      hosts:
+        windows-pc-v2:
+          ansible_host: "[2025:db8:101::11]"
+          ansible_connection: winrm
+          ansible_winrm_transport: basic
+          ansible_winrm_server_cert_validation: ignore
+          ansible_port: 5985
+          ansible_user: ansible
+          ansible_password: "Ansible123!"
+          
+    # Configuración Windows - VARIANTE 3 (NTLM en lugar de basic)
+    windows_test_v3:
+      hosts:
+        windows-pc-v3:
+          ansible_host: "2025:db8:101::11"
+          ansible_connection: winrm
+          ansible_winrm_transport: ntlm
+          ansible_winrm_server_cert_validation: ignore
+          ansible_port: 5985
+          ansible_user: ansible
+          ansible_password: "Ansible123!"
+          
+    # Configuración Windows - VARIANTE 4 (con timeouts explícitos)
+    windows_test_v4:
+      hosts:
+        windows-pc-v4:
+          ansible_host: "2025:db8:101::11"
+          ansible_connection: winrm
+          ansible_winrm_transport: basic
+          ansible_winrm_server_cert_validation: ignore
+          ansible_port: 5985
+          ansible_user: ansible
+          ansible_password: "Ansible123!"
+          ansible_winrm_operation_timeout_sec: 60
+          ansible_winrm_read_timeout_sec: 70
+          ansible_winrm_connection_timeout_sec: 30

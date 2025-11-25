@@ -1,0 +1,43 @@
+---
+- name: Test Windows variants
+  hosts: localhost
+  gather_facts: false
+  
+  tasks:
+    - name: Test Variant 1 - Sin corchetes IPv6
+      win_ping:
+      vars:
+        ansible_host: "2025:db8:101::11"
+        ansible_connection: winrm
+        ansible_winrm_transport: basic
+        ansible_winrm_server_cert_validation: ignore
+        ansible_port: 5985
+        ansible_user: ansible
+        ansible_password: "Ansible123!"
+      register: test_v1
+      ignore_errors: true
+      delegate_to: "2025:db8:101::11"
+      
+    - name: Test Variant 2 - Con corchetes IPv6  
+      win_ping:
+      vars:
+        ansible_host: "[2025:db8:101::11]"
+        ansible_connection: winrm
+        ansible_winrm_transport: basic
+        ansible_winrm_server_cert_validation: ignore
+        ansible_port: 5985
+        ansible_user: ansible
+        ansible_password: "Ansible123!"
+      register: test_v2
+      ignore_errors: true
+      delegate_to: "[2025:db8:101::11]"
+      
+    - name: Mostrar resultados
+      debug:
+        msg:
+          - "Variant 1 (sin corchetes): {{ 'SUCCESS' if test_v1 is succeeded else 'FAILED' }}"
+          - "Variant 2 (con corchetes): {{ 'SUCCESS' if test_v2 is succeeded else 'FAILED' }}"
+          - ""
+          - "Errores:"
+          - "V1: {{ test_v1.msg | default('OK') }}"
+          - "V2: {{ test_v2.msg | default('OK') }}"

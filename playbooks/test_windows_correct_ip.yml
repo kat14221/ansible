@@ -1,0 +1,42 @@
+---
+- name: Test Windows con IP correcta
+  hosts: windows_hosts
+  gather_facts: false
+  
+  tasks:
+    - name: Test ping con IP real de Windows
+      win_ping:
+      register: ping_result
+      timeout: 30
+      
+    - name: Mostrar resultado exitoso
+      debug:
+        msg:
+          - "✅ ¡CONEXIÓN WINDOWS EXITOSA!"
+          - "Host: {{ ansible_host }}"
+          - "Conectado correctamente por WinRM"
+      when: ping_result is succeeded
+      
+    - name: Test comando básico
+      win_shell: |
+        Write-Host "=== CONEXIÓN ANSIBLE EXITOSA ==="
+        Write-Host "Hostname: $env:COMPUTERNAME"
+        Write-Host "Usuario: $env:USERNAME" 
+        Write-Host "Fecha: $(Get-Date)"
+        Write-Host "IPv6 configurado:"
+        Get-NetIPAddress -AddressFamily IPv6 | Where-Object {$_.IPAddress -like "2025:*"} | Format-Table IPAddress
+      register: test_command
+      when: ping_result is succeeded
+      
+    - name: Mostrar información del sistema
+      debug:
+        msg: "{{ test_command.stdout_lines }}"
+      when: ping_result is succeeded and test_command is defined
+      
+    - name: Mostrar error si falla
+      debug:
+        msg:
+          - "❌ Conexión falló"
+          - "Error: {{ ping_result.msg | default('Timeout o error de conectividad') }}"
+          - "Verificar que WinRM esté configurado en Windows"
+      when: ping_result is failed
