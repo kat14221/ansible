@@ -1,0 +1,55 @@
+---
+- name: Gestión de seguridad por usuario (Linux) - Simplificado
+  hosts: debian_router
+  gather_facts: true
+  serial: 1
+  strategy: linear
+  vars:
+    ansible_ssh_timeout: 60
+    ansible_timeout: 120
+    
+  tasks:
+    - name: Test connectivity first
+      ping:
+      timeout: 30
+      
+    - name: Ensure remote dashboard directory exists
+      file:
+        path: /tmp/user_security_dashboard
+        state: directory
+        mode: 0750
+      become: true
+      timeout: 30
+
+    - name: Capture basic user info (simplified)
+      shell: |
+        echo "# Usuarios con shell valido" > /tmp/user_security_dashboard/01_usuarios.txt
+        getent passwd | head -20 >> /tmp/user_security_dashboard/01_usuarios.txt
+      become: true
+      timeout: 60
+      ignore_errors: true
+
+    - name: Capture basic group info
+      shell: |
+        echo "# Grupos basicos" > /tmp/user_security_dashboard/02_grupos.txt
+        getent group | head -10 >> /tmp/user_security_dashboard/02_grupos.txt
+      become: true
+      timeout: 60
+      ignore_errors: true
+
+    - name: Create simple dashboard
+      shell: |
+        echo "# Dashboard Basico de Seguridad" > /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
+        echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
+        echo "## Usuarios" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
+        cat /tmp/user_security_dashboard/01_usuarios.txt >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
+        echo "" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
+        echo "## Grupos" >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
+        cat /tmp/user_security_dashboard/02_grupos.txt >> /tmp/user_security_dashboard/SEGURIDAD_DASHBOARD.md
+      become: true
+      timeout: 30
+      ignore_errors: true
+
+    - name: Show completion message
+      debug:
+        msg: "Dashboard basico creado en /tmp/user_security_dashboard/"

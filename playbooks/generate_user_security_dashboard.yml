@@ -1,13 +1,25 @@
 ---
 - name: "Gestión de seguridad por usuario (Linux)"
   hosts: linux_servers
+  gather_facts: true
+  serial: 1
+  strategy: linear
   become: yes
+  vars:
+    ansible_ssh_timeout: 60
+    ansible_timeout: 120
   roles:
-    - user-security-hardening
-    - user-security-dashboard
+    - { role: user-security-hardening, ignore_errors: yes }
+    - { role: user-security-dashboard, ignore_errors: yes }
 
 - name: "Gestión de seguridad por usuario (Windows)"
   hosts: windows_hosts
+  gather_facts: true
+  serial: 1
+  strategy: linear
+  vars:
+    ansible_winrm_operation_timeout_sec: 120
+    ansible_winrm_read_timeout_sec: 150
   roles:
-    - user-security-hardening
-    - user-security-dashboard
+    - { role: user-security-hardening, ignore_errors: yes }
+    - { role: user-security-dashboard, ignore_errors: yes }

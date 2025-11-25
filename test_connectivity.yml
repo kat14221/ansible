@@ -1,0 +1,15 @@
+---
+- name: Test SSH connectivity to debian-router
+  hosts: debian-router
+  gather_facts: false
+  tasks:
+    - name: Simple ping test
+      ping:
+      
+    - name: Test basic command
+      shell: echo "Connection successful"
+      register: test_result
+      
+    - name: Show result
+      debug:
+        msg: "{{ test_result.stdout }}"
