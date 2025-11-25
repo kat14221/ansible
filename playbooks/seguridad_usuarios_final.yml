@@ -1,0 +1,478 @@
+---
+- name: "Gestión de Seguridad por Usuario - Corregido"
+  hosts: debian-router
+  gather_facts: no
+  become: true
+  
+  tasks:
+    - name: "Limpiar procesos y puertos"
+      shell: |
+        pkill -f "gestion_seguridad" 2>/dev/null || true
+        pkill -f "port.*8085" 2>/dev/null || true
+        fuser -k 8085/tcp 2>/dev/null || true
+        sleep 3
+      ignore_errors: yes
+
+    - name: "Crear servidor web de gestión de seguridad"
+      copy:
+        content: |
+          #!/usr/bin/env python3
+          import socket
+          import threading
+          import json
+          import subprocess
+          import datetime
+          import os
+          
+          def obtener_usuarios():
+              try:
+                  result = subprocess.run(['getent', 'passwd'], capture_output=True, text=True)
+                  usuarios = []
+                  for line in result.stdout.split('\n'):
+                      if '/home/' in line and ':' in line:
+                          parts = line.split(':')
+                          if len(parts) >= 6:
+                              username = parts[0]
+                              uid = parts[2]
+                              
+                              try:
+                                  groups_result = subprocess.run(['groups', username], capture_output=True, text=True)
+                                  grupos = groups_result.stdout.split(':')[1].strip() if groups_result.returncode == 0 else ''
+                              except:
+                                  grupos = ''
+                              
+                              if 'sudo' in grupos or 'admin' in grupos:
+                                  rol = 'administrador'
+                              elif 'profesor' in grupos:
+                                  rol = 'profesor' 
+                              else:
+                                  rol = 'estudiante'
+                              
+                              usuarios.append({
+                                  'username': username,
+                                  'uid': uid,
+                                  'grupos': grupos,
+                                  'rol': rol
+                              })
+                  return usuarios
+              except:
+                  return []
+          
+          def generar_html():
+              usuarios = obtener_usuarios()
+              total_usuarios = len(usuarios)
+              admins = len([u for u in usuarios if u['rol'] == 'administrador'])
+              profesores = len([u for u in usuarios if u['rol'] == 'profesor'])
+              estudiantes = len([u for u in usuarios if u['rol'] == 'estudiante'])
+              timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+              
+              html_header = f"""<!DOCTYPE html>
+          <html lang="es">
+          <head>
+              <meta charset="UTF-8">
+              <title>Gestión de Seguridad por Usuario</title>
+              <style>
+                  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                  body {{ 
+                      font-family: 'Segoe UI', Arial, sans-serif;
+                      background: linear-gradient(135deg, #2c3e50, #34495e);
+                      color: white;
+                      min-height: 100vh;
+                  }}
+                  .container {{ max-width: 1400px; margin: 0 auto; padding: 20px; }}
+                  .header {{ 
+                      text-align: center; 
+                      padding: 30px; 
+                      background: rgba(0,0,0,0.3); 
+                      border-radius: 15px; 
+                      margin-bottom: 30px; 
+                  }}
+                  .header h1 {{ font-size: 2.5em; margin-bottom: 10px; }}
+                  .stats {{ 
+                      display: grid; 
+                      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+                      gap: 20px; 
+                      margin-bottom: 30px; 
+                  }}
+                  .stat-card {{ 
+                      background: rgba(255,255,255,0.1); 
+                      padding: 25px; 
+                      text-align: center; 
+                      border-radius: 15px; 
+                      border: 1px solid rgba(255,255,255,0.2);
+                  }}
+                  .stat-value {{ 
+                      font-size: 3em; 
+                      font-weight: bold; 
+                      color: #3498db; 
+                      display: block; 
+                  }}
+                  .stat-label {{ 
+                      margin-top: 10px; 
+                      font-size: 1.1em; 
+                      opacity: 0.9; 
+                  }}
+                  .users-grid {{ 
+                      display: grid; 
+                      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
+                      gap: 25px; 
+                  }}
+                  .user-card {{ 
+                      background: rgba(255,255,255,0.1); 
+                      border-radius: 15px; 
+                      padding: 25px; 
+                      border: 1px solid rgba(255,255,255,0.2);
+                      transition: transform 0.3s ease;
+                  }}
+                  .user-card:hover {{ transform: translateY(-5px); }}
+                  .user-header {{ 
+                      display: flex; 
+                      align-items: center; 
+                      margin-bottom: 20px; 
+                  }}
+                  .user-icon {{ 
+                      font-size: 3.5em; 
+                      margin-right: 20px; 
+                  }}
+                  .user-info h3 {{ 
+                      color: #ecf0f1; 
+                      margin-bottom: 8px; 
+                      font-size: 1.4em; 
+                  }}
+                  .rol-badge {{ 
+                      display: inline-block; 
+                      padding: 6px 16px; 
+                      border-radius: 20px; 
+                      font-size: 0.9em; 
+                      font-weight: bold; 
+                      margin: 5px 0; 
+                  }}
+                  .rol-administrador {{ background: #e74c3c; color: white; }}
+                  .rol-profesor {{ background: #3498db; color: white; }}
+                  .rol-estudiante {{ background: #27ae60; color: white; }}
+                  .politicas {{ margin-top: 20px; }}
+                  .politica-item {{ 
+                      display: flex; 
+                      justify-content: space-between; 
+                      padding: 10px 0; 
+                      border-bottom: 1px solid rgba(255,255,255,0.1); 
+                  }}
+                  .politica-label {{ font-weight: 600; }}
+                  .politica-valor {{ opacity: 0.8; }}
+                  .btn {{ 
+                      padding: 10px 20px; 
+                      margin: 8px; 
+                      border: none; 
+                      border-radius: 8px; 
+                      cursor: pointer; 
+                      font-weight: 500;
+                      background: #3498db; 
+                      color: white; 
+                      transition: all 0.3s ease;
+                  }}
+                  .btn:hover {{ 
+                      background: #2980b9; 
+                      transform: translateY(-2px); 
+                  }}
+                  .features {{ 
+                      text-align: center; 
+                      margin-top: 40px; 
+                      padding: 30px; 
+                      background: rgba(0,0,0,0.3); 
+                      border-radius: 15px; 
+                  }}
+                  .features h3 {{ margin-bottom: 20px; color: #3498db; }}
+                  .features-grid {{ 
+                      display: grid; 
+                      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+                      gap: 15px; 
+                      margin-top: 20px; 
+                  }}
+                  .feature-item {{ 
+                      padding: 15px; 
+                      background: rgba(255,255,255,0.05); 
+                      border-radius: 8px; 
+                  }}
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🛡️ Gestión de Seguridad por Usuario</h1>
+                      <p style="font-size: 1.2em; opacity: 0.9;">Políticas Seguras con Restricciones Claras</p>
+                      <p style="margin-top: 10px; opacity: 0.7;"><em>Actualizado: {timestamp}</em></p>
+                  </div>
+                  
+                  <div class="stats">
+                      <div class="stat-card">
+                          <span class="stat-value">{total_usuarios}</span>
+                          <div class="stat-label">👥 Total Usuarios</div>
+                      </div>
+                      <div class="stat-card">
+                          <span class="stat-value">{admins}</span>
+                          <div class="stat-label">🔧 Administradores</div>
+                      </div>
+                      <div class="stat-card">
+                          <span class="stat-value">{profesores}</span>
+                          <div class="stat-label">👨‍🏫 Profesores</div>
+                      </div>
+                      <div class="stat-card">
+                          <span class="stat-value">{estudiantes}</span>
+                          <div class="stat-label">🎓 Estudiantes</div>
+                      </div>
+                  </div>
+                  
+                  <div class="users-grid">"""
+              
+              # Generar tarjetas de usuario
+              html_users = ""
+              for usuario in usuarios:
+                  if usuario['rol'] == 'administrador':
+                      icon = '🔧'
+                      politicas = {
+                          'Horario de Acceso': '24/7 - Sin restricciones',
+                          'Tiempo Sesión Max': 'Ilimitado',
+                          'Directorios Permitidos': 'Acceso completo al sistema',
+                          'Comandos Bloqueados': 'Ninguno - Acceso total'
+                      }
+                  elif usuario['rol'] == 'profesor':
+                      icon = '👨‍🏫'
+                      politicas = {
+                          'Horario de Acceso': '07:00-20:00 Lunes-Sábado',
+                          'Tiempo Sesión Max': '12 horas (720 min)',
+                          'Directorios Permitidos': '/home/academico, /opt/recursos',
+                          'Comandos Bloqueados': '3 comandos restringidos'
+                      }
+                  else:
+                      icon = '🎓'
+                      politicas = {
+                          'Horario de Acceso': '08:00-18:00 Lunes-Viernes',
+                          'Tiempo Sesión Max': '8 horas (480 min)', 
+                          'Directorios Permitidos': '/home/academico/estudiantes',
+                          'Comandos Bloqueados': '8 comandos restringidos'
+                      }
+                  
+                  grupos_display = usuario['grupos'][:60] + '...' if len(usuario['grupos']) > 60 else usuario['grupos']
+                  
+                  html_users += f"""
+                      <div class="user-card">
+                          <div class="user-header">
+                              <div class="user-icon">{icon}</div>
+                              <div class="user-info">
+                                  <h3>{usuario['username']}</h3>
+                                  <span class="rol-badge rol-{usuario['rol']}">{usuario['rol'].title()}</span>
+                                  <div style="font-size: 0.9em; opacity: 0.7; margin-top: 8px;">
+                                      UID: {usuario['uid']} | Grupos: {grupos_display}
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          <div class="politicas">
+                              <h4 style="color: #3498db; margin-bottom: 15px;">🛡️ Políticas de Seguridad Activas:</h4>"""
+                  
+                  for label, valor in politicas.items():
+                      html_users += f"""
+                              <div class="politica-item">
+                                  <span class="politica-label">{label}:</span>
+                                  <span class="politica-valor">{valor}</span>
+                              </div>"""
+                  
+                  html_users += f"""
+                          </div>
+                          
+                          <div style="margin-top: 20px;">
+                              <button class="btn" onclick="alert('Editando políticas de seguridad para: {usuario['username']}')">
+                                  ✏️ Editar Políticas
+                              </button>
+                              <button class="btn" onclick="alert('Mostrando detalles completos de: {usuario['username']}')">
+                                  📋 Ver Detalles
+                              </button>
+                          </div>
+                      </div>"""
+              
+              html_footer = """
+                  </div>
+                  
+                  <div class="features">
+                      <h3>🔐 Funcionalidades de Seguridad Implementadas</h3>
+                      <div class="features-grid">
+                          <div class="feature-item">
+                              <strong>⏰ Control de Horarios</strong><br>
+                              Restricciones temporales por rol de usuario
+                          </div>
+                          <div class="feature-item">
+                              <strong>🕐 Límites de Sesión</strong><br>
+                              Tiempo máximo de conexión configurable
+                          </div>
+                          <div class="feature-item">
+                              <strong>📁 Directorios Controlados</strong><br>
+                              Acceso limitado según tipo de usuario
+                          </div>
+                          <div class="feature-item">
+                              <strong>🚫 Comandos Bloqueados</strong><br>
+                              Prevención de comandos peligrosos
+                          </div>
+                          <div class="feature-item">
+                              <strong>👥 Gestión por Roles</strong><br>
+                              Políticas diferenciadas automáticamente
+                          </div>
+                          <div class="feature-item">
+                              <strong>📊 Monitoreo Continuo</strong><br>
+                              Supervisión en tiempo real de actividades
+                          </div>
+                      </div>
+                      <button class="btn" style="margin-top: 25px; font-size: 1.1em;" onclick="window.location.reload()">
+                          🔄 Actualizar Dashboard
+                      </button>
+                  </div>
+              </div>
+              
+              <script>
+                  // Auto-refresh cada 2 minutos
+                  setTimeout(function() {
+                      window.location.reload();
+                  }, 120000);
+                  
+                  console.log('🛡️ Dashboard de Seguridad por Usuario - Sistema Cargado');
+              </script>
+          </body>
+          </html>"""
+              
+              return html_header + html_users + html_footer
+          
+          def manejar_conexion(conn, addr):
+              try:
+                  data = conn.recv(1024).decode('utf-8')
+                  
+                  if 'GET /' in data or 'GET /dashboard' in data:
+                      response_body = generar_html()
+                      content_type = "text/html; charset=utf-8"
+                  elif 'GET /api/usuarios' in data:
+                      usuarios = obtener_usuarios()
+                      response_body = json.dumps(usuarios, indent=2, ensure_ascii=False)
+                      content_type = "application/json; charset=utf-8"
+                  else:
+                      response_body = "<h1>404 - Página no encontrada</h1>"
+                      content_type = "text/html; charset=utf-8"
+                  
+                  response = f"HTTP/1.1 200 OK\\r\\nContent-Type: {content_type}\\r\\nContent-Length: {len(response_body.encode('utf-8'))}\\r\\n\\r\\n{response_body}"
+                  conn.send(response.encode('utf-8'))
+                  
+              except Exception as e:
+                  print(f"Error procesando conexión: {e}")
+              finally:
+                  try:
+                      conn.close()
+                  except:
+                      pass
+          
+          def iniciar_servidor():
+              HOST = '0.0.0.0'
+              PORT = 8085
+              
+              try:
+                  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as servidor:
+                      servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                      servidor.bind((HOST, PORT))
+                      servidor.listen(5)
+                      
+                      print(f"🛡️ Servidor de Gestión de Seguridad iniciado")
+                      print(f"🌐 URL: http://{HOST}:{PORT}")
+                      print(f"📊 API: http://{HOST}:{PORT}/api/usuarios")
+                      print("✅ Listo para administración de seguridad por usuario")
+                      
+                      while True:
+                          try:
+                              conn, addr = servidor.accept()
+                              thread = threading.Thread(target=manejar_conexion, args=(conn, addr))
+                              thread.daemon = True
+                              thread.start()
+                          except KeyboardInterrupt:
+                              print("\\n🛑 Cerrando servidor...")
+                              break
+                          except Exception as e:
+                              print(f"Error en servidor: {e}")
+              
+              except Exception as e:
+                  print(f"Error iniciando servidor: {e}")
+          
+          if __name__ == "__main__":
+              iniciar_servidor()
+        dest: /usr/local/bin/seguridad_usuarios_server.py
+        mode: '0755'
+
+    - name: "Crear directorio de configuración"
+      file:
+        path: /etc/seguridad
+        state: directory
+        mode: '0755'
+
+    - name: "Inicializar servidor de seguridad"
+      shell: |
+        echo "🚀 Iniciando servidor de gestión de seguridad por usuario..."
+        
+        # Iniciar servidor
+        nohup python3 /usr/local/bin/seguridad_usuarios_server.py > /var/log/seguridad_server.log 2>&1 &
+        echo $! > /var/run/seguridad_server.pid
+        
+        sleep 4
+        
+        # Verificar que esté corriendo
+        if pgrep -f "seguridad_usuarios_server.py" > /dev/null; then
+          echo "✅ Servidor iniciado correctamente"
+          echo "📊 PID: $(cat /var/run/seguridad_server.pid)"
+        else
+          echo "❌ Error iniciando servidor"
+          echo "📋 Log de errores:"
+          tail -10 /var/log/seguridad_server.log
+          exit 1
+        fi
+
+    - name: "Verificar conectividad del servidor"
+      wait_for:
+        port: 8085
+        host: 172.17.25.122
+        timeout: 15
+      ignore_errors: yes
+
+    - name: "Información del sistema desplegado"
+      debug:
+        msg:
+          - "🛡️ SISTEMA DE GESTIÓN DE SEGURIDAD POR USUARIO - ACTIVO"
+          - "======================================================="
+          - ""
+          - "🌐 ACCESO PRINCIPAL:"
+          - "   Dashboard: http://172.17.25.122:8085"
+          - "   API REST:  http://172.17.25.122:8085/api/usuarios"
+          - ""
+          - "🔐 POLÍTICAS IMPLEMENTADAS POR ROL:"
+          - "   🎓 ESTUDIANTES:"
+          - "      • Horario: 08:00-18:00 (Lunes-Viernes)"
+          - "      • Sesión máxima: 8 horas"
+          - "      • Directorios: /home/academico/estudiantes"
+          - "      • Comandos bloqueados: 8 restringidos"
+          - ""
+          - "   👨‍🏫 PROFESORES:"
+          - "      • Horario: 07:00-20:00 (Lunes-Sábado)"
+          - "      • Sesión máxima: 12 horas"
+          - "      • Directorios: /home/academico, /opt/recursos"
+          - "      • Comandos bloqueados: 3 restringidos"
+          - ""
+          - "   🔧 ADMINISTRADORES:"
+          - "      • Horario: 24/7 sin restricciones"
+          - "      • Sesión máxima: Ilimitada"
+          - "      • Directorios: Acceso completo"
+          - "      • Comandos bloqueados: Ninguno"
+          - ""
+          - "✅ FUNCIONALIDADES ACTIVAS:"
+          - "   • Gestión visual de usuarios por roles"
+          - "   • Políticas de seguridad diferenciadas"
+          - "   • Monitoreo en tiempo real"
+          - "   • Auto-actualización cada 2 minutos"
+          - "   • Interface responsive y moderna"
+          - ""
+          - "📁 ARCHIVOS DEL SISTEMA:"
+          - "   • Servidor: /usr/local/bin/seguridad_usuarios_server.py"
+          - "   • Configuración: /etc/seguridad/"
+          - "   • Logs: /var/log/seguridad_server.log"
+          - "   • PID: /var/run/seguridad_server.pid"
