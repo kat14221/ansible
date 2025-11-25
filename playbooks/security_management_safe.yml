@@ -402,15 +402,18 @@
         # Buscar y terminar procesos anteriores de forma segura
         if pgrep -f "security_app.py" > /dev/null; then
           echo "Terminando procesos anteriores..."
-          pkill -f "security_app.py"
+          pkill -f "security_app.py" || true
           sleep 2
+          echo "Procesos terminados exitosamente"
         else
           echo "No hay procesos anteriores ejecutándose"
         fi
         # Limpiar archivos PID antiguos
         rm -f /home/ansible/app.pid
+        echo "Limpieza completada"
       become: false
-      ignore_errors: yes
+      failed_when: false
+      changed_when: false
 
     - name: Verificar que Python3 y Flask funcionan
       shell: |
