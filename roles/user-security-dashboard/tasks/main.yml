@@ -109,6 +109,150 @@
     EOF
   become: yes
 
+- name: Load usuarios section
+  slurp:
+    src: /tmp/user_security_dashboard/01_usuarios.txt
+  register: usuarios_raw
+  become: yes
+
+- name: Load grupos section
+  slurp:
+    src: /tmp/user_security_dashboard/02_grupos.txt
+  register: grupos_raw
+  become: yes
+
+- name: Load contraseñas section
+  slurp:
+    src: /tmp/user_security_dashboard/03_politica_contrasenas.txt
+  register: contrasenas_raw
+  become: yes
+
+- name: Load sudo section
+  slurp:
+    src: /tmp/user_security_dashboard/04_sudo_policies.txt
+  register: sudo_raw
+  become: yes
+
+- name: Load ACL section
+  slurp:
+    src: /tmp/user_security_dashboard/05_acl_evidence.txt
+  register: acl_raw
+  become: yes
+
+- name: Load audit section
+  slurp:
+    src: /tmp/user_security_dashboard/06_audit_rules.txt
+  register: audit_raw
+  become: yes
+
+- name: Ensure dashboard web root exists
+  file:
+    path: "{{ security_dashboard_site_dir }}"
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Publish HTML dashboard
+  template:
+    src: security_dashboard.html.j2
+    dest: "{{ security_dashboard_site_dir }}/index.html"
+    mode: '0644'
+  become: yes
+
+- name: Install systemd service for dashboard
+  template:
+    src: security-dashboard.service.j2
+    dest: "/etc/systemd/system/{{ security_dashboard_service_name }}.service"
+    mode: '0644'
+  become: yes
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Ensure dashboard service is running
+  systemd:
+    name: "{{ security_dashboard_service_name }}"
+    state: restarted
+    enabled: yes
+  become: yes
+
+- name: Check nftables table for dashboard
+  command:
+    argv:
+      - nft
+      - list
+      - table
+      - inet
+      - ansible
+  register: user_dash_nft_table
+  failed_when: false
+  changed_when: false
+  become: yes
+
+- name: Create nftables table for dashboard when missing
+  command:
+    argv:
+      - nft
+      - add
+      - table
+      - inet
+      - ansible
+  when: user_dash_nft_table.rc != 0
+  become: yes
+
+- name: Check nftables chain for dashboard
+  command:
+    argv:
+      - nft
+      - list
+      - chain
+      - inet
+      - ansible
+      - input
+  register: user_dash_nft_chain
+  failed_when: false
+  changed_when: false
+  become: yes
+
+- name: Create nftables chain for dashboard when missing
+  command:
+    argv:
+      - nft
+      - add
+      - chain
+      - inet
+      - ansible
+      - input
+      - '{ type filter hook input priority 0; policy drop; }'
+  when: user_dash_nft_chain.rc != 0
+  become: yes
+
+- name: Check firewall rule for dashboard port
+  shell: "nft list chain inet ansible input | grep -q 'tcp dport {{ security_dashboard_port }}'"
+  register: user_dash_rule
+  failed_when: false
+  changed_when: false
+  become: yes
+
+- name: Add firewall rule for dashboard port
+  command:
+    argv:
+      - nft
+      - add
+      - rule
+      - inet
+      - ansible
+      - input
+      - tcp
+      - dport
+      - "{{ security_dashboard_port }}"
+      - counter
+      - accept
+  when: user_dash_rule.rc != 0
+  become: yes
+
 - name: Ensure local evidence base directory exists
   delegate_to: localhost
   file:
@@ -142,5 +286,6 @@
 - name: Show summary
   debug:
     msg:
-      - "📁 Evidencias descargadas en evidence/gestion_seguridad/{{ inventory_hostname }}"
+      - "📁 Evidencias descargadas en evidence/gestion-seguridad/{{ inventory_hostname }}"
       - "Incluye SEGURIDAD_DASHBOARD.md y archivos fuente (users, groups, sudo, ACL, audit)"
+      - "🌐 Dashboard visual: http://{{ ansible_host | default(inventory_hostname) }}:{{ security_dashboard_port }}"

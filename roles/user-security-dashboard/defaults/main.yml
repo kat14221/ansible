@@ -1,0 +1,5 @@
+---
+security_dashboard_site_dir: /srv/security-dashboard
+security_dashboard_port: 8088
+security_dashboard_service_name: security-dashboard
+security_dashboard_service_user: root

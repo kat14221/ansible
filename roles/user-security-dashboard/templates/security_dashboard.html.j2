@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard de Gestión de Seguridad por Usuario</title>
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; margin: 0; background-color: #10121a; color: #f4f4f4; }
+    header { background: #1f8ef1; padding: 1.5rem; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+    header h1 { margin: 0; font-size: 1.6rem; }
+    header p { margin: 0.25rem 0 0; font-size: 0.9rem; }
+    main { padding: 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.2rem; }
+    section { background: #161a27; border-radius: 10px; padding: 1rem; box-shadow: 0 0 15px rgba(0,0,0,.15); border: 1px solid rgba(255,255,255,.08); }
+    section h2 { margin-top: 0; font-size: 1.1rem; color: #5fd1ff; letter-spacing: 0.05rem; }
+    pre { white-space: pre-wrap; word-break: break-word; background: rgba(255,255,255,.04); border-radius: 6px; padding: 0.6rem; max-height: 320px; overflow-y: auto; }
+    footer { text-align: center; padding: 1rem; font-size: 0.8rem; background: #0c0e16; border-top: 1px solid rgba(255,255,255,.05); }
+    .tag { display: inline-block; background: rgba(255,255,255,.15); padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.75rem; margin-right: 0.3rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Gestión de seguridad por usuario</h1>
+    <p>Última actualización: {{ ansible_date_time.iso8601 }} &middot; Nodo: {{ inventory_hostname }}</p>
+    <p>
+      <span class="tag">Usuarios</span>
+      <span class="tag">Permisos</span>
+      <span class="tag">Políticas</span>
+      <span class="tag">Auditoría</span>
+    </p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Usuarios con shell válido</h2>
+      <pre>{{ usuarios_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>2. Grupos críticos</h2>
+      <pre>{{ grupos_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>3. Políticas de contraseña</h2>
+      <pre>{{ contrasenas_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>4. Reglas sudo delegadas</h2>
+      <pre>{{ sudo_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>5. ACL sobre repositorio de evidencias</h2>
+      <pre>{{ acl_raw.content | b64decode }}</pre>
+    </section>
+
+    <section>
+      <h2>6. Auditoría activa</h2>
+      <pre>{{ audit_raw.content | b64decode }}</pre>
+    </section>
+  </main>
+
+  <footer>
+    Generado automáticamente por Ansible · Rol user-security-dashboard
+  </footer>
+</body>
+</html>

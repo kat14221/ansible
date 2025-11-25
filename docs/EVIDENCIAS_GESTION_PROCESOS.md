@@ -1092,17 +1092,21 @@ administrativas.
 
 #### Automatización y Dashboard Generado
 
-Para consolidar la evidencia técnica, construí el playbook `playbooks/generate_user_security_dashboard.yml` que aplica el rol `user-security-dashboard`. Este rol recolecta información clave desde el router (`getent passwd/group`, `chage`, `sudoers`, `getfacl`, `auditctl`) y genera el archivo `SEGURIDAD_DASHBOARD.md` junto con cada fuente sin procesar en `evidence/gestion_seguridad/debian-router/`.
+Para consolidar la evidencia técnica, construí el playbook `playbooks/generate_user_security_dashboard.yml` que aplica el rol `user-security-dashboard`. Este rol recolecta información clave desde el router (`getent passwd/group`, `chage`, `sudoers`, `getfacl`, `auditctl`), genera el archivo `SEGURIDAD_DASHBOARD.md` junto con cada fuente sin procesar en `evidence/gestion-seguridad/debian-router/` **y** levanta un dashboard visual auto-actualizable servido desde `/srv/security-dashboard` por medio de un servicio systemd (`security-dashboard.service`).
 
 **Ejecución:**
 
 ```bash
 cd ~/ansible
 ansible-playbook playbooks/generate_user_security_dashboard.yml -i inventory/hosts.yml -l debian_router -vv
-ls evidence/gestion_seguridad/debian-router/
+ls evidence/gestion-seguridad/debian-router/
+
+# Validar servicio web expuesto
+sudo systemctl status security-dashboard.service
+curl -I http://$(ansible-inventory -i inventory/hosts.yml --host debian_router | awk -F': ' '/ansible_host/ {print $2}'):8088
 ```
 
-**Figura 12B - Dashboard de seguridad por usuario**
+**Figura 12B - Dashboard de seguridad por usuario (Markdown)**
 
 - Mostrar `SEGURIDAD_DASHBOARD.md` (o abrirlo en VS Code) donde se aprecian las secciones de usuarios, grupos, políticas de contraseña, sudoers, ACLs y reglas de auditoría.
 - Adjuntar captura del terminal evidenciando la ejecución del playbook (tareas `user-security-dashboard`).
@@ -1122,6 +1126,31 @@ identidad.
 Gracias a esta automatización puedo regenerar la evidencia en segundos y
 garantizar que las restricciones definidas (ACLs, sudoers, expiración de
 contraseñas) se mantengan alineadas con las políticas del laboratorio.
+```
+
+**Figura 12C - Dashboard visual en el navegador**
+
+- Abrir `http://172.17.25.126:8088` (o `http://[2025:db8:101::1]:8088`) desde la red de gestión.
+- Mostrar las tarjetas del dashboard resaltando “Usuarios con shell válido”, “Grupos críticos”, “Políticas de contraseña”, “Reglas sudo” y “Auditoría activa”.
+- Señalar la etiqueta de última actualización y el host monitoreado.
+
+**Texto sugerido:**
+
+```
+FIGURA 12C: Dashboard visual y auto-actualizable de seguridad por usuario
+
+El rol user-security-dashboard ahora publica un sitio estático en
+http://debian-router:8088 utilizando un servicio systemd dedicado. Cada
+ejecución del playbook regenera el HTML a partir de la misma evidencia
+empleada en el informe Markdown, por lo que el tablero refleja en tiempo
+real la situación de usuarios, grupos, políticas de contraseña, reglas
+sudo, ACLs y auditoría.
+
+Desde este tablero puedo demostrar la administración de usuarios, permisos
+y políticas con un formato visual que facilita la inspección rápida durante
+auditorías o sustentaciones. El servicio queda activo al arranque del
+servidor y protegido por nftables, garantizando acceso controlado y
+automatizado.
 ```
 ```
 

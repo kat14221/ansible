@@ -1,0 +1,15 @@
+[Unit]
+Description=User Security Dashboard static site
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory={{ security_dashboard_site_dir }}
+ExecStart=/usr/bin/python3 -m http.server {{ security_dashboard_port }}
+Restart=on-failure
+User={{ security_dashboard_service_user }}
+Group={{ security_dashboard_service_user }}
+
+[Install]
+WantedBy=multi-user.target
