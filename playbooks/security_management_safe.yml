@@ -383,19 +383,72 @@
         owner: ansible
         group: ansible
 
-    - name: Ejecutar aplicación
+    - name: Verificar sintaxis del archivo Python
       shell: |
         cd /home/ansible
-        pkill -f "python3 security_app.py" || true
-        nohup python3 security_app.py > security_app.log 2>&1 &
-        sleep 3
+        python3 -m py_compile security_app.py
+        echo "Sintaxis Python OK"
+        wc -l security_app.py
+        tail -5 security_app.py
+      become: false
+      register: python_check
+
+    - name: Mostrar verificación Python
+      debug:
+        var: python_check.stdout_lines
+
+    - name: Detener procesos anteriores
+      shell: |
+        pkill -f "security_app.py" || true
+        sleep 2
+      become: false
+      ignore_errors: yes
+
+    - name: Verificar que Python3 y Flask funcionan
+      shell: |
+        cd /home/ansible
+        python3 -c "import flask; print('Flask OK')"
+        python3 -c "import subprocess; print('Subprocess OK')"
+        ls -la security_app.py
       become: false
 
-    - name: Verificar puerto
-      wait_for:
-        port: 8090
-        host: "{{ ansible_default_ipv4.address }}"
-        timeout: 30
+    - name: Ejecutar aplicación en background
+      shell: |
+        cd /home/ansible
+        python3 security_app.py &
+        echo $! > app.pid
+        sleep 5
+      become: false
+      async: 30
+      poll: 0
+
+    - name: Esperar inicio de aplicación
+      pause:
+        seconds: 3
+
+    - name: Verificar que la aplicación está ejecutándose
+      shell: |
+        cd /home/ansible
+        if [ -f app.pid ]; then
+          pid=$(cat app.pid)
+          if ps -p $pid > /dev/null; then
+            echo "Aplicación ejecutándose con PID: $pid"
+            netstat -tuln | grep 8090 && echo "Puerto 8090 activo" || echo "Puerto 8090 no disponible"
+          else
+            echo "Error: Proceso no encontrado"
+            cat security_app.log 2>/dev/null || echo "No hay log disponible"
+            exit 1
+          fi
+        else
+          echo "Error: No se creó el archivo PID"
+          exit 1
+        fi
+      become: false
+      register: app_status
+
+    - name: Mostrar estado de la aplicación
+      debug:
+        var: app_status.stdout_lines
 
     - name: Mostrar información
       debug:
