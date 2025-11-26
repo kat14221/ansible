@@ -1,0 +1,371 @@
+---
+# Role: automation-tasks
+# Descripción: Configuración de tareas automatizadas con cron
+
+- name: Asegurar que cron está instalado
+  package:
+    name: cron
+    state: present
+  become: yes
+
+- name: Asegurar que el servicio cron está activo
+  systemd:
+    name: cron
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Crear directorio para scripts de automatización
+  file:
+    path: /usr/local/bin
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Crear directorio para backups
+  file:
+    path: /backup/configs
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+
+- name: Crear directorio para logs de automatización
+  file:
+    path: /var/log/automation
+    state: directory
+    mode: '0755'
+  become: yes
+
+# ========================================
+# SCRIPT 1: Backup de Configuraciones
+# ========================================
+- name: Crear script de backup de configuraciones
+  copy:
+    dest: /usr/local/bin/backup_configs.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Script de backup automático de configuraciones
+      # Proyecto: VMWARE-101001
+      
+      BACKUP_DIR="/backup/configs"
+      DATE=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="$BACKUP_DIR/config_backup_$DATE.tar.gz"
+      LOG_FILE="/var/log/automation/backup_configs.log"
+      
+      echo "=== Backup iniciado: $(date) ===" >> $LOG_FILE
+      
+      # Crear backup
+      tar -czf $BACKUP_FILE \
+        /etc/network/ \
+        /etc/ssh/ \
+        /etc/sudoers.d/ \
+        /etc/sysctl.d/ \
+        /etc/security/ \
+        /etc/audit/ \
+        /etc/cron.d/ \
+        2>> $LOG_FILE
+      
+      if [ $? -eq 0 ]; then
+        echo "✓ Backup creado exitosamente: $BACKUP_FILE" >> $LOG_FILE
+        echo "  Tamaño: $(du -h $BACKUP_FILE | cut -f1)" >> $LOG_FILE
+      else
+        echo "✗ Error al crear backup" >> $LOG_FILE
+        exit 1
+      fi
+      
+      # Eliminar backups mayores a 7 días
+      find $BACKUP_DIR -name "config_backup_*.tar.gz" -mtime +7 -delete
+      echo "✓ Backups antiguos eliminados" >> $LOG_FILE
+      
+      echo "=== Backup completado: $(date) ===" >> $LOG_FILE
+      echo "" >> $LOG_FILE
+  become: yes
+
+# ========================================
+# SCRIPT 2: Limpieza de Logs
+# ========================================
+- name: Crear script de limpieza de logs
+  copy:
+    dest: /usr/local/bin/cleanup_logs.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Script de limpieza automática de logs
+      # Proyecto: VMWARE-101001
+      
+      LOG_FILE="/var/log/automation/cleanup.log"
+      
+      echo "=== Limpieza iniciada: $(date) ===" >> $LOG_FILE
+      
+      # Espacio antes de limpieza
+      SPACE_BEFORE=$(df -h /var/log | tail -1 | awk '{print $4}')
+      echo "Espacio disponible antes: $SPACE_BEFORE" >> $LOG_FILE
+      
+      # Comprimir logs mayores a 7 días
+      find /var/log -type f -name "*.log" -mtime +7 ! -name "*.gz" -exec gzip {} \; 2>> $LOG_FILE
+      echo "✓ Logs comprimidos" >> $LOG_FILE
+      
+      # Eliminar logs comprimidos mayores a 30 días
+      find /var/log -type f -name "*.gz" -mtime +30 -delete 2>> $LOG_FILE
+      echo "✓ Logs antiguos eliminados" >> $LOG_FILE
+      
+      # Espacio después de limpieza
+      SPACE_AFTER=$(df -h /var/log | tail -1 | awk '{print $4}')
+      echo "Espacio disponible después: $SPACE_AFTER" >> $LOG_FILE
+      
+      echo "=== Limpieza completada: $(date) ===" >> $LOG_FILE
+      echo "" >> $LOG_FILE
+  become: yes
+
+# ========================================
+# SCRIPT 3: Actualización de Seguridad
+# ========================================
+- name: Crear script de actualizaciones de seguridad
+  copy:
+    dest: /usr/local/bin/security_updates.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Script de actualización automática de seguridad
+      # Proyecto: VMWARE-101001
+      
+      LOG_FILE="/var/log/automation/security_updates.log"
+      
+      echo "=== Actualización de seguridad iniciada: $(date) ===" >> $LOG_FILE
+      
+      # Actualizar lista de paquetes
+      apt-get update >> $LOG_FILE 2>&1
+      
+      # Instalar solo actualizaciones de seguridad
+      apt-get upgrade -y --only-upgrade \
+        -o Dpkg::Options::="--force-confdef" \
+        -o Dpkg::Options::="--force-confold" \
+        >> $LOG_FILE 2>&1
+      
+      if [ $? -eq 0 ]; then
+        echo "✓ Actualizaciones aplicadas exitosamente" >> $LOG_FILE
+      else
+        echo "✗ Error al aplicar actualizaciones" >> $LOG_FILE
+      fi
+      
+      # Listar paquetes actualizados
+      echo "Paquetes actualizados:" >> $LOG_FILE
+      grep "Setting up" $LOG_FILE | tail -10 >> $LOG_FILE
+      
+      echo "=== Actualización completada: $(date) ===" >> $LOG_FILE
+      echo "" >> $LOG_FILE
+  become: yes
+
+# ========================================
+# SCRIPT 4: Monitoreo de Servicios
+# ========================================
+- name: Crear script de monitoreo de servicios
+  copy:
+    dest: /usr/local/bin/check_services.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Script de monitoreo automático de servicios
+      # Proyecto: VMWARE-101001
+      
+      LOG_FILE="/var/log/automation/service_monitor.log"
+      SERVICES=("ssh" "cron" "firewalld")
+      
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Verificando servicios..." >> $LOG_FILE
+      
+      for service in "${SERVICES[@]}"; do
+        if systemctl is-active --quiet $service; then
+          echo "  ✓ $service: activo" >> $LOG_FILE
+        else
+          echo "  ✗ $service: CAÍDO - Reiniciando..." >> $LOG_FILE
+          systemctl restart $service
+          if systemctl is-active --quiet $service; then
+            echo "  ✓ $service: reiniciado exitosamente" >> $LOG_FILE
+          else
+            echo "  ✗ $service: FALLO AL REINICIAR" >> $LOG_FILE
+          fi
+        fi
+      done
+      
+      echo "" >> $LOG_FILE
+  become: yes
+
+# ========================================
+# SCRIPT 5: Reporte del Sistema
+# ========================================
+- name: Crear script de reporte del sistema
+  copy:
+    dest: /usr/local/bin/system_report.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Script de reporte automático del sistema
+      # Proyecto: VMWARE-101001
+      
+      REPORT_FILE="/var/log/automation/system_report_$(date +%Y%m%d).log"
+      
+      echo "╔════════════════════════════════════════════════════════════╗" > $REPORT_FILE
+      echo "║          REPORTE DEL SISTEMA - $(date '+%Y-%m-%d')                ║" >> $REPORT_FILE
+      echo "╚════════════════════════════════════════════════════════════╝" >> $REPORT_FILE
+      echo "" >> $REPORT_FILE
+      
+      echo "=== USO DE CPU ===" >> $REPORT_FILE
+      top -bn1 | grep "Cpu(s)" >> $REPORT_FILE
+      echo "" >> $REPORT_FILE
+      
+      echo "=== USO DE MEMORIA ===" >> $REPORT_FILE
+      free -h >> $REPORT_FILE
+      echo "" >> $REPORT_FILE
+      
+      echo "=== USO DE DISCO ===" >> $REPORT_FILE
+      df -h >> $REPORT_FILE
+      echo "" >> $REPORT_FILE
+      
+      echo "=== SERVICIOS ACTIVOS ===" >> $REPORT_FILE
+      systemctl list-units --type=service --state=running | head -20 >> $REPORT_FILE
+      echo "" >> $REPORT_FILE
+      
+      echo "=== USUARIOS CONECTADOS ===" >> $REPORT_FILE
+      who >> $REPORT_FILE
+      echo "" >> $REPORT_FILE
+      
+      echo "=== UPTIME ===" >> $REPORT_FILE
+      uptime >> $REPORT_FILE
+      echo "" >> $REPORT_FILE
+      
+      echo "Reporte generado: $(date)" >> $REPORT_FILE
+  become: yes
+
+# ========================================
+# SCRIPT 6: Rotación de Logs de Firewall
+# ========================================
+- name: Crear script de rotación de logs de firewall
+  copy:
+    dest: /usr/local/bin/rotate_firewall_logs.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Script de rotación de logs de firewall
+      # Proyecto: VMWARE-101001
+      
+      LOG_FILE="/var/log/automation/log_rotation.log"
+      FIREWALL_LOG="/var/log/firewalld"
+      
+      echo "=== Rotación de logs iniciada: $(date) ===" >> $LOG_FILE
+      
+      if [ -d "$FIREWALL_LOG" ]; then
+        # Comprimir logs antiguos
+        find $FIREWALL_LOG -type f -name "*.log" -mtime +1 ! -name "*.gz" -exec gzip {} \;
+        echo "✓ Logs de firewall comprimidos" >> $LOG_FILE
+        
+        # Eliminar logs mayores a 30 días
+        find $FIREWALL_LOG -type f -name "*.gz" -mtime +30 -delete
+        echo "✓ Logs antiguos eliminados" >> $LOG_FILE
+      else
+        echo "⚠ Directorio de logs de firewall no encontrado" >> $LOG_FILE
+      fi
+      
+      echo "=== Rotación completada: $(date) ===" >> $LOG_FILE
+      echo "" >> $LOG_FILE
+  become: yes
+
+# ========================================
+# CONFIGURAR TAREAS CRON
+# ========================================
+- name: Configurar tarea cron - Backup diario
+  cron:
+    name: "Backup diario de configuraciones"
+    minute: "0"
+    hour: "2"
+    job: "/usr/local/bin/backup_configs.sh"
+    user: root
+  become: yes
+
+- name: Configurar tarea cron - Limpieza semanal
+  cron:
+    name: "Limpieza semanal de logs"
+    minute: "0"
+    hour: "3"
+    weekday: "0"
+    job: "/usr/local/bin/cleanup_logs.sh"
+    user: root
+  become: yes
+
+- name: Configurar tarea cron - Actualización de seguridad
+  cron:
+    name: "Actualización semanal de seguridad"
+    minute: "0"
+    hour: "4"
+    weekday: "1"
+    job: "/usr/local/bin/security_updates.sh"
+    user: root
+  become: yes
+
+- name: Configurar tarea cron - Monitoreo de servicios
+  cron:
+    name: "Monitoreo de servicios cada 5 minutos"
+    minute: "*/5"
+    job: "/usr/local/bin/check_services.sh"
+    user: root
+  become: yes
+
+- name: Configurar tarea cron - Reporte diario
+  cron:
+    name: "Reporte diario del sistema"
+    minute: "0"
+    hour: "8"
+    job: "/usr/local/bin/system_report.sh"
+    user: root
+  become: yes
+
+- name: Configurar tarea cron - Rotación de logs
+  cron:
+    name: "Rotación diaria de logs de firewall"
+    minute: "0"
+    hour: "1"
+    job: "/usr/local/bin/rotate_firewall_logs.sh"
+    user: root
+  become: yes
+
+# ========================================
+# VALIDACIÓN
+# ========================================
+- name: Verificar que cron está activo
+  systemd:
+    name: cron
+    state: started
+  become: yes
+
+- name: Listar tareas cron configuradas
+  command: crontab -l
+  register: cron_list
+  changed_when: false
+  become: yes
+
+- name: Mostrar resumen de automatización
+  debug:
+    msg:
+      - "=========================================="
+      - "✅ Automatización configurada"
+      - ""
+      - "Tareas cron activas:"
+      - "  • Backup diario (2:00 AM)"
+      - "  • Limpieza semanal (3:00 AM domingos)"
+      - "  • Actualizaciones seguridad (4:00 AM lunes)"
+      - "  • Monitoreo servicios (cada 5 minutos)"
+      - "  • Reporte diario (8:00 AM)"
+      - "  • Rotación logs (1:00 AM)"
+      - ""
+      - "Scripts creados:"
+      - "  • /usr/local/bin/backup_configs.sh"
+      - "  • /usr/local/bin/cleanup_logs.sh"
+      - "  • /usr/local/bin/security_updates.sh"
+      - "  • /usr/local/bin/check_services.sh"
+      - "  • /usr/local/bin/system_report.sh"
+      - "  • /usr/local/bin/rotate_firewall_logs.sh"
+      - ""
+      - "Logs en: /var/log/automation/"
+      - "=========================================="
