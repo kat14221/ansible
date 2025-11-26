@@ -8,6 +8,11 @@
   gather_facts: yes
   
   tasks:
+    - name: Aplicar rol de usuarios académicos (prerequisito)
+      include_role:
+        name: academic-users
+      tags: users
+    
     - name: Aplicar rol de gestión de almacenamiento
       include_role:
         name: storage-management
