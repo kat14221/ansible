@@ -3,7 +3,7 @@
 # Descripción: Diagnostica y corrige problemas con el servicio DHCP
 
 - name: Diagnosticar y Arreglar ISC DHCP Server
-  hosts: vm_router
+  hosts: debian-router
   become: yes
   gather_facts: yes
   
