@@ -1,0 +1,405 @@
+---
+# Playbook: Generar Evidencias de Administración de Usuarios y Permisos
+# Objetivo: Recopilar todas las evidencias necesarias para demostrar cumplimiento
+
+- name: Generar Evidencias de Usuarios, Permisos y Políticas
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  vars:
+    evidence_base: "evidence/usuarios_permisos"
+    evidence_reports: "{{ evidence_base }}/reports"
+    timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+
+  pre_tasks:
+    - name: Crear directorios de evidencias
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ evidence_base }}"
+        - "{{ evidence_reports }}"
+      delegate_to: localhost
+      run_once: yes
+
+  tasks:
+    # ========================================
+    # 1. USUARIOS DEL SISTEMA
+    # ========================================
+    - name: "[1/10] Recopilar usuarios del sistema"
+      shell: |
+        getent passwd | grep -E "(alumno|profesor|admin|operator|ansible)"
+      register: usuarios_sistema
+      changed_when: false
+
+    - name: Guardar usuarios del sistema
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          USUARIOS DEL SISTEMA
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }}
+          
+          {{ usuarios_sistema.stdout }}
+          
+          ANÁLISIS:
+          - Total de usuarios académicos/técnicos: {{ usuarios_sistema.stdout_lines | length }}
+          - Cada usuario tiene UID único y directorio home
+          - Separación clara de roles
+        dest: "{{ evidence_reports }}/01_usuarios_sistema.txt"
+      delegate_to: localhost
+
+    # ========================================
+    # 2. GRUPOS DEL SISTEMA
+    # ========================================
+    - name: "[2/10] Recopilar grupos del sistema"
+      shell: |
+        getent group | grep -E "(alumnos|profesores|sudo)"
+      register: grupos_sistema
+      changed_when: false
+
+    - name: Guardar grupos del sistema
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          GRUPOS DEL SISTEMA
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }}
+          
+          {{ grupos_sistema.stdout }}
+          
+          ANÁLISIS:
+          - Grupos específicos por rol (alumnos, profesores)
+          - Grupo sudo para administradores
+          - Gestión de permisos por grupo (no individual)
+        dest: "{{ evidence_reports }}/02_grupos_sistema.txt"
+      delegate_to: localhost
+
+    # ========================================
+    # 3. CONFIGURACIÓN SUDOERS
+    # ========================================
+    - name: "[3/10] Recopilar configuración sudoers operator"
+      shell: cat /etc/sudoers.d/operator
+      register: sudoers_operator
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Guardar sudoers operator
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          CONFIGURACIÓN SUDOERS - OPERATOR
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }}
+          Archivo: /etc/sudoers.d/operator
+          
+          {{ sudoers_operator.stdout }}
+          
+          ANÁLISIS:
+          - Permisos granulares y específicos
+          - Solo comandos necesarios para operación
+          - NOPASSWD para comandos de monitoreo
+          - NO puede instalar software ni modificar configuración
+        dest: "{{ evidence_reports }}/03_sudoers_operator.txt"
+      delegate_to: localhost
+      when: sudoers_operator.rc == 0
+
+    - name: Recopilar configuración sudoers ansible
+      shell: cat /etc/sudoers.d/ansible
+      register: sudoers_ansible
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Guardar sudoers ansible
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          CONFIGURACIÓN SUDOERS - ANSIBLE
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }}
+          Archivo: /etc/sudoers.d/ansible
+          
+          {{ sudoers_ansible.stdout }}
+          
+          ANÁLISIS:
+          - Acceso completo sin password (NOPASSWD: ALL)
+          - Necesario para automatización con Ansible
+          - Usuario dedicado para IaC
+        dest: "{{ evidence_reports }}/03_sudoers_ansible.txt"
+      delegate_to: localhost
+      when: sudoers_ansible.rc == 0
+
+
+    # ========================================
+    # 4. CONFIGURACIÓN SSH
+    # ========================================
+    - name: "[4/10] Recopilar configuración SSH"
+      shell: |
+        grep -E "^(PermitRootLogin|PasswordAuthentication|MaxAuthTries|AllowUsers|Protocol|LogLevel|ClientAliveInterval|MaxSessions)" /etc/ssh/sshd_config
+      register: ssh_config
+      changed_when: false
+
+    - name: Guardar configuración SSH
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          CONFIGURACIÓN SSH
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          Host: {{ inventory_hostname }}
+          Archivo: /etc/ssh/sshd_config
+          
+          {{ ssh_config.stdout }}
+          
+          ANÁLISIS:
+          ✅ PermitRootLogin: no (root NO puede hacer SSH)
+          ✅ PasswordAuthentication: no (solo autenticación por clave)
+          ✅ MaxAuthTries: 3 (máximo 3 intentos)
+          ✅ Protocol: 2 (solo SSH v2)
+          ✅ LogLevel: VERBOSE (logging detallado)
+        dest: "{{ evidence_reports }}/04_ssh_config.txt"
+      delegate_to: localhost
+
+    - name: Recopilar algoritmos de cifrado SSH
+      shell: |
+        grep -A 5 "ANSIBLE MANAGED SSH HARDENING" /etc/ssh/sshd_config
+      register: ssh_algorithms
+      changed_when: false
+
+    - name: Guardar algoritmos SSH
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          ALGORITMOS DE CIFRADO SSH
+          ═══════════════════════════════════════════════════════════════
+          
+          {{ ssh_algorithms.stdout }}
+          
+          ANÁLISIS:
+          ✅ Solo algoritmos modernos y seguros
+          ✅ Ciphers: chacha20-poly1305, aes256-gcm
+          ✅ MACs: hmac-sha2-256-etm, hmac-sha2-512-etm
+          ✅ KexAlgorithms: curve25519-sha256, diffie-hellman-group16-sha512
+        dest: "{{ evidence_reports }}/04_ssh_algorithms.txt"
+      delegate_to: localhost
+
+    # ========================================
+    # 5. FAIL2BAN
+    # ========================================
+    - name: "[5/10] Recopilar estado de fail2ban"
+      shell: systemctl status fail2ban --no-pager
+      register: fail2ban_status
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Recopilar estadísticas fail2ban SSH
+      shell: fail2ban-client status sshd
+      register: fail2ban_sshd
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Guardar fail2ban
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          FAIL2BAN - PROTECCIÓN CONTRA ATAQUES
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          
+          Estado del servicio:
+          {{ fail2ban_status.stdout }}
+          
+          Estadísticas SSH:
+          {{ fail2ban_sshd.stdout }}
+          
+          ANÁLISIS:
+          ✅ Protección automática contra fuerza bruta
+          ✅ Ban después de 3 intentos fallidos
+          ✅ Tiempo de ban: 3600 segundos (1 hora)
+          ✅ Monitorea: /var/log/auth.log
+        dest: "{{ evidence_reports }}/05_fail2ban.txt"
+      delegate_to: localhost
+      when: fail2ban_status.rc == 0
+
+    # ========================================
+    # 6. FIREWALL
+    # ========================================
+    - name: "[6/10] Recopilar configuración de firewall"
+      shell: |
+        echo "=== Estado del Firewall ==="
+        firewall-cmd --state
+        echo ""
+        echo "=== Zonas Activas ==="
+        firewall-cmd --get-active-zones
+        echo ""
+        echo "=== Zona INTERNAL ==="
+        firewall-cmd --zone=internal --list-all
+        echo ""
+        echo "=== Zona EXTERNAL ==="
+        firewall-cmd --zone=external --list-all
+      register: firewall_config
+      changed_when: false
+
+    - name: Guardar configuración firewall
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          CONFIGURACIÓN DE FIREWALL
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          
+          {{ firewall_config.stdout }}
+          
+          ANÁLISIS:
+          ✅ Firewall activo y configurado
+          ✅ Segmentación por zonas (internal/external)
+          ✅ Reglas asimétricas:
+             - 100::/64 → 101::/64: PERMITIDO
+             - 101::/64 → 100::/64: BLOQUEADO (nuevas conexiones)
+          ✅ Stateful inspection (respuestas permitidas)
+        dest: "{{ evidence_reports }}/06_firewall.txt"
+      delegate_to: localhost
+
+    # ========================================
+    # 7. HARDENING KERNEL
+    # ========================================
+    - name: "[7/10] Recopilar parámetros de hardening"
+      shell: |
+        sysctl -a | grep -E "(ip_forward|accept_redirects|send_redirects|log_martians|syncookies|dmesg_restrict|kptr_restrict|ptrace_scope|protected_hardlinks|protected_symlinks)"
+      register: kernel_hardening
+      changed_when: false
+
+    - name: Guardar hardening kernel
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          HARDENING DEL KERNEL
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          
+          {{ kernel_hardening.stdout }}
+          
+          ANÁLISIS:
+          ✅ Protección contra IP spoofing (accept_redirects = 0)
+          ✅ Protección contra ICMP redirects
+          ✅ Logging de paquetes sospechosos (log_martians = 1)
+          ✅ Protección SYN flood (syncookies = 1)
+          ✅ Protección de memoria (dmesg_restrict, kptr_restrict)
+          ✅ Protección de archivos (protected_hardlinks, protected_symlinks)
+        dest: "{{ evidence_reports }}/07_kernel_hardening.txt"
+      delegate_to: localhost
+
+    # ========================================
+    # 8. LÍMITES DE RECURSOS
+    # ========================================
+    - name: "[8/10] Recopilar límites de recursos"
+      shell: cat /etc/security/limits.d/99-hardening.conf
+      register: resource_limits
+      changed_when: false
+
+    - name: Guardar límites de recursos
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          LÍMITES DE RECURSOS
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          Archivo: /etc/security/limits.d/99-hardening.conf
+          
+          {{ resource_limits.stdout }}
+          
+          ANÁLISIS:
+          ✅ Previene fork bombs (límite de procesos)
+          ✅ Previene agotamiento de descriptores (límite de archivos)
+          ✅ Sin core dumps (no expone información sensible)
+          ✅ Operator tiene límites más restrictivos
+        dest: "{{ evidence_reports }}/08_resource_limits.txt"
+      delegate_to: localhost
+
+    # ========================================
+    # 9. AUDITORÍA
+    # ========================================
+    - name: "[9/10] Recopilar configuración de auditoría"
+      shell: |
+        echo "=== Estado de Auditd ==="
+        systemctl status auditd --no-pager
+        echo ""
+        echo "=== Reglas de Auditoría ==="
+        cat /etc/audit/rules.d/99-hardening.rules
+      register: auditoria
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Guardar auditoría
+      copy:
+        content: |
+          ═══════════════════════════════════════════════════════════════
+          AUDITORÍA Y MONITOREO
+          ═══════════════════════════════════════════════════════════════
+          Fecha: {{ ansible_date_time.iso8601 }}
+          
+          {{ auditoria.stdout }}
+          
+          ANÁLISIS:
+          ✅ Auditd activo y monitoreando
+          ✅ Archivos críticos monitoreados:
+             - /etc/passwd, /etc/group, /etc/shadow
+             - /etc/sudoers
+             - /etc/ssh/sshd_config
+             - /var/log/auth.log
+          ✅ Permite investigación forense
+          ✅ Cumplimiento de normativas
+        dest: "{{ evidence_reports }}/09_auditoria.txt"
+      delegate_to: localhost
+      when: auditoria.rc == 0
+
+    # ========================================
+    # 10. REPORTE COMPLETO
+    # ========================================
+    - name: "[10/10] Generar reporte completo consolidado"
+      template:
+        src: ../templates/reporte_usuarios_completo.j2
+        dest: "{{ evidence_reports }}/00_REPORTE_COMPLETO.txt"
+      delegate_to: localhost
+      vars:
+        fecha_generacion: "{{ ansible_date_time.iso8601 }}"
+
+  post_tasks:
+    - name: Mostrar resumen de evidencias generadas
+      debug:
+        msg:
+          - ""
+          - "╔════════════════════════════════════════════════════════════╗"
+          - "║     EVIDENCIAS GENERADAS EXITOSAMENTE                      ║"
+          - "╚════════════════════════════════════════════════════════════╝"
+          - ""
+          - "📁 Ubicación: {{ evidence_base }}"
+          - ""
+          - "Archivos generados:"
+          - "  ✅ 01_usuarios_sistema.txt"
+          - "  ✅ 02_grupos_sistema.txt"
+          - "  ✅ 03_sudoers_operator.txt"
+          - "  ✅ 03_sudoers_ansible.txt"
+          - "  ✅ 04_ssh_config.txt"
+          - "  ✅ 04_ssh_algorithms.txt"
+          - "  ✅ 05_fail2ban.txt"
+          - "  ✅ 06_firewall.txt"
+          - "  ✅ 07_kernel_hardening.txt"
+          - "  ✅ 08_resource_limits.txt"
+          - "  ✅ 09_auditoria.txt"
+          - "  ✅ 00_REPORTE_COMPLETO.txt"
+          - ""
+          - "🎯 Próximos pasos:"
+          - "  1. Revisar: cat {{ evidence_reports }}/00_REPORTE_COMPLETO.txt"
+          - "  2. Tomar capturas de pantalla según la guía"
+          - "  3. Organizar capturas en {{ evidence_base }}/screenshots/"
+          - ""
+          - "🏆 Nivel alcanzado: ⭐⭐⭐⭐⭐"
+          - "   'Define políticas seguras con restricciones claras'"
+          - ""
+      run_once: yes

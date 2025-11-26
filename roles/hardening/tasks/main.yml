@@ -35,7 +35,7 @@
     mode: '0440'
     content: |
       # Ansible user - full sudo access without password
-      {{ vault_ansible_user }} ALL=(ALL) NOPASSWD: ALL
+      {{ ansible_user | default('ansible') }} ALL=(ALL) NOPASSWD: ALL
   become: yes
 
 - name: Configurar kernel hardening (sysctl)
@@ -189,7 +189,7 @@
     owner: "{{ item }}"
     group: "{{ item }}"
   loop:
-    - "{{ vault_ansible_user }}"
+    - "{{ ansible_user | default('ansible') }}"
     - operator
   become: yes
   ignore_errors: yes
@@ -237,7 +237,7 @@
     sysctl -a | grep -E "(net.ipv4|net.ipv6|kernel|fs)" | grep -E "(forward|redirect|source_route|log_martians|syncookies|dmesg_restrict|kptr_restrict|ptrace_scope|protected)" >> /tmp/hardening_status.txt
     echo "" >> /tmp/hardening_status.txt
     echo "=== Users and Groups ===" >> /tmp/hardening_status.txt
-    getent passwd | grep -E "(operator|{{ vault_ansible_user }})" >> /tmp/hardening_status.txt
+    getent passwd | grep -E "(operator|{{ ansible_user | default('ansible') }})" >> /tmp/hardening_status.txt
     echo "" >> /tmp/hardening_status.txt
     echo "=== Sudoers Configuration ===" >> /tmp/hardening_status.txt
     ls -la /etc/sudoers.d/ >> /tmp/hardening_status.txt
@@ -261,7 +261,7 @@
       - ""
       - "Usuarios creados:"
       - "  • operator (permisos limitados)"
-      - "  • {{ vault_ansible_user }} (acceso completo)"
+      - "  • {{ ansible_user | default('ansible') }} (acceso completo)"
       - ""
       - "Configuraciones aplicadas:"
       - "  • Kernel hardening (sysctl)"

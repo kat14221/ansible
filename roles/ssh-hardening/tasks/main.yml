@@ -38,7 +38,7 @@
     - { regexp: '^#?MaxSessions', line: 'MaxSessions 2' }
     - { regexp: '^#?Protocol', line: 'Protocol 2' }
     - { regexp: '^#?LogLevel', line: 'LogLevel VERBOSE' }
-    - { regexp: '^#?AllowUsers', line: 'AllowUsers {{ vault_ansible_user }}' }
+    - { regexp: '^#?AllowUsers', line: 'AllowUsers {{ ansible_user | default('ansible') }}' }
   become: yes
   notify: restart sshd
 
