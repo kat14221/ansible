@@ -1,0 +1,63 @@
+---
+# Playbook: Configuración de Gestión de Almacenamiento
+# Descripción: Configura gestión avanzada de almacenamiento y sistemas de archivos
+
+- name: Configurar Gestión de Almacenamiento
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Aplicar rol de gestión de almacenamiento
+      include_role:
+        name: storage-management
+      tags: storage
+
+- name: Resumen de Gestión de Almacenamiento
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Mostrar resumen completo
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ GESTIÓN DE ALMACENAMIENTO CONFIGURADA"
+          - "=========================================="
+          - ""
+          - "📁 ESTRUCTURA DE DIRECTORIOS:"
+          - "   /backup/configs - Backups automáticos"
+          - "   /srv/ftp - Archivos FTP"
+          - "   /srv/www - Archivos web"
+          - "   /srv/alumnos - Espacio para alumnos"
+          - "   /srv/profesores - Espacio para profesores"
+          - ""
+          - "💾 CUOTAS DE DISCO:"
+          - "   Alumnos: 500MB soft / 600MB hard"
+          - "   Profesores: 1GB soft / 1.2GB hard"
+          - "   Grupo alumnos: 2GB soft / 2.5GB hard"
+          - "   Grupo profesores: 5GB soft / 6GB hard"
+          - ""
+          - "📊 MONITOREO:"
+          - "   • Verificación cada hora"
+          - "   • Alertas si uso >80%"
+          - "   • Identificación de archivos grandes"
+          - ""
+          - "🧹 LIMPIEZA AUTOMÁTICA:"
+          - "   • Archivos temporales >7 días"
+          - "   • Cache de paquetes"
+          - "   • Compresión de logs antiguos"
+          - ""
+          - "📝 SCRIPTS DISPONIBLES:"
+          - "   sudo /usr/local/bin/analyze_disk_usage.sh"
+          - "   sudo /usr/local/bin/monitor_disk_space.sh"
+          - "   sudo /usr/local/bin/cleanup_temp.sh"
+          - ""
+          - "📊 VERIFICACIÓN:"
+          - "   ssh ansible@172.17.25.126"
+          - "   df -h"
+          - "   sudo repquota -a"
+          - "   sudo tail -f /var/log/storage/*.log"
+          - ""
+          - "🎯 NIVEL ALCANZADO: ⭐⭐⭐⭐⭐"
+          - "   'Administración avanzada, uso eficiente de espacio'"
+          - "=========================================="

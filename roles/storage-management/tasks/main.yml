@@ -1,0 +1,284 @@
+---
+# Role: storage-management
+# Descripción: Gestión avanzada de almacenamiento y sistemas de archivos
+
+- name: Instalar herramientas de gestión de almacenamiento
+  package:
+    name:
+      - quota
+      - fdupes
+      - ncdu
+      - tree
+    state: present
+  become: yes
+
+# ========================================
+# ESTRUCTURA DE DIRECTORIOS
+# ========================================
+- name: Crear estructura de directorios organizada
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+  loop:
+    - { path: '/backup', mode: '0755', owner: 'root', group: 'root' }
+    - { path: '/backup/configs', mode: '0755', owner: 'root', group: 'root' }
+    - { path: '/srv/ftp', mode: '0755', owner: 'ftp', group: 'ftp' }
+    - { path: '/srv/www', mode: '0755', owner: 'www-data', group: 'www-data' }
+    - { path: '/srv/alumnos', mode: '0770', owner: 'root', group: 'alumnos' }
+    - { path: '/srv/profesores', mode: '0770', owner: 'root', group: 'profesores' }
+    - { path: '/var/log/storage', mode: '0755', owner: 'root', group: 'root' }
+  become: yes
+
+# ========================================
+# OPTIMIZACIÓN DE FSTAB
+# ========================================
+- name: Verificar opciones de montaje en fstab
+  shell: grep -E "noatime|relatime" /etc/fstab || echo "No optimizado"
+  register: fstab_check
+  changed_when: false
+
+- name: Informar sobre optimización de fstab
+  debug:
+    msg:
+      - "Verificar /etc/fstab manualmente para agregar 'noatime' si no está presente"
+      - "Esto reduce escrituras innecesarias y mejora rendimiento"
+  when: "'No optimizado' in fstab_check.stdout"
+
+# ========================================
+# CUOTAS DE DISCO
+# ========================================
+- name: Verificar si cuotas están habilitadas
+  shell: mount | grep -E "usrquota|grpquota" || echo "No habilitado"
+  register: quota_check
+  changed_when: false
+
+- name: Crear base de datos de cuotas
+  shell: quotacheck -cugm /
+  become: yes
+  when: "'No habilitado' not in quota_check.stdout"
+  ignore_errors: yes
+
+- name: Habilitar cuotas
+  shell: quotaon -v /
+  become: yes
+  when: "'No habilitado' not in quota_check.stdout"
+  ignore_errors: yes
+
+- name: Configurar cuotas para alumnos
+  shell: |
+    setquota -u {{ item }} 500M 600M 0 0 /
+  loop:
+    - alumno1
+    - alumno2
+    - alumno3
+  become: yes
+  ignore_errors: yes
+
+- name: Configurar cuotas para profesores
+  shell: |
+    setquota -u {{ item }} 1000M 1200M 0 0 /
+  loop:
+    - profesor1
+    - profesor2
+  become: yes
+  ignore_errors: yes
+
+- name: Configurar cuotas por grupo
+  shell: |
+    setquota -g alumnos 2000M 2500M 0 0 /
+    setquota -g profesores 5000M 6000M 0 0 /
+  become: yes
+  ignore_errors: yes
+
+# ========================================
+# SCRIPT DE MONITOREO DE ESPACIO
+# ========================================
+- name: Crear script de monitoreo de espacio
+  copy:
+    dest: /usr/local/bin/monitor_disk_space.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Script de monitoreo de espacio en disco
+      # Proyecto: VMWARE-101001
+      
+      LOG_FILE="/var/log/storage/disk_monitor.log"
+      THRESHOLD=80
+      
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Disk usage check started" >> $LOG_FILE
+      
+      # Verificar uso de cada partición
+      df -h | grep "^/dev" | while read line; do
+        PARTITION=$(echo $line | awk '{print $1}')
+        MOUNTPOINT=$(echo $line | awk '{print $6}')
+        USAGE=$(echo $line | awk '{print $5}' | sed 's/%//')
+        
+        if [ $USAGE -ge $THRESHOLD ]; then
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $MOUNTPOINT is ${USAGE}% full" >> $LOG_FILE
+        else
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] $MOUNTPOINT: ${USAGE}% used (OK)" >> $LOG_FILE
+        fi
+      done
+      
+      # Identificar archivos grandes
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Largest files:" >> $LOG_FILE
+      find / -type f -size +100M 2>/dev/null | head -10 | while read file; do
+        SIZE=$(du -h "$file" | cut -f1)
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')]   $SIZE $file" >> $LOG_FILE
+      done
+      
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Disk usage check completed" >> $LOG_FILE
+      echo "" >> $LOG_FILE
+  become: yes
+
+# ========================================
+# SCRIPT DE LIMPIEZA DE TEMPORALES
+# ========================================
+- name: Crear script de limpieza de temporales
+  copy:
+    dest: /usr/local/bin/cleanup_temp.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Script de limpieza de archivos temporales
+      # Proyecto: VMWARE-101001
+      
+      LOG_FILE="/var/log/storage/cleanup.log"
+      
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleanup started" >> $LOG_FILE
+      
+      # Limpiar /tmp
+      TEMP_COUNT=$(find /tmp -type f -mtime +7 2>/dev/null | wc -l)
+      find /tmp -type f -mtime +7 -delete 2>/dev/null
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Removed $TEMP_COUNT files from /tmp" >> $LOG_FILE
+      
+      # Limpiar cache de paquetes
+      if command -v apt-get &> /dev/null; then
+        CACHE_BEFORE=$(du -sm /var/cache/apt/archives | cut -f1)
+        apt-get clean >> $LOG_FILE 2>&1
+        CACHE_AFTER=$(du -sm /var/cache/apt/archives | cut -f1)
+        CACHE_FREED=$((CACHE_BEFORE - CACHE_AFTER))
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Freed ${CACHE_FREED}MB from package cache" >> $LOG_FILE
+      fi
+      
+      # Comprimir logs antiguos
+      LOG_COUNT=$(find /var/log -name "*.log" -mtime +7 ! -name "*.gz" 2>/dev/null | wc -l)
+      find /var/log -name "*.log" -mtime +7 ! -name "*.gz" -exec gzip {} \; 2>/dev/null
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Compressed $LOG_COUNT old log files" >> $LOG_FILE
+      
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleanup completed" >> $LOG_FILE
+      echo "" >> $LOG_FILE
+  become: yes
+
+# ========================================
+# SCRIPT DE ANÁLISIS DE ESPACIO
+# ========================================
+- name: Crear script de análisis de espacio
+  copy:
+    dest: /usr/local/bin/analyze_disk_usage.sh
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      # Script de análisis de uso de espacio
+      # Proyecto: VMWARE-101001
+      
+      echo "╔════════════════════════════════════════════════════════════╗"
+      echo "║          ANÁLISIS DE USO DE ALMACENAMIENTO                 ║"
+      echo "╚════════════════════════════════════════════════════════════╝"
+      echo ""
+      
+      echo "=== USO POR PARTICIÓN ==="
+      df -h | grep "^/dev"
+      echo ""
+      
+      echo "=== USO DE INODOS ==="
+      df -i | grep "^/dev"
+      echo ""
+      
+      echo "=== TOP 10 DIRECTORIOS MÁS GRANDES ==="
+      du -sh /* 2>/dev/null | sort -h | tail -10
+      echo ""
+      
+      echo "=== CUOTAS DE USUARIOS ==="
+      repquota -a 2>/dev/null || echo "Cuotas no habilitadas"
+      echo ""
+      
+      echo "=== ARCHIVOS GRANDES (>100MB) ==="
+      find / -type f -size +100M -exec du -h {} \; 2>/dev/null | sort -h | tail -10
+      echo ""
+  become: yes
+
+# ========================================
+# CONFIGURAR TAREAS CRON
+# ========================================
+- name: Configurar tarea cron - Monitoreo de espacio
+  cron:
+    name: "Monitoreo de espacio en disco"
+    minute: "0"
+    hour: "*"
+    job: "/usr/local/bin/monitor_disk_space.sh"
+    user: root
+  become: yes
+
+- name: Configurar tarea cron - Limpieza de temporales
+  cron:
+    name: "Limpieza de archivos temporales"
+    minute: "0"
+    hour: "3"
+    weekday: "0"
+    job: "/usr/local/bin/cleanup_temp.sh"
+    user: root
+  become: yes
+
+# ========================================
+# VALIDACIÓN
+# ========================================
+- name: Recopilar información de almacenamiento
+  shell: |
+    echo "=== Particiones ===" > /tmp/storage_info.txt
+    lsblk -f >> /tmp/storage_info.txt
+    echo "" >> /tmp/storage_info.txt
+    echo "=== Uso de espacio ===" >> /tmp/storage_info.txt
+    df -h >> /tmp/storage_info.txt
+    echo "" >> /tmp/storage_info.txt
+    echo "=== Uso de inodos ===" >> /tmp/storage_info.txt
+    df -i >> /tmp/storage_info.txt
+    echo "" >> /tmp/storage_info.txt
+    echo "=== Puntos de montaje ===" >> /tmp/storage_info.txt
+    mount | grep "^/dev" >> /tmp/storage_info.txt
+  register: storage_info
+  changed_when: false
+
+- name: Mostrar resumen de gestión de almacenamiento
+  debug:
+    msg:
+      - "=========================================="
+      - "✅ Gestión de almacenamiento configurada"
+      - ""
+      - "Estructura de directorios:"
+      - "  • /backup/configs - Backups"
+      - "  • /srv/ftp - Archivos FTP"
+      - "  • /srv/www - Archivos web"
+      - "  • /srv/alumnos - Espacio alumnos"
+      - "  • /srv/profesores - Espacio profesores"
+      - ""
+      - "Cuotas configuradas:"
+      - "  • Alumnos: 500MB soft, 600MB hard"
+      - "  • Profesores: 1GB soft, 1.2GB hard"
+      - "  • Grupo alumnos: 2GB soft, 2.5GB hard"
+      - "  • Grupo profesores: 5GB soft, 6GB hard"
+      - ""
+      - "Scripts creados:"
+      - "  • /usr/local/bin/monitor_disk_space.sh"
+      - "  • /usr/local/bin/cleanup_temp.sh"
+      - "  • /usr/local/bin/analyze_disk_usage.sh"
+      - ""
+      - "Tareas cron:"
+      - "  • Monitoreo cada hora"
+      - "  • Limpieza semanal (domingos 3:00 AM)"
+      - ""
+      - "Logs en: /var/log/storage/"
+      - "=========================================="
