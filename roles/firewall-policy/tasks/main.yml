@@ -98,13 +98,11 @@
   when: wan_interface is defined
 
 - name: Habilitar IPv6 forwarding en firewalld
-  firewalld:
-    permanent: yes
-    immediate: yes
-    state: enabled
-    ipv6_forwarding: yes
+  command: firewall-cmd --permanent --add-forward
   become: yes
   notify: reload firewalld
+  changed_when: false
+  ignore_errors: yes
 
 - name: Verificar estado del firewall
   command: firewall-cmd --state
