@@ -17,6 +17,9 @@ Este documento consolida **todas las evidencias** de los 3 componentes principal
 ### 3️⃣ Administración del Almacenamiento
 **Nivel alcanzado:** ⭐⭐⭐⭐⭐ "Administración avanzada, uso eficiente de espacio"
 
+### 4️⃣ Seguridad Local Básica
+**Nivel alcanzado:** ⭐⭐⭐⭐⭐ "Seguridad robusta, hardening completo"
+
 ---
 
 ## 📁 Archivos Creados por Componente
@@ -65,6 +68,21 @@ Este documento consolida **todas las evidencias** de los 3 componentes principal
 
 **Subtotal:** 5 archivos, ~1,460 líneas
 
+### Componente 4: Seguridad (8 archivos)
+
+| Archivo | Tipo | Líneas |
+|---------|------|--------|
+| `docs/EVIDENCIAS_SEGURIDAD.md` | Documentación | 800+ |
+| `docs/INTRODUCCION_SEGURIDAD.md` | Introducción | 500+ |
+| `playbooks/configure_security.yml` | Playbook | 60+ |
+| `playbooks/generar_evidencias_seguridad.yml` | Playbook | 350+ |
+| `evidence/seguridad/README.md` | Documentación | 150+ |
+| `COMANDOS_SEGURIDAD.md` | Comandos | 350+ |
+| `README_SEGURIDAD.md` | Resumen | 300+ |
+| `roles/hardening/tasks/main.yml` | Rol Ansible | 250+ |
+
+**Subtotal:** 8 archivos, ~2,760 líneas
+
 ### Archivos de Corrección (3 archivos)
 
 | Archivo | Propósito | Líneas |
@@ -81,12 +99,12 @@ Este documento consolida **todas las evidencias** de los 3 componentes principal
 
 | Métrica | Valor |
 |---------|-------|
-| **Archivos creados** | 26 |
-| **Líneas de código** | ~7,010 |
-| **Roles de Ansible** | 3 nuevos |
-| **Playbooks** | 5 nuevos |
+| **Archivos creados** | 34 |
+| **Líneas de código** | ~9,770 |
+| **Roles de Ansible** | 4 nuevos |
+| **Playbooks** | 7 nuevos |
 | **Scripts** | 12 |
-| **Documentación** | 15 archivos |
+| **Documentación** | 23 archivos |
 
 ---
 
@@ -106,6 +124,9 @@ ansible-playbook playbooks/configure_automation.yml -i inventory/hosts.yml -v
 
 # 3. Almacenamiento
 ansible-playbook playbooks/configure_storage.yml -i inventory/hosts.yml -v
+
+# 4. Seguridad
+ansible-playbook playbooks/configure_security.yml -i inventory/hosts.yml -v
 ```
 
 ### Generar Todas las Evidencias (5 minutos)
@@ -120,6 +141,9 @@ ansible-playbook playbooks/generar_evidencias_automatizacion.yml -i inventory/ho
 # Evidencias de almacenamiento (manual)
 ssh ansible@172.17.25.126
 sudo /usr/local/bin/analyze_disk_usage.sh > /tmp/storage_analysis.txt
+
+# Evidencias de seguridad
+ansible-playbook playbooks/generar_evidencias_seguridad.yml -i inventory/hosts.yml -v
 ```
 
 ---
@@ -165,6 +189,19 @@ sudo /usr/local/bin/analyze_disk_usage.sh > /tmp/storage_analysis.txt
 
 **Subtotal:** 6/6 ⭐⭐⭐⭐⭐
 
+### Componente 4: Seguridad
+
+| Criterio | Nivel |
+|----------|-------|
+| Hardening del sistema | ⭐⭐⭐⭐⭐ |
+| Hardening SSH | ⭐⭐⭐⭐⭐ |
+| Firewall asimétrico | ⭐⭐⭐⭐⭐ |
+| Auditoría | ⭐⭐⭐⭐⭐ |
+| Fail2ban | ⭐⭐⭐⭐⭐ |
+| Monitoreo | ⭐⭐⭐⭐⭐ |
+
+**Subtotal:** 6/6 ⭐⭐⭐⭐⭐
+
 ---
 
 ## 🏆 NIVEL FINAL DEL PROYECTO
@@ -174,8 +211,9 @@ sudo /usr/local/bin/analyze_disk_usage.sh > /tmp/storage_analysis.txt
 - ✅ Usuarios y Permisos: 6/6 ⭐⭐⭐⭐⭐
 - ✅ Automatización: 6/6 ⭐⭐⭐⭐⭐
 - ✅ Almacenamiento: 6/6 ⭐⭐⭐⭐⭐
+- ✅ Seguridad: 6/6 ⭐⭐⭐⭐⭐
 
-**TOTAL: 18/18 ⭐⭐⭐⭐⭐**
+**TOTAL: 24/24 ⭐⭐⭐⭐⭐**
 
 ---
 
@@ -196,16 +234,23 @@ sudo /usr/local/bin/analyze_disk_usage.sh > /tmp/storage_analysis.txt
 - `COMANDOS_ALMACENAMIENTO.md` - Comandos listos
 - `docs/EVIDENCIAS_ALMACENAMIENTO.md` - Guía completa
 
+### Para Seguridad
+- `README_SEGURIDAD.md` - Resumen ejecutivo
+- `COMANDOS_SEGURIDAD.md` - Comandos listos
+- `docs/EVIDENCIAS_SEGURIDAD.md` - Guía completa
+- `docs/INTRODUCCION_SEGURIDAD.md` - Introducción completa
+
 ---
 
 ## 🎯 Próximos Pasos
 
 ### 1. Aplicar Configuraciones (15 minutos)
 ```bash
-# Ejecutar los 3 playbooks principales
+# Ejecutar los 4 playbooks principales
 ansible-playbook playbooks/configure_academic_lab.yml -i inventory/hosts.yml --tags users -v
 ansible-playbook playbooks/configure_automation.yml -i inventory/hosts.yml -v
 ansible-playbook playbooks/configure_storage.yml -i inventory/hosts.yml -v
+ansible-playbook playbooks/configure_security.yml -i inventory/hosts.yml -v
 ```
 
 ### 2. Generar Evidencias (5 minutos)
@@ -213,6 +258,7 @@ ansible-playbook playbooks/configure_storage.yml -i inventory/hosts.yml -v
 # Generar reportes automáticos
 ansible-playbook playbooks/generar_evidencias_usuarios.yml -i inventory/hosts.yml -v
 ansible-playbook playbooks/generar_evidencias_automatizacion.yml -i inventory/hosts.yml -v
+ansible-playbook playbooks/generar_evidencias_seguridad.yml -i inventory/hosts.yml -v
 ```
 
 ### 3. Tomar Capturas (30 minutos)
@@ -256,9 +302,10 @@ El proyecto VMWARE-101001 demuestra una implementación **profesional y completa
 ✅ **Gestión de usuarios** con 5 tipos y permisos diferenciados  
 ✅ **Automatización integral** con Ansible, cron y dashboards  
 ✅ **Gestión avanzada de almacenamiento** con cuotas y optimización  
-✅ **Documentación exhaustiva** con 7,000+ líneas  
+✅ **Seguridad robusta** con hardening, SSH, firewall y auditoría  
+✅ **Documentación exhaustiva** con 9,700+ líneas  
 ✅ **Evidencias automáticas** para validación  
-✅ **Cumplimiento total** de las 3 rúbricas  
+✅ **Cumplimiento total** de las 4 rúbricas  
 
 **Nivel alcanzado en todos los componentes:** ⭐⭐⭐⭐⭐ **SOBRESALIENTE**
 

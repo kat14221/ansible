@@ -69,7 +69,7 @@
 
 - name: Configurar cuotas para alumnos
   shell: |
-    setquota -u {{ item }} 500M 600M 0 0 /
+    setquota -u {{ item }} 512000 614400 0 0 -a
   loop:
     - alumno1
     - alumno2
@@ -79,7 +79,7 @@
 
 - name: Configurar cuotas para profesores
   shell: |
-    setquota -u {{ item }} 1000M 1200M 0 0 /
+    setquota -u {{ item }} 1024000 1228800 0 0 -a
   loop:
     - profesor1
     - profesor2
@@ -88,8 +88,8 @@
 
 - name: Configurar cuotas por grupo
   shell: |
-    setquota -g alumnos 2000M 2500M 0 0 /
-    setquota -g profesores 5000M 6000M 0 0 /
+    setquota -g alumnos 2048000 2560000 0 0 -a
+    setquota -g profesores 5120000 6144000 0 0 -a
   become: yes
   ignore_errors: yes
 
