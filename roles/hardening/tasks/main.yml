@@ -6,6 +6,7 @@
   user:
     name: operator
     comment: "Operator user for limited system access"
+    password: "{{ 'operator123' | password_hash('sha512') }}"
     shell: /bin/bash
     create_home: yes
     groups: users
