@@ -1,0 +1,77 @@
+---
+# Playbook: Instalar y configurar ClamAV (Antivirus)
+# Descripción: Instala ClamAV para protección contra malware
+
+- name: Instalar ClamAV Antivirus
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Actualizar cache de paquetes
+      apt:
+        update_cache: yes
+      
+    - name: Instalar ClamAV y componentes
+      apt:
+        name:
+          - clamav
+          - clamav-daemon
+          - clamav-freshclam
+        state: present
+    
+    - name: Detener freshclam para actualización inicial
+      systemd:
+        name: clamav-freshclam
+        state: stopped
+      ignore_errors: yes
+    
+    - name: Actualizar base de datos de virus
+      command: freshclam
+      register: freshclam_update
+      ignore_errors: yes
+    
+    - name: Iniciar y habilitar clamav-freshclam
+      systemd:
+        name: clamav-freshclam
+        state: started
+        enabled: yes
+    
+    - name: Iniciar y habilitar clamav-daemon
+      systemd:
+        name: clamav-daemon
+        state: started
+        enabled: yes
+      ignore_errors: yes
+    
+    - name: Crear directorio para logs de escaneo
+      file:
+        path: /var/log/clamav-scans
+        state: directory
+        mode: '0755'
+    
+    - name: Realizar escaneo de prueba en /home
+      shell: |
+        clamscan -r /home --infected --log=/var/log/clamav-scans/scan_$(date +%Y%m%d_%H%M%S).log
+      register: scan_result
+      ignore_errors: yes
+    
+    - name: Mostrar resumen
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ CLAMAV INSTALADO Y CONFIGURADO"
+          - "=========================================="
+          - ""
+          - "Servicios activos:"
+          - "  • clamav-daemon (protección en tiempo real)"
+          - "  • clamav-freshclam (actualización automática)"
+          - ""
+          - "Comandos útiles:"
+          - "  sudo systemctl status clamav-daemon"
+          - "  sudo systemctl status clamav-freshclam"
+          - "  sudo clamscan -r /home --infected"
+          - ""
+          - "Logs de escaneo:"
+          - "  /var/log/clamav-scans/"
+          - "=========================================="
