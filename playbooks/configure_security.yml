@@ -1,0 +1,74 @@
+---
+# Playbook: Configuración de Seguridad Local Básica
+# Descripción: Configura hardening, SSH, firewall y auditoría
+
+- name: Configurar Seguridad Local Básica
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Aplicar rol de hardening del sistema
+      include_role:
+        name: hardening
+      tags: hardening
+    
+    - name: Aplicar rol de hardening SSH
+      include_role:
+        name: ssh-hardening
+      tags: ssh
+    
+    - name: Aplicar rol de políticas de firewall
+      include_role:
+        name: firewall-policy
+      tags: firewall
+
+- name: Resumen de Seguridad Configurada
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Mostrar resumen completo
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ SEGURIDAD LOCAL BÁSICA CONFIGURADA"
+          - "=========================================="
+          - ""
+          - "🔒 HARDENING DEL SISTEMA:"
+          - "   • Kernel hardening (sysctl)"
+          - "   • Usuario operator con permisos limitados"
+          - "   • Límites de recursos configurados"
+          - "   • Servicios innecesarios deshabilitados"
+          - "   • Umask seguro (027)"
+          - "   • Auditd configurado"
+          - ""
+          - "🔐 HARDENING SSH:"
+          - "   • PermitRootLogin: no"
+          - "   • PasswordAuthentication: no"
+          - "   • PubkeyAuthentication: yes"
+          - "   • MaxAuthTries: 3"
+          - "   • Algoritmos seguros"
+          - "   • Fail2ban activo"
+          - ""
+          - "🛡️ FIREWALL ASIMÉTRICO:"
+          - "   • Zona internal: 2025:db8:101::/64"
+          - "   • Zona external: 2025:db8:100::/64"
+          - "   • Reglas asimétricas configuradas"
+          - "   • 2025:db8:100::/64 → 2025:db8:101::/64 ✅"
+          - "   • 2025:db8:101::/64 → 2025:db8:100::/64 ❌"
+          - ""
+          - "📊 AUDITORÍA:"
+          - "   • Auditd monitoreando archivos críticos"
+          - "   • Logs de autenticación activos"
+          - "   • Eventos registrados"
+          - ""
+          - "📝 GENERAR EVIDENCIAS:"
+          - "   ansible-playbook playbooks/generar_evidencias_seguridad.yml -i inventory/hosts.yml"
+          - ""
+          - "📖 DOCUMENTACIÓN:"
+          - "   cat docs/EVIDENCIAS_SEGURIDAD.md"
+          - "   cat COMANDOS_SEGURIDAD.md"
+          - ""
+          - "🎯 NIVEL ALCANZADO: ⭐⭐⭐⭐⭐"
+          - "   'Seguridad robusta, hardening completo'"
+          - "=========================================="

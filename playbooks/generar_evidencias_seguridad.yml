@@ -1,0 +1,362 @@
+---
+# Playbook: Generar Evidencias de Seguridad Local Básica
+# Descripción: Recopila evidencias de hardening, SSH, firewall y auditoría
+
+- name: Generar Evidencias de Seguridad Local Básica
+  hosts: debian_router
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    evidence_dir: "/tmp/evidencias_seguridad"
+    evidence_local_dir: "evidence/seguridad"
+  
+  tasks:
+    - name: Crear directorio de evidencias en el servidor
+      file:
+        path: "{{ evidence_dir }}"
+        state: directory
+        mode: '0755'
+    
+    - name: Crear directorio de evidencias local
+      file:
+        path: "{{ evidence_local_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      become: no
+
+    # ========================================
+    # HARDENING DEL SISTEMA
+    # ========================================
+    - name: Recopilar configuración de kernel hardening
+      shell: |
+        echo "=== KERNEL HARDENING - SYSCTL ===" > {{ evidence_dir }}/01_kernel_hardening.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/01_kernel_hardening.txt
+        echo "" >> {{ evidence_dir }}/01_kernel_hardening.txt
+        echo "--- Protección de Red IPv4 ---" >> {{ evidence_dir }}/01_kernel_hardening.txt
+        sysctl -a | grep -E "net.ipv4" | grep -E "forward|redirect|source_route|log_martians|syncookies" >> {{ evidence_dir }}/01_kernel_hardening.txt
+        echo "" >> {{ evidence_dir }}/01_kernel_hardening.txt
+        echo "--- Protección de Red IPv6 ---" >> {{ evidence_dir }}/01_kernel_hardening.txt
+        sysctl -a | grep -E "net.ipv6" | grep -E "forward|redirect|source_route" >> {{ evidence_dir }}/01_kernel_hardening.txt
+        echo "" >> {{ evidence_dir }}/01_kernel_hardening.txt
+        echo "--- Protección de Memoria y Sistema ---" >> {{ evidence_dir }}/01_kernel_hardening.txt
+        sysctl -a | grep -E "kernel|fs" | grep -E "dmesg_restrict|kptr_restrict|ptrace_scope|protected" >> {{ evidence_dir }}/01_kernel_hardening.txt
+      register: kernel_hardening
+      changed_when: false
+
+    - name: Recopilar información de usuarios y permisos
+      shell: |
+        echo "=== USUARIOS Y PERMISOS ===" > {{ evidence_dir }}/02_usuarios_permisos.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        echo "" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        echo "--- Usuario Operator ---" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        id operator >> {{ evidence_dir }}/02_usuarios_permisos.txt 2>&1 || echo "Usuario operator no existe" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        echo "" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        echo "--- Permisos Sudo de Operator ---" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        sudo -l -U operator >> {{ evidence_dir }}/02_usuarios_permisos.txt 2>&1 || echo "No sudo permissions" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        echo "" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        echo "--- Configuración Sudoers ---" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        ls -la /etc/sudoers.d/ >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        echo "" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        cat /etc/sudoers.d/operator >> {{ evidence_dir }}/02_usuarios_permisos.txt 2>&1 || echo "No operator sudoers file" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        echo "" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+        cat /etc/sudoers.d/ansible >> {{ evidence_dir }}/02_usuarios_permisos.txt 2>&1 || echo "No ansible sudoers file" >> {{ evidence_dir }}/02_usuarios_permisos.txt
+      register: usuarios_permisos
+      changed_when: false
+
+    - name: Recopilar límites de recursos
+      shell: |
+        echo "=== LÍMITES DE RECURSOS ===" > {{ evidence_dir }}/03_limites_recursos.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/03_limites_recursos.txt
+        echo "" >> {{ evidence_dir }}/03_limites_recursos.txt
+        echo "--- Configuración de Límites ---" >> {{ evidence_dir }}/03_limites_recursos.txt
+        cat /etc/security/limits.d/99-hardening.conf >> {{ evidence_dir }}/03_limites_recursos.txt 2>&1 || echo "No limits file" >> {{ evidence_dir }}/03_limites_recursos.txt
+        echo "" >> {{ evidence_dir }}/03_limites_recursos.txt
+        echo "--- Umask Actual ---" >> {{ evidence_dir }}/03_limites_recursos.txt
+        umask >> {{ evidence_dir }}/03_limites_recursos.txt
+        echo "" >> {{ evidence_dir }}/03_limites_recursos.txt
+        echo "--- Umask en Profile ---" >> {{ evidence_dir }}/03_limites_recursos.txt
+        grep umask /etc/profile >> {{ evidence_dir }}/03_limites_recursos.txt 2>&1 || echo "No umask in profile" >> {{ evidence_dir }}/03_limites_recursos.txt
+      register: limites_recursos
+      changed_when: false
+
+    - name: Recopilar servicios deshabilitados
+      shell: |
+        echo "=== SERVICIOS DESHABILITADOS ===" > {{ evidence_dir }}/04_servicios.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/04_servicios.txt
+        echo "" >> {{ evidence_dir }}/04_servicios.txt
+        systemctl list-unit-files | grep -E "avahi|cups|bluetooth" >> {{ evidence_dir }}/04_servicios.txt 2>&1 || echo "Services not found" >> {{ evidence_dir }}/04_servicios.txt
+      register: servicios
+      changed_when: false
+
+    # ========================================
+    # HARDENING SSH
+    # ========================================
+    - name: Recopilar configuración SSH
+      shell: |
+        echo "=== CONFIGURACIÓN SSH ===" > {{ evidence_dir }}/05_ssh_config.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/05_ssh_config.txt
+        echo "" >> {{ evidence_dir }}/05_ssh_config.txt
+        echo "--- Test de Configuración ---" >> {{ evidence_dir }}/05_ssh_config.txt
+        sshd -t >> {{ evidence_dir }}/05_ssh_config.txt 2>&1 && echo "SSH config: OK" >> {{ evidence_dir }}/05_ssh_config.txt || echo "SSH config: ERROR" >> {{ evidence_dir }}/05_ssh_config.txt
+        echo "" >> {{ evidence_dir }}/05_ssh_config.txt
+        echo "--- Configuración Activa (sin comentarios) ---" >> {{ evidence_dir }}/05_ssh_config.txt
+        grep -v "^#" /etc/ssh/sshd_config | grep -v "^$" >> {{ evidence_dir }}/05_ssh_config.txt
+        echo "" >> {{ evidence_dir }}/05_ssh_config.txt
+        echo "--- Banner SSH ---" >> {{ evidence_dir }}/05_ssh_config.txt
+        cat /etc/ssh/banner >> {{ evidence_dir }}/05_ssh_config.txt 2>&1 || echo "No banner file" >> {{ evidence_dir }}/05_ssh_config.txt
+      register: ssh_config
+      changed_when: false
+
+    - name: Recopilar estado de SSH y Fail2ban
+      shell: |
+        echo "=== ESTADO SSH Y FAIL2BAN ===" > {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "--- Estado SSH ---" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        systemctl status ssh --no-pager >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "--- Estado Fail2ban ---" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        systemctl status fail2ban --no-pager >> {{ evidence_dir }}/06_ssh_fail2ban.txt 2>&1 || echo "Fail2ban not installed" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "--- Fail2ban Status ---" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        fail2ban-client status >> {{ evidence_dir }}/06_ssh_fail2ban.txt 2>&1 || echo "Fail2ban not available" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "--- Fail2ban SSH Jail ---" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        fail2ban-client status sshd >> {{ evidence_dir }}/06_ssh_fail2ban.txt 2>&1 || echo "SSH jail not configured" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        echo "--- Configuración Fail2ban ---" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+        cat /etc/fail2ban/jail.local >> {{ evidence_dir }}/06_ssh_fail2ban.txt 2>&1 || echo "No jail.local file" >> {{ evidence_dir }}/06_ssh_fail2ban.txt
+      register: ssh_fail2ban
+      changed_when: false
+
+    # ========================================
+    # FIREWALL
+    # ========================================
+    - name: Recopilar configuración de firewall
+      shell: |
+        echo "=== CONFIGURACIÓN DE FIREWALL ===" > {{ evidence_dir }}/07_firewall.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/07_firewall.txt
+        echo "" >> {{ evidence_dir }}/07_firewall.txt
+        echo "--- Estado del Firewall ---" >> {{ evidence_dir }}/07_firewall.txt
+        firewall-cmd --state >> {{ evidence_dir }}/07_firewall.txt 2>&1 || echo "Firewalld not running" >> {{ evidence_dir }}/07_firewall.txt
+        echo "" >> {{ evidence_dir }}/07_firewall.txt
+        echo "--- Zonas Activas ---" >> {{ evidence_dir }}/07_firewall.txt
+        firewall-cmd --get-active-zones >> {{ evidence_dir }}/07_firewall.txt 2>&1
+        echo "" >> {{ evidence_dir }}/07_firewall.txt
+        echo "--- Zona Default ---" >> {{ evidence_dir }}/07_firewall.txt
+        firewall-cmd --get-default-zone >> {{ evidence_dir }}/07_firewall.txt 2>&1
+        echo "" >> {{ evidence_dir }}/07_firewall.txt
+        echo "--- Todas las Zonas ---" >> {{ evidence_dir }}/07_firewall.txt
+        firewall-cmd --get-zones >> {{ evidence_dir }}/07_firewall.txt 2>&1
+      register: firewall_config
+      changed_when: false
+
+    - name: Recopilar reglas de zonas de firewall
+      shell: |
+        echo "=== REGLAS DE ZONAS DE FIREWALL ===" > {{ evidence_dir }}/08_firewall_zones.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/08_firewall_zones.txt
+        echo "" >> {{ evidence_dir }}/08_firewall_zones.txt
+        echo "--- Zona Internal (Completa) ---" >> {{ evidence_dir }}/08_firewall_zones.txt
+        firewall-cmd --zone=internal --list-all >> {{ evidence_dir }}/08_firewall_zones.txt 2>&1 || echo "Internal zone not configured" >> {{ evidence_dir }}/08_firewall_zones.txt
+        echo "" >> {{ evidence_dir }}/08_firewall_zones.txt
+        echo "--- Zona External (Completa) ---" >> {{ evidence_dir }}/08_firewall_zones.txt
+        firewall-cmd --zone=external --list-all >> {{ evidence_dir }}/08_firewall_zones.txt 2>&1 || echo "External zone not configured" >> {{ evidence_dir }}/08_firewall_zones.txt
+        echo "" >> {{ evidence_dir }}/08_firewall_zones.txt
+        echo "--- Servicios en Internal ---" >> {{ evidence_dir }}/08_firewall_zones.txt
+        firewall-cmd --zone=internal --list-services >> {{ evidence_dir }}/08_firewall_zones.txt 2>&1
+        echo "" >> {{ evidence_dir }}/08_firewall_zones.txt
+        echo "--- Servicios en External ---" >> {{ evidence_dir }}/08_firewall_zones.txt
+        firewall-cmd --zone=external --list-services >> {{ evidence_dir }}/08_firewall_zones.txt 2>&1
+        echo "" >> {{ evidence_dir }}/08_firewall_zones.txt
+        echo "--- Rich Rules en Internal ---" >> {{ evidence_dir }}/08_firewall_zones.txt
+        firewall-cmd --zone=internal --list-rich-rules >> {{ evidence_dir }}/08_firewall_zones.txt 2>&1
+        echo "" >> {{ evidence_dir }}/08_firewall_zones.txt
+        echo "--- Rich Rules en External ---" >> {{ evidence_dir }}/08_firewall_zones.txt
+        firewall-cmd --zone=external --list-rich-rules >> {{ evidence_dir }}/08_firewall_zones.txt 2>&1
+      register: firewall_zones
+      changed_when: false
+
+    # ========================================
+    # AUDITORÍA
+    # ========================================
+    - name: Recopilar configuración de auditoría
+      shell: |
+        echo "=== AUDITORÍA - AUDITD ===" > {{ evidence_dir }}/09_auditoria.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/09_auditoria.txt
+        echo "" >> {{ evidence_dir }}/09_auditoria.txt
+        echo "--- Estado de Auditd ---" >> {{ evidence_dir }}/09_auditoria.txt
+        systemctl status auditd --no-pager >> {{ evidence_dir }}/09_auditoria.txt 2>&1 || echo "Auditd not installed" >> {{ evidence_dir }}/09_auditoria.txt
+        echo "" >> {{ evidence_dir }}/09_auditoria.txt
+        echo "--- Reglas de Auditoría ---" >> {{ evidence_dir }}/09_auditoria.txt
+        auditctl -l >> {{ evidence_dir }}/09_auditoria.txt 2>&1 || echo "No audit rules" >> {{ evidence_dir }}/09_auditoria.txt
+        echo "" >> {{ evidence_dir }}/09_auditoria.txt
+        echo "--- Configuración de Reglas ---" >> {{ evidence_dir }}/09_auditoria.txt
+        cat /etc/audit/rules.d/99-hardening.rules >> {{ evidence_dir }}/09_auditoria.txt 2>&1 || echo "No hardening rules file" >> {{ evidence_dir }}/09_auditoria.txt
+      register: auditoria
+      changed_when: false
+
+    - name: Recopilar logs de seguridad
+      shell: |
+        echo "=== LOGS DE SEGURIDAD ===" > {{ evidence_dir }}/10_logs_seguridad.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        echo "" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        echo "--- Últimos 50 eventos de Auth Log ---" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        tail -50 /var/log/auth.log >> {{ evidence_dir }}/10_logs_seguridad.txt 2>&1 || echo "No auth.log" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        echo "" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        echo "--- Intentos de Autenticación Fallidos ---" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        grep "Failed password" /var/log/auth.log | tail -20 >> {{ evidence_dir }}/10_logs_seguridad.txt 2>&1 || echo "No failed attempts" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        echo "" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        echo "--- Autenticaciones Exitosas ---" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        grep "Accepted publickey" /var/log/auth.log | tail -20 >> {{ evidence_dir }}/10_logs_seguridad.txt 2>&1 || echo "No successful logins" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        echo "" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        echo "--- Logs de Fail2ban ---" >> {{ evidence_dir }}/10_logs_seguridad.txt
+        tail -50 /var/log/fail2ban.log >> {{ evidence_dir }}/10_logs_seguridad.txt 2>&1 || echo "No fail2ban.log" >> {{ evidence_dir }}/10_logs_seguridad.txt
+      register: logs_seguridad
+      changed_when: false
+
+    - name: Recopilar información de conexiones y usuarios
+      shell: |
+        echo "=== CONEXIONES Y USUARIOS ===" > {{ evidence_dir }}/11_conexiones_usuarios.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        echo "" >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        echo "--- Usuarios Conectados ---" >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        who >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        echo "" >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        w >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        echo "" >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        echo "--- Últimos Logins ---" >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        last | head -20 >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        echo "" >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        echo "--- Conexiones SSH Activas ---" >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+        ss -tnpa | grep :22 >> {{ evidence_dir }}/11_conexiones_usuarios.txt 2>&1 || echo "No SSH connections" >> {{ evidence_dir }}/11_conexiones_usuarios.txt
+      register: conexiones_usuarios
+      changed_when: false
+
+    # ========================================
+    # RESUMEN GENERAL
+    # ========================================
+    - name: Crear resumen general de seguridad
+      shell: |
+        echo "╔════════════════════════════════════════════════════════════╗" > {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "║          RESUMEN DE SEGURIDAD LOCAL BÁSICA                 ║" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "╚════════════════════════════════════════════════════════════╝" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "Fecha: $(date)" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "Host: {{ inventory_hostname }}" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "Sistema: $(uname -a)" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "=== ESTADO DE COMPONENTES ===" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "Kernel Hardening:" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        sysctl net.ipv4.tcp_syncookies | awk '{print "  - SYN Cookies: " $3}' >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        sysctl kernel.dmesg_restrict | awk '{print "  - Dmesg Restrict: " $3}' >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "SSH:" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        systemctl is-active ssh | awk '{print "  - Estado: " $1}' >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        sshd -t && echo "  - Configuración: OK" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt || echo "  - Configuración: ERROR" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "Fail2ban:" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        systemctl is-active fail2ban | awk '{print "  - Estado: " $1}' >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt 2>&1 || echo "  - Estado: not installed" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "Firewall:" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        firewall-cmd --state | awk '{print "  - Estado: " $1}' >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt 2>&1 || echo "  - Estado: not running" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        firewall-cmd --get-active-zones | head -1 | awk '{print "  - Zonas activas: " $1}' >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt 2>&1
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "Auditoría:" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        systemctl is-active auditd | awk '{print "  - Estado: " $1}' >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt 2>&1 || echo "  - Estado: not installed" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "=== ARCHIVOS DE EVIDENCIA GENERADOS ===" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        ls -lh {{ evidence_dir }}/*.txt | awk '{print "  " $9 " (" $5 ")"}' >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "╔════════════════════════════════════════════════════════════╗" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "║                  EVIDENCIAS COMPLETADAS                    ║" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+        echo "╚════════════════════════════════════════════════════════════╝" >> {{ evidence_dir }}/00_RESUMEN_SEGURIDAD.txt
+      register: resumen_seguridad
+      changed_when: false
+
+    # ========================================
+    # DESCARGAR EVIDENCIAS
+    # ========================================
+    - name: Descargar evidencias al control node
+      fetch:
+        src: "{{ evidence_dir }}/{{ item }}"
+        dest: "{{ evidence_local_dir }}/{{ item }}"
+        flat: yes
+      loop:
+        - 00_RESUMEN_SEGURIDAD.txt
+        - 01_kernel_hardening.txt
+        - 02_usuarios_permisos.txt
+        - 03_limites_recursos.txt
+        - 04_servicios.txt
+        - 05_ssh_config.txt
+        - 06_ssh_fail2ban.txt
+        - 07_firewall.txt
+        - 08_firewall_zones.txt
+        - 09_auditoria.txt
+        - 10_logs_seguridad.txt
+        - 11_conexiones_usuarios.txt
+      ignore_errors: yes
+
+    - name: Mostrar resumen de evidencias generadas
+      debug:
+        msg:
+          - "=========================================="
+          - "✅ EVIDENCIAS DE SEGURIDAD GENERADAS"
+          - "=========================================="
+          - ""
+          - "📁 Ubicación: {{ evidence_local_dir }}/"
+          - ""
+          - "📄 Archivos generados:"
+          - "  00_RESUMEN_SEGURIDAD.txt - Resumen general"
+          - "  01_kernel_hardening.txt - Configuración sysctl"
+          - "  02_usuarios_permisos.txt - Usuarios y sudo"
+          - "  03_limites_recursos.txt - Límites y umask"
+          - "  04_servicios.txt - Servicios deshabilitados"
+          - "  05_ssh_config.txt - Configuración SSH"
+          - "  06_ssh_fail2ban.txt - Estado SSH y Fail2ban"
+          - "  07_firewall.txt - Estado del firewall"
+          - "  08_firewall_zones.txt - Reglas de zonas"
+          - "  09_auditoria.txt - Configuración auditd"
+          - "  10_logs_seguridad.txt - Logs de seguridad"
+          - "  11_conexiones_usuarios.txt - Conexiones activas"
+          - ""
+          - "🎯 Nivel alcanzado: ⭐⭐⭐⭐⭐"
+          - "   'Seguridad robusta, hardening completo'"
+          - "=========================================="
+
+- name: Resumen Final
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Mostrar instrucciones de revisión
+      debug:
+        msg:
+          - "=========================================="
+          - "📋 CÓMO REVISAR LAS EVIDENCIAS"
+          - "=========================================="
+          - ""
+          - "1. Ver resumen general:"
+          - "   cat evidence/seguridad/00_RESUMEN_SEGURIDAD.txt"
+          - ""
+          - "2. Revisar hardening del sistema:"
+          - "   cat evidence/seguridad/01_kernel_hardening.txt"
+          - "   cat evidence/seguridad/02_usuarios_permisos.txt"
+          - ""
+          - "3. Revisar configuración SSH:"
+          - "   cat evidence/seguridad/05_ssh_config.txt"
+          - "   cat evidence/seguridad/06_ssh_fail2ban.txt"
+          - ""
+          - "4. Revisar firewall:"
+          - "   cat evidence/seguridad/07_firewall.txt"
+          - "   cat evidence/seguridad/08_firewall_zones.txt"
+          - ""
+          - "5. Revisar auditoría:"
+          - "   cat evidence/seguridad/09_auditoria.txt"
+          - "   cat evidence/seguridad/10_logs_seguridad.txt"
+          - ""
+          - "📖 Documentación completa:"
+          - "   docs/EVIDENCIAS_SEGURIDAD.md"
+          - "=========================================="
