@@ -50,48 +50,92 @@
 # ========================================
 # CUOTAS DE DISCO
 # ========================================
-- name: Verificar si cuotas están habilitadas
-  shell: mount | grep -E "usrquota|grpquota" || echo "No habilitado"
-  register: quota_check
+# ========================================
+# CONFIGURACIÓN DE CUOTAS DE DISCO
+# ========================================
+- name: Verificar si cuotas están habilitadas en fstab
+  shell: grep -E "usrquota|grpquota" /etc/fstab || echo "No configurado"
+  register: fstab_quota_check
   changed_when: false
 
-- name: Crear base de datos de cuotas
-  shell: quotacheck -cugm /
+- name: Obtener dispositivo raíz
+  shell: df / | tail -1 | awk '{print $1}'
+  register: root_device
+  changed_when: false
+
+- name: Configurar cuotas en fstab si no están configuradas
+  shell: |
+    # Hacer backup de fstab
+    cp /etc/fstab /etc/fstab.backup.$(date +%Y%m%d_%H%M%S)
+    
+    # Agregar opciones de cuota a la partición raíz
+    sed -i 's|\({{ root_device.stdout }}.*defaults\)|\1,usrquota,grpquota|' /etc/fstab
   become: yes
-  when: "'No habilitado' not in quota_check.stdout"
+  when: "'No configurado' in fstab_quota_check.stdout"
+
+- name: Remontar sistema de archivos con cuotas
+  shell: mount -o remount /
+  become: yes
+  when: "'No configurado' in fstab_quota_check.stdout"
   ignore_errors: yes
 
-- name: Habilitar cuotas
-  shell: quotaon -v /
+- name: Crear archivos de base de datos de cuotas
+  shell: |
+    quotaoff -a
+    quotacheck -cugm /
+    quotaon -a
   become: yes
-  when: "'No habilitado' not in quota_check.stdout"
+  ignore_errors: yes
+
+- name: Verificar si cuotas están activas
+  shell: quotaon -p / 2>&1
+  register: quota_status
+  changed_when: false
   ignore_errors: yes
 
 - name: Configurar cuotas para alumnos
   shell: |
-    setquota -u {{ item }} 512000 614400 0 0 -a
+    if id {{ item }} &>/dev/null; then
+      setquota -u {{ item }} 512000 614400 0 0 -a 2>/dev/null || true
+    fi
   loop:
     - alumno1
     - alumno2
     - alumno3
   become: yes
+  when: "'is on' in quota_status.stdout or 'user quota turned on' in quota_status.stdout"
   ignore_errors: yes
 
 - name: Configurar cuotas para profesores
   shell: |
-    setquota -u {{ item }} 1024000 1228800 0 0 -a
+    if id {{ item }} &>/dev/null; then
+      setquota -u {{ item }} 1024000 1228800 0 0 -a 2>/dev/null || true
+    fi
   loop:
     - profesor1
     - profesor2
   become: yes
+  when: "'is on' in quota_status.stdout or 'user quota turned on' in quota_status.stdout"
   ignore_errors: yes
 
 - name: Configurar cuotas por grupo
   shell: |
-    setquota -g alumnos 2048000 2560000 0 0 -a
-    setquota -g profesores 5120000 6144000 0 0 -a
+    if getent group alumnos &>/dev/null; then
+      setquota -g alumnos 2048000 2560000 0 0 -a 2>/dev/null || true
+    fi
+    if getent group profesores &>/dev/null; then
+      setquota -g profesores 5120000 6144000 0 0 -a 2>/dev/null || true
+    fi
   become: yes
+  when: "'is on' in quota_status.stdout or 'user quota turned on' in quota_status.stdout"
   ignore_errors: yes
+
+- name: Mostrar estado de cuotas
+  debug:
+    msg:
+      - "Estado de cuotas: {{ quota_status.stdout }}"
+      - "Si las cuotas no están activas, puede ser necesario reiniciar el sistema"
+      - "Comando para verificar: sudo repquota -a"
 
 # ========================================
 # SCRIPT DE MONITOREO DE ESPACIO
