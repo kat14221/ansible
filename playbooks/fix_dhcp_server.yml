@@ -1,0 +1,137 @@
+---
+# Playbook: Arreglar isc-dhcp-server
+# Descripción: Diagnostica y corrige problemas con el servicio DHCP
+
+- name: Diagnosticar y Arreglar ISC DHCP Server
+  hosts: vm_router
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Verificar estado actual del servicio
+      command: systemctl status isc-dhcp-server --no-pager
+      register: dhcp_status
+      failed_when: false
+      changed_when: false
+
+    - name: Mostrar estado actual
+      debug:
+        msg: "{{ dhcp_status.stdout_lines }}"
+
+    - name: Verificar archivo de configuración DHCPv4
+      stat:
+        path: /etc/dhcp/dhcpd.conf
+      register: dhcpv4_conf
+
+    - name: Verificar archivo de configuración DHCPv6
+      stat:
+        path: /etc/dhcp/dhcpd6.conf
+      register: dhcpv6_conf
+
+    - name: Verificar archivo de interfaces
+      command: cat /etc/default/isc-dhcp-server
+      register: dhcp_interfaces
+      changed_when: false
+
+    - name: Mostrar configuración de interfaces
+      debug:
+        msg: "{{ dhcp_interfaces.stdout_lines }}"
+
+    - name: Verificar sintaxis de dhcpd.conf
+      command: dhcpd -t -cf /etc/dhcp/dhcpd.conf
+      register: dhcpv4_syntax
+      failed_when: false
+      changed_when: false
+      when: dhcpv4_conf.stat.exists
+
+    - name: Verificar sintaxis de dhcpd6.conf
+      command: dhcpd -6 -t -cf /etc/dhcp/dhcpd6.conf
+      register: dhcpv6_syntax
+      failed_when: false
+      changed_when: false
+      when: dhcpv6_conf.stat.exists
+
+    - name: Mostrar resultado de validación DHCPv4
+      debug:
+        msg: "{{ dhcpv4_syntax.stderr_lines }}"
+      when: dhcpv4_conf.stat.exists
+
+    - name: Mostrar resultado de validación DHCPv6
+      debug:
+        msg: "{{ dhcpv6_syntax.stderr_lines }}"
+      when: dhcpv6_conf.stat.exists
+
+    - name: Verificar interfaces de red disponibles
+      command: ip -br link show
+      register: network_interfaces
+      changed_when: false
+
+    - name: Mostrar interfaces disponibles
+      debug:
+        msg: "{{ network_interfaces.stdout_lines }}"
+
+    - name: Verificar IPs en ens34 (LAN)
+      command: ip addr show ens34
+      register: ens34_ips
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar IPs en ens34
+      debug:
+        msg: "{{ ens34_ips.stdout_lines }}"
+
+    - name: Detener el servicio
+      systemd:
+        name: isc-dhcp-server
+        state: stopped
+      ignore_errors: yes
+
+    - name: Asegurar que la IP IPv4 está configurada en ens34
+      command: ip addr add 192.168.101.1/24 dev ens34
+      register: ip_add_result
+      failed_when: ip_add_result.rc != 0 and 'File exists' not in ip_add_result.stderr
+      changed_when: ip_add_result.rc == 0
+
+    - name: Asegurar que ens34 está UP
+      command: ip link set ens34 up
+      changed_when: false
+
+    - name: Verificar logs del servicio
+      command: journalctl -u isc-dhcp-server -n 50 --no-pager
+      register: dhcp_logs
+      changed_when: false
+
+    - name: Mostrar últimos logs
+      debug:
+        msg: "{{ dhcp_logs.stdout_lines }}"
+
+    - name: Intentar iniciar el servicio
+      systemd:
+        name: isc-dhcp-server
+        state: started
+        enabled: yes
+      register: start_result
+      failed_when: false
+
+    - name: Verificar estado final
+      command: systemctl status isc-dhcp-server --no-pager
+      register: final_status
+      failed_when: false
+      changed_when: false
+
+    - name: Resumen Final
+      debug:
+        msg:
+          - "================================================"
+          - "  Diagnóstico ISC DHCP Server"
+          - "================================================"
+          - ""
+          - "Estado del servicio: {{ 'ACTIVO ✓' if start_result.failed == false else 'FALLÓ ✗' }}"
+          - "Archivo DHCPv4: {{ 'Existe ✓' if dhcpv4_conf.stat.exists else 'No existe ✗' }}"
+          - "Archivo DHCPv6: {{ 'Existe ✓' if dhcpv6_conf.stat.exists else 'No existe ✗' }}"
+          - "Sintaxis DHCPv4: {{ 'OK ✓' if dhcpv4_syntax.rc == 0 else 'ERROR ✗' }}"
+          - "Sintaxis DHCPv6: {{ 'OK ✓' if dhcpv6_syntax.rc == 0 else 'ERROR ✗' }}"
+          - ""
+          - "Para ver logs detallados:"
+          - "  sudo journalctl -u isc-dhcp-server -f"
+          - "================================================"
