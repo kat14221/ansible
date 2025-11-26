@@ -200,7 +200,6 @@
       - htop
       - iotop
       - nethogs
-      - ss
       - lsof
       - psmisc
       - sysstat
